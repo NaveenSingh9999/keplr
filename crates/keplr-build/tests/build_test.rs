@@ -1,0 +1,12 @@
+use keplr_build::{load_tasks, run_task};
+use std::path::PathBuf;
+
+#[test]
+fn load_and_run_echo_task() {
+    let path = PathBuf::from("/tmp/keplr-tasks-test.json");
+    std::fs::write(&path, r#"{"tasks":{"hi":{"cmd":"echo hello","outputs":[]}}}"#).unwrap();
+    let tasks = load_tasks(&path).unwrap();
+    assert!(tasks.contains_key("hi"));
+    let out = run_task(&tasks["hi"], std::path::Path::new("/tmp")).unwrap();
+    assert!(out.contains("hello"));
+}
