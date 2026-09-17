@@ -14,6 +14,6 @@ pub fn fuzzy_paths(paths: &[PathBuf], query: &str, limit: usize) -> Vec<PathBuf>
             scored.push((score, p.clone()));
         }
     }
-    scored.sort_by(|a, b| b.0.cmp(&a.0));
+    scored.sort_by_key(|a| std::cmp::Reverse(a.0));
     scored.into_iter().take(limit).map(|(_, p)| p).collect()
 }

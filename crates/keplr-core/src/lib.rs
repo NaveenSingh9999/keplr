@@ -79,7 +79,7 @@ impl Workspace {
                 hash,
             });
         }
-        out.sort_by(|a, b| a.path.cmp(&b.path));
+        out.sort_by_key(|e| e.path.clone());
         out
     }
 
