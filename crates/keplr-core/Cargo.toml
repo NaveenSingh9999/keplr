@@ -1,0 +1,16 @@
+[package]
+name = "keplr-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow.workspace = true
+ignore.workspace = true
+walkdir.workspace = true
+notify.workspace = true
+blake3.workspace = true
+ropey.workspace = true
+nucleo-matcher.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true

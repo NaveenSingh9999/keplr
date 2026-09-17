@@ -1,0 +1,19 @@
+[workspace]
+members = ["crates/keplr-core", "crates/keplr-sync", "crates/keplr-build", "crates/keplr-lang", "crates/keplr-serve", "crates/keplr-cli"]
+resolver = "2"
+
+[workspace.dependencies]
+anyhow = "1.0.95"
+thiserror = "1.0.69"
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+tokio = { version = "1.43.0", features = ["full"] }
+axum = "0.7.9"
+clap = { version = "4.5.21", features = ["derive"] }
+ignore = "0.4.23"
+walkdir = "2.5.0"
+notify = "6.1.1"
+blake3 = "1.5.5"
+ropey = "1.6.1"
+nucleo-matcher = "0.3.1"
+yrs = "0.18.8"

@@ -1,0 +1,6 @@
+{
+  "tasks": {
+    "check": { "cmd": "cargo test --workspace", "outputs": [] },
+    "lint": { "cmd": "cargo clippy --workspace -- -D warnings", "outputs": [] }
+  }
+}
