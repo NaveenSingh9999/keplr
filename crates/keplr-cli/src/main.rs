@@ -57,7 +57,7 @@ async fn main() -> anyhow::Result<()> {
         Cmd::Open { file, line } => {
             let buf = keplr_core::buffer::Buffer::load(file.clone())?;
             if line == 0 {
-                println!("{}", buf.rope.to_string());
+                println!("{}", buf.rope);
             } else {
                 println!("{}", buf.line(line).unwrap_or_default());
             }
