@@ -1,5 +1,5 @@
 use super::{branch_for, Scene, SceneSpec, Theme};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
 use winit::{
@@ -101,6 +101,12 @@ struct Gpu {
     vbuf: wgpu::Buffer,
     vcap: usize,
     size: (u32, u32),
+    text_pipeline: wgpu::RenderPipeline,
+    text_bind_group: wgpu::BindGroup,
+    text_vbuf: wgpu::Buffer,
+    text_vcap: usize,
+    text_on: bool,
+    text_atlas: Option<GlyphAtlas>,
 }
 
 impl Gpu {
@@ -199,6 +205,8 @@ impl Gpu {
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
+        let (text_pipeline, text_bind_group, text_vbuf, text_on, text_atlas) =
+            text_stack(&device, &queue, format);
         Ok(Self {
             surface,
             device,
@@ -208,6 +216,12 @@ impl Gpu {
             vbuf,
             vcap: 65536,
             size,
+            text_pipeline,
+            text_bind_group,
+            text_vbuf,
+            text_vcap: 65536,
+            text_on,
+            text_atlas,
         })
     }
 
@@ -225,7 +239,12 @@ impl Gpu {
         self.queue.write_buffer(&self.vbuf, 0, &bytes);
     }
 
-    fn frame(&mut self, clear: wgpu::Color, verts: usize) -> anyhow::Result<()> {
+    fn frame(
+        &mut self,
+        clear: wgpu::Color,
+        verts: usize,
+        text_verts: &[f32],
+    ) -> anyhow::Result<()> {
         let texture = self
             .surface
             .get_current_texture()
@@ -254,6 +273,39 @@ impl Gpu {
             pass.set_pipeline(&self.pipeline);
             pass.set_vertex_buffer(0, self.vbuf.slice(..));
             pass.draw(0..verts as u32, 0..1);
+        }
+        if self.text_on && !text_verts.is_empty() {
+            let bytes = f32_to_bytes(text_verts);
+            if bytes.len() > self.text_vcap {
+                self.text_vbuf = self.device.create_buffer(&wgpu::BufferDescriptor {
+                    label: None,
+                    size: bytes.len() as u64,
+                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                    mapped_at_creation: false,
+                });
+                self.text_vcap = bytes.len();
+            }
+            self.queue.write_buffer(&self.text_vbuf, 0, &bytes);
+            {
+                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: None,
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        },
+                    })],
+                    depth_stencil_attachment: None,
+                    timestamp_writes: None,
+                    occlusion_query_set: None,
+                });
+                pass.set_pipeline(&self.text_pipeline);
+                pass.set_bind_group(0, &self.text_bind_group, &[]);
+                pass.set_vertex_buffer(0, self.text_vbuf.slice(..));
+                pass.draw(0..text_verts.len() as u32 / 8, 0..1);
+            }
         }
         self.queue.submit([encoder.finish()]);
         texture.present();
@@ -353,6 +405,12 @@ impl ApplicationHandler for App {
                         let quads = layout_quads(scene, gpu.size.0, gpu.size.1);
                         let n = quads.len() / 6;
                         gpu.upload(&quads);
+                        let text_verts = match &gpu.text_atlas {
+                            Some(atlas) => {
+                                scene_text_quads(atlas, scene, gpu.size.0, gpu.size.1)
+                            }
+                            None => Vec::new(),
+                        };
                         let bg = parse_hex(&Theme::zed_dark().bg);
                         let clear = wgpu::Color {
                             r: bg[0] as f64,
@@ -360,7 +418,7 @@ impl ApplicationHandler for App {
                             b: bg[2] as f64,
                             a: 1.0,
                         };
-                        if let Err(e) = gpu.frame(clear, n) {
+                        if let Err(e) = gpu.frame(clear, n, &text_verts) {
                             failed = Some(format!("{e:#}"));
                         }
                     }
@@ -571,4 +629,319 @@ pub fn upload_atlas(
         },
     );
     texture
+}
+
+fn token_rgb(kind: keplr_lang::TokenKind) -> [f32; 3] {
+    match kind {
+        keplr_lang::TokenKind::Keyword => [0.35, 0.65, 1.0],
+        keplr_lang::TokenKind::Str => [0.45, 0.85, 0.55],
+        keplr_lang::TokenKind::Comment => [0.55, 0.55, 0.6],
+        keplr_lang::TokenKind::Number => [0.95, 0.75, 0.35],
+        keplr_lang::TokenKind::Other => [0.9, 0.93, 0.95],
+    }
+}
+
+fn lang_of(label: &str) -> keplr_lang::LangKind {
+    keplr_lang::LangKind::from_path(Path::new(&format!("x.{label}")))
+}
+
+const TEXT_SHADER: &str = r#"
+@group(0) @binding(0) var t: texture_2d<f32>;
+@group(0) @binding(1) var s: sampler;
+struct VsOut {
+    @builtin(position) pos: vec4<f32>,
+    @location(0) uv: vec2<f32>,
+    @location(1) col: vec4<f32>,
+};
+@vertex
+fn vs(@location(0) p: vec2<f32>, @location(1) uv: vec2<f32>, @location(2) c: vec4<f32>) -> VsOut {
+    var o: VsOut;
+    o.pos = vec4<f32>(p, 0.0, 1.0);
+    o.uv = uv;
+    o.col = c;
+    return o;
+}
+@fragment
+fn fs(in: VsOut) -> @location(0) vec4<f32> {
+    let a = textureSample(t, s, in.uv).r;
+    return vec4<f32>(in.col.rgb, in.col.a * a);
+}
+"#;
+
+fn byte_slice_span(text: &str, start: usize, len: usize) -> &str {
+    let end = (start + len).min(text.len());
+    let mut s = start.min(text.len());
+    while s < text.len() && !text.is_char_boundary(s) {
+        s += 1;
+    }
+    let mut e = end;
+    while e > s && !text.is_char_boundary(e) {
+        e -= 1;
+    }
+    &text[s..e]
+}
+
+pub fn layout_colored_line(
+    atlas: &GlyphAtlas,
+    line: &str,
+    spans: &[keplr_lang::Span],
+    x_px: f32,
+    y_top_px: f32,
+    w_px: f32,
+    h_px: f32,
+) -> Vec<f32> {
+    let mut v = Vec::new();
+    let nx = |px: f32| px / w_px * 2.0 - 1.0;
+    let ny = |py: f32| 1.0 - py / h_px * 2.0;
+    let fallback = [keplr_lang::Span {
+        start: 0,
+        len: line.len(),
+        kind: keplr_lang::TokenKind::Other,
+    }];
+    let spans = if spans.is_empty() { &fallback[..] } else { spans };
+    let mut pen = x_px;
+    for s in spans {
+        let col = token_rgb(s.kind);
+        let piece = byte_slice_span(line, s.start, s.len);
+        for c in piece.chars() {
+            let spot = match atlas.glyphs.get(&(c, 16u32)) {
+                Some(g) => *g,
+                None => {
+                    if let Some(space) = atlas.glyphs.get(&(' ', 16u32)) {
+                        pen += space.advance;
+                    }
+                    continue;
+                }
+            };
+            if spot.w > 0 && spot.h > 0 {
+                let gx0 = pen + spot.bx;
+                let gy0 = y_top_px + spot.by;
+                let gx1 = gx0 + spot.w as f32;
+                let gy1 = gy0 + spot.h as f32;
+                let u0 = spot.x as f32 / atlas.width as f32;
+                let v0 = spot.y as f32 / atlas.height as f32;
+                let u1 = (spot.x + spot.w) as f32 / atlas.width as f32;
+                let v1 = (spot.y + spot.h) as f32 / atlas.height as f32;
+                let quad = [
+                    (nx(gx0), ny(gy0), u0, v0),
+                    (nx(gx1), ny(gy0), u1, v0),
+                    (nx(gx1), ny(gy1), u1, v1),
+                    (nx(gx0), ny(gy0), u0, v0),
+                    (nx(gx1), ny(gy1), u1, v1),
+                    (nx(gx0), ny(gy1), u0, v1),
+                ];
+                for (px, py, u, vv) in quad {
+                    v.push(px);
+                    v.push(py);
+                    v.push(u);
+                    v.push(vv);
+                    v.push(col[0]);
+                    v.push(col[1]);
+                    v.push(col[2]);
+                    v.push(1.0);
+                }
+            }
+            pen += spot.advance;
+        }
+    }
+    v
+}
+
+pub fn scene_text_quads(
+    atlas: &GlyphAtlas,
+    scene: &Scene,
+    w_px: u32,
+    h_px: u32,
+) -> Vec<f32> {
+    let lang = lang_of(&scene.center.lang);
+    let mut v = Vec::new();
+    let x0 = w_px as f32 * 0.22 + 12.0;
+    let mut y = 44.0f32;
+    for line in scene.center.lines.iter().take(25) {
+        let spans = keplr_lang::highlight(lang, line);
+        v.extend(layout_colored_line(
+            atlas,
+            line,
+            &spans,
+            x0,
+            y,
+            w_px as f32,
+            h_px as f32,
+        ));
+        y += 18.0;
+    }
+    v
+}
+
+#[allow(clippy::type_complexity)]
+fn text_stack(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    format: wgpu::TextureFormat,
+) -> (
+    wgpu::RenderPipeline,
+    wgpu::BindGroup,
+    wgpu::Buffer,
+    bool,
+    Option<GlyphAtlas>,
+) {
+    let empty_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: None,
+        entries: &[],
+    });
+    let empty_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: None,
+        layout: &empty_layout,
+        entries: &[],
+    });
+    let off_pipeline = |layout: &wgpu::PipelineLayout| {
+        let tshader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("keplr-text-off"),
+            source: wgpu::ShaderSource::Wgsl(TEXT_SHADER.into()),
+        });
+        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: None,
+            layout: Some(layout),
+            vertex: wgpu::VertexState {
+                module: &tshader,
+                entry_point: "vs",
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                buffers: &[],
+            },
+            fragment: None,
+            primitive: wgpu::PrimitiveState::default(),
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview: None,
+            cache: None,
+        })
+    };
+    let small_buf = || {
+        device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
+            size: 16,
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        })
+    };
+    let atlas = match super::discover_font()
+        .and_then(|p| std::fs::read(p).ok())
+        .and_then(|bytes| build_atlas(&bytes, 16.0).ok())
+    {
+        Some(a) => a,
+        None => {
+            let off_layout =
+                device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    label: None,
+                    bind_group_layouts: &[],
+                    push_constant_ranges: &[],
+                });
+            return (
+                off_pipeline(&off_layout),
+                empty_bg,
+                small_buf(),
+                false,
+                None,
+            );
+        }
+    };
+    let texture = upload_atlas(device, queue, &atlas);
+    let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+    let sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
+    let bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: None,
+        entries: &[
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                count: None,
+            },
+        ],
+    });
+    let bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: None,
+        layout: &bgl,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(&view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::Sampler(&sampler),
+            },
+        ],
+    });
+    let tshader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("keplr-text"),
+        source: wgpu::ShaderSource::Wgsl(TEXT_SHADER.into()),
+    });
+    let tlayout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: None,
+        bind_group_layouts: &[&bgl],
+        push_constant_ranges: &[],
+    });
+    let tpipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: None,
+        layout: Some(&tlayout),
+        vertex: wgpu::VertexState {
+            module: &tshader,
+            entry_point: "vs",
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+            buffers: &[wgpu::VertexBufferLayout {
+                array_stride: 32,
+                step_mode: wgpu::VertexStepMode::Vertex,
+                attributes: &[
+                    wgpu::VertexAttribute {
+                        format: wgpu::VertexFormat::Float32x2,
+                        offset: 0,
+                        shader_location: 0,
+                    },
+                    wgpu::VertexAttribute {
+                        format: wgpu::VertexFormat::Float32x2,
+                        offset: 8,
+                        shader_location: 1,
+                    },
+                    wgpu::VertexAttribute {
+                        format: wgpu::VertexFormat::Float32x4,
+                        offset: 16,
+                        shader_location: 2,
+                    },
+                ],
+            }],
+        },
+        fragment: Some(wgpu::FragmentState {
+            module: &tshader,
+            entry_point: "fs",
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+            targets: &[Some(wgpu::ColorTargetState {
+                format,
+                blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+        }),
+        primitive: wgpu::PrimitiveState::default(),
+        depth_stencil: None,
+        multisample: wgpu::MultisampleState::default(),
+        multiview: None,
+        cache: None,
+    });
+    let tvbuf = device.create_buffer(&wgpu::BufferDescriptor {
+        label: None,
+        size: 65536,
+        usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+    (tpipeline, bg, tvbuf, true, Some(atlas))
 }
