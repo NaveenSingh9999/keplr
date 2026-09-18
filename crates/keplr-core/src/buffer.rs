@@ -6,6 +6,7 @@ pub struct Buffer {
 }
 
 impl Buffer {
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn load(path: PathBuf) -> anyhow::Result<Self> {
         let text = std::fs::read_to_string(&path)?;
         Ok(Self {
@@ -14,10 +15,24 @@ impl Buffer {
         })
     }
 
+    #[cfg(target_arch = "wasm32")]
+    pub fn load(path: PathBuf) -> anyhow::Result<Self> {
+        Ok(Self {
+            path,
+            rope: ropey::Rope::new(),
+        })
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn save(&self) -> anyhow::Result<()> {
         let text = self.rope.to_string();
         std::fs::write(&self.path, text)?;
         Ok(())
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn save(&self) -> anyhow::Result<()> {
+        anyhow::bail!("no filesystem on wasm")
     }
 
     pub fn line(&self, n: usize) -> Option<String> {

@@ -5,6 +5,7 @@ use std::{
 
 pub mod buffer;
 pub mod search;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod git;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -21,6 +22,7 @@ impl Workspace {
         self.root.join(".keplr/cas")
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn ensure_dirs(&self) -> std::io::Result<()> {
         std::fs::create_dir_all(self.cas_dir())
     }
@@ -47,6 +49,7 @@ pub fn is_tracked_path(path: &Path) -> bool {
 }
 
 impl Workspace {
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn walk_files(&self, limit: usize) -> Vec<FileEntry> {
         let mut out = Vec::new();
         let walker = ignore::WalkBuilder::new(&self.root)
@@ -87,6 +90,12 @@ impl Workspace {
         out
     }
 
+    #[cfg(target_arch = "wasm32")]
+    pub fn walk_files(&self, _limit: usize) -> Vec<FileEntry> {
+        Vec::new()
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn grep(&self, needle: &str, limit: usize) -> Vec<SearchHit> {
         let mut hits = Vec::new();
         if needle.is_empty() {
@@ -113,12 +122,18 @@ impl Workspace {
         }
         hits
     }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn grep(&self, _needle: &str, _limit: usize) -> Vec<SearchHit> {
+        Vec::new()
+    }
 }
 
 pub fn fingerprint_bytes(bytes: &[u8]) -> String {
     blake3::hash(bytes).to_hex().to_string()
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn index_path(root: &Path) -> PathBuf {
     root.join(".keplr/index.json")
 }
@@ -129,12 +144,18 @@ pub struct Index {
 }
 
 impl Index {
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn build(ws: &Workspace) -> Self {
         let mut entries = BTreeMap::new();
         for e in ws.walk_files(100_000) {
             entries.insert(e.path.clone(), e);
         }
         Self { entries }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn build(_ws: &Workspace) -> Self {
+        Self::default()
     }
 
     pub fn files(&self) -> Vec<&FileEntry> {
@@ -153,6 +174,7 @@ impl Index {
         self.entries.get(path)
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn load(ws: &Workspace) -> Self {
         std::fs::read_to_string(index_path(&ws.root))
             .ok()
@@ -163,6 +185,12 @@ impl Index {
             .unwrap_or_default()
     }
 
+    #[cfg(target_arch = "wasm32")]
+    pub fn load(_ws: &Workspace) -> Self {
+        Self::default()
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn save(&self, ws: &Workspace) -> anyhow::Result<()> {
         let path = index_path(&ws.root);
         if let Some(parent) = path.parent() {
@@ -173,6 +201,12 @@ impl Index {
         Ok(())
     }
 
+    #[cfg(target_arch = "wasm32")]
+    pub fn save(&self, _ws: &Workspace) -> anyhow::Result<()> {
+        anyhow::bail!("no filesystem on wasm")
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn apply(&mut self, ws: &Workspace, path: &Path) {
         if !is_tracked_path(path) {
             return;
@@ -210,6 +244,10 @@ impl Index {
         }
     }
 
+    #[cfg(target_arch = "wasm32")]
+    pub fn apply(&mut self, _ws: &Workspace, _path: &Path) {}
+
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn refresh(&mut self, ws: &Workspace) -> Vec<PathBuf> {
         let fresh = Self::build(ws);
         let mut changed = Vec::new();
@@ -228,6 +266,12 @@ impl Index {
         changed
     }
 
+    #[cfg(target_arch = "wasm32")]
+    pub fn refresh(&mut self, _ws: &Workspace) -> Vec<PathBuf> {
+        Vec::new()
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn grep(&self, needle: &str, limit: usize) -> Vec<SearchHit> {
         let mut hits = Vec::new();
         if needle.is_empty() {
@@ -256,6 +300,11 @@ impl Index {
         }
         hits
     }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn grep(&self, _needle: &str, _limit: usize) -> Vec<SearchHit> {
+        Vec::new()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -270,6 +319,7 @@ pub struct Change {
     pub kind: ChangeKind,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn poll_changes(root: &Path, wait_ms: u64) -> anyhow::Result<Vec<Change>> {
     use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
     let (tx, rx) = std::sync::mpsc::channel();
@@ -315,6 +365,11 @@ pub fn poll_changes(root: &Path, wait_ms: u64) -> anyhow::Result<Vec<Change>> {
         .collect())
 }
 
+#[cfg(target_arch = "wasm32")]
+pub fn poll_changes(_root: &Path, _wait_ms: u64) -> anyhow::Result<Vec<Change>> {
+    anyhow::bail!("notify unavailable on wasm")
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct TrigramIndex {
     files: Vec<PathBuf>,
@@ -323,6 +378,7 @@ pub struct TrigramIndex {
 }
 
 impl TrigramIndex {
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn build(ws: &Workspace, cap_files: usize, cap_bytes: u64) -> Self {
         let mut idx = Self::default();
         for entry in ws.walk_files(cap_files.max(1)) {
@@ -390,7 +446,15 @@ impl TrigramIndex {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+impl TrigramIndex {
+    pub fn build(_ws: &Workspace, _cap_files: usize, _cap_bytes: u64) -> Self {
+        Self::default()
+    }
+}
+
 impl Workspace {
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn grep_trigram(&self, needle: &str, limit: usize) -> Vec<SearchHit> {
         let mut hits = Vec::new();
         if needle.is_empty() {
@@ -420,6 +484,11 @@ impl Workspace {
         }
         hits
     }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn grep_trigram(&self, _needle: &str, _limit: usize) -> Vec<SearchHit> {
+        Vec::new()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -433,6 +502,7 @@ pub struct SaveReport {
     pub git_output: String,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn git_commit_file(ws: &Workspace, full: &Path) -> (bool, String) {
     if !ws.root.join(".git").exists() {
         return (false, String::from("no git repo"));
@@ -474,6 +544,7 @@ fn git_commit_file(ws: &Workspace, full: &Path) -> (bool, String) {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn save_buffer(ws: &Workspace, path: &Path, content: &str) -> anyhow::Result<SaveReport> {
     let full = if path.is_absolute() {
         path.to_path_buf()
@@ -511,6 +582,7 @@ fn lcg_next(state: &mut u64) -> u64 {
     *state >> 33
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn synth_tree(root: &Path, files: usize, lines_per: usize) -> anyhow::Result<Vec<PathBuf>> {
     const WORDS: &[&str] = &[
         "fn", "let", "mut", "config", "serve", "render", "index", "alpha", "beta",
