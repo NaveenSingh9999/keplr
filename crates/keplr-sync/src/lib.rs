@@ -13,6 +13,7 @@ impl Cas {
         self.dir.join(&hash[0..2]).join(hash)
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn put(&self, bytes: &[u8]) -> anyhow::Result<String> {
         let hash = blake3::hash(bytes).to_hex().to_string();
         let path = self.path_for(&hash);
@@ -25,12 +26,29 @@ impl Cas {
         Ok(hash)
     }
 
+    #[cfg(target_arch = "wasm32")]
+    pub fn put(&self, _bytes: &[u8]) -> anyhow::Result<String> {
+        anyhow::bail!("no filesystem on wasm")
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn get(&self, hash: &str) -> anyhow::Result<Vec<u8>> {
         Ok(std::fs::read(self.path_for(hash))?)
     }
 
+    #[cfg(target_arch = "wasm32")]
+    pub fn get(&self, _hash: &str) -> anyhow::Result<Vec<u8>> {
+        anyhow::bail!("no filesystem on wasm")
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn exists(&self, hash: &str) -> bool {
         self.path_for(hash).exists()
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn exists(&self, _hash: &str) -> bool {
+        false
     }
 }
 
@@ -120,6 +138,7 @@ pub fn snapshot_name_ok(name: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.')
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn save_snapshot(dir: &Path, name: &str, update: &[u8]) -> anyhow::Result<PathBuf> {
     if !snapshot_name_ok(name) {
         anyhow::bail!("bad snapshot name `{name}`");
@@ -130,11 +149,22 @@ pub fn save_snapshot(dir: &Path, name: &str, update: &[u8]) -> anyhow::Result<Pa
     Ok(path)
 }
 
+#[cfg(target_arch = "wasm32")]
+pub fn save_snapshot(_dir: &Path, _name: &str, _update: &[u8]) -> anyhow::Result<PathBuf> {
+    anyhow::bail!("no filesystem on wasm")
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 pub fn load_snapshot(dir: &Path, name: &str) -> anyhow::Result<Vec<u8>> {
     if !snapshot_name_ok(name) {
         anyhow::bail!("bad snapshot name `{name}`");
     }
     Ok(std::fs::read(dir.join(format!("{name}.update")))?)
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn load_snapshot(_dir: &Path, _name: &str) -> anyhow::Result<Vec<u8>> {
+    anyhow::bail!("no filesystem on wasm")
 }
 
 pub fn restore_snapshot(name: &str, update: &[u8]) -> anyhow::Result<SyncDoc> {
@@ -178,11 +208,13 @@ pub fn parse_lfs_pointer(text: &str) -> Option<LfsPointer> {
     })
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn lfs_pointer_of_file(path: &Path) -> Option<LfsPointer> {
     let text = std::fs::read_to_string(path).ok()?;
     parse_lfs_pointer(&text)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn ensure_materialized(workdir: &Path, rel: &str) -> anyhow::Result<String> {
     let full = workdir.join(rel);
     let text = std::fs::read_to_string(&full).unwrap_or_default();
