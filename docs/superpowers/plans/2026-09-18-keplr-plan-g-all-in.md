@@ -379,6 +379,12 @@ New (keep the rest of the match, add arms before `LangKind::Other`):
         LangKind::Shell => &[],
         LangKind::Sql => &[],
         LangKind::Lua => &["function"],
+        LangKind::Html
+        | LangKind::Css
+        | LangKind::Json
+        | LangKind::Toml
+        | LangKind::Yaml
+        | LangKind::Markdown => &[],
 ```
 
 And Markdown headers: at the top of the function body after the empty check, add:

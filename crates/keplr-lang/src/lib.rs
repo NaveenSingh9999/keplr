@@ -624,6 +624,12 @@ pub fn symbols_for(lang: LangKind, lines: &[String]) -> Vec<String> {
         LangKind::Shell => &[],
         LangKind::Sql => &[],
         LangKind::Lua => &["function"],
+        LangKind::Html
+        | LangKind::Css
+        | LangKind::Json
+        | LangKind::Toml
+        | LangKind::Yaml
+        | LangKind::Markdown => &[],
         LangKind::TypeScript | LangKind::Tsx | LangKind::JavaScript => {
             &["function", "class", "interface"]
         }
