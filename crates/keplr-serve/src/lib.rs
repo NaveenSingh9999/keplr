@@ -21,6 +21,8 @@ struct AppState {
     token: String,
     attempts: Arc<Mutex<HashMap<String, (u32, Instant)>>>,
     daemons: DaemonMap,
+    sync_docs: Arc<Mutex<HashMap<String, keplr_sync::SyncDoc>>>,
+    sync_tx: Arc<Mutex<HashMap<String, tokio::sync::broadcast::Sender<Vec<u8>>>>>,
 }
 
 #[derive(Clone)]
@@ -594,6 +596,8 @@ pub async fn serve_full(
         token,
         attempts: Arc::new(Mutex::new(HashMap::new())),
         daemons: Arc::new(Mutex::new(HashMap::new())),
+        sync_docs: Arc::new(Mutex::new(HashMap::new())),
+        sync_tx: Arc::new(Mutex::new(HashMap::new())),
     };
     if let Ok(tasks) = keplr_build::load_tasks(&root.join("keplr.json")) {
         for (name, def) in &tasks {
@@ -642,6 +646,7 @@ pub async fn serve_full(
         .route("/daemons", get(daemons))
         .route("/daemons/restart", post(daemon_restart))
         .route("/tasks/log", get(task_log))
+        .route("/sync/channel", get(sync_channel))
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             require_token,
@@ -724,5 +729,74 @@ async fn task_log(
             "output_tail": e.output_tail,
         })),
         None => Json(serde_json::json!({ "error": "no cached log" })),
+    }
+}
+
+async fn sync_channel(
+    State(state): State<AppState>,
+    Query(params): Query<HashMap<String, String>>,
+    ws: axum::extract::ws::WebSocketUpgrade,
+) -> impl axum::response::IntoResponse {
+    let name = params
+        .get("name")
+        .cloned()
+        .unwrap_or_else(|| String::from("buffer"));
+    ws.on_upgrade(move |socket| channel_loop(state, name, socket))
+}
+
+async fn channel_loop(
+    state: AppState,
+    name: String,
+    mut socket: axum::extract::ws::WebSocket,
+) {
+    use axum::extract::ws::Message;
+    let (full, mut rx) = {
+        let mut docs = state.sync_docs.lock().unwrap_or_else(|e| e.into_inner());
+        let doc = docs
+            .entry(name.clone())
+            .or_insert_with(|| keplr_sync::SyncDoc::new(&name));
+        let full = doc.encode_update();
+        let mut txs = state.sync_tx.lock().unwrap_or_else(|e| e.into_inner());
+        let tx = txs
+            .entry(name.clone())
+            .or_insert_with(|| tokio::sync::broadcast::channel(64).0)
+            .clone();
+        (full, tx.subscribe())
+    };
+    if socket.send(Message::Binary(full)).await.is_err() {
+        return;
+    }
+    loop {
+        tokio::select! {
+            msg = socket.recv() => {
+                match msg {
+                    Some(Ok(Message::Binary(bytes))) => {
+                        let mut docs = state.sync_docs.lock().unwrap_or_else(|e| e.into_inner());
+                        if let Some(doc) = docs.get(&name) {
+                            if doc.apply_update(&bytes).is_ok() {
+                                let merged = doc.encode_update();
+                                drop(docs);
+                                let txs = state.sync_tx.lock().unwrap_or_else(|e| e.into_inner());
+                                if let Some(tx) = txs.get(&name) {
+                                    // echo is idempotent; clients must not re-send on receive
+                                    let _ = tx.send(merged);
+                                }
+                            }
+                        }
+                    }
+                    _ => break,
+                }
+            }
+            update = rx.recv() => {
+                match update {
+                    Ok(bytes) => {
+                        if socket.send(Message::Binary(bytes)).await.is_err() {
+                            break;
+                        }
+                    }
+                    Err(_) => break,
+                }
+            }
+        }
     }
 }

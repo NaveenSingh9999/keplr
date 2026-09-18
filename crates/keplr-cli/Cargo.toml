@@ -20,6 +20,9 @@ keplr-render = { path = "../keplr-render" }
 keplr-ui = { path = "../keplr-ui" }
 tokio.workspace = true
 crossterm.workspace = true
+tokio-tungstenite.workspace = true
+futures-util.workspace = true
+http.workspace = true
 
 [features]
 desktop = ["keplr-render/gpu"]
