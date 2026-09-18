@@ -313,7 +313,7 @@ pub fn edit_file(root: PathBuf, file: PathBuf, no_animations: bool) -> anyhow::R
     let mut git_lines: Vec<String> = Vec::new();
     let mut last_frame = Instant::now();
     let mut last_key = Instant::now();
-    let mut blink_on = true;
+    let mut blink_on;
     let _guard = ScreenGuard::enter()?;
 
     let refresh_palette = |query: &str, index: &[PathBuf], root: &Path| -> Vec<String> {
@@ -360,7 +360,7 @@ pub fn edit_file(root: PathBuf, file: PathBuf, no_animations: bool) -> anyhow::R
         if idle_ms < 530 {
             blink_on = true;
         } else if !reduced {
-            blink_on = (idle_ms / 530) % 2 == 0;
+            blink_on = (idle_ms / 530).is_multiple_of(2);
         } else {
             blink_on = true;
         }
@@ -417,7 +417,6 @@ pub fn edit_file(root: PathBuf, file: PathBuf, no_animations: bool) -> anyhow::R
             continue;
         };
         last_key = Instant::now();
-        blink_on = true;
         if key.modifiers.contains(KeyModifiers::CONTROL) {
             match key.code {
                 KeyCode::Char('s') => {
@@ -653,6 +652,7 @@ pub fn edit_file(root: PathBuf, file: PathBuf, no_animations: bool) -> anyhow::R
                             });
                         tab.dirty = true;
                         status = String::from("expanded snippet");
+                        continue;
                     } else {
                         let byte = tab.doc.byte_col(tab.cursor.0, tab.cursor.1);
                         tab.doc.lines[tab.cursor.0].insert_str(byte, "  ");
