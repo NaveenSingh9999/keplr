@@ -9,6 +9,23 @@ pub enum LangKind {
     Go,
     Rust,
     Laml,
+    Python,
+    C,
+    CSharp,
+    Java,
+    Swift,
+    Kotlin,
+    Ruby,
+    Php,
+    Html,
+    Css,
+    Json,
+    Toml,
+    Yaml,
+    Markdown,
+    Shell,
+    Sql,
+    Lua,
     Other,
 }
 
@@ -22,6 +39,23 @@ impl LangKind {
             "go" => Self::Go,
             "rs" => Self::Rust,
             "lm" => Self::Laml,
+            "py" => Self::Python,
+            "c" => Self::C,
+            "cs" => Self::CSharp,
+            "java" => Self::Java,
+            "swift" => Self::Swift,
+            "kt" | "kts" => Self::Kotlin,
+            "rb" => Self::Ruby,
+            "php" => Self::Php,
+            "html" | "htm" => Self::Html,
+            "css" => Self::Css,
+            "json" => Self::Json,
+            "toml" => Self::Toml,
+            "yaml" | "yml" => Self::Yaml,
+            "md" | "markdown" => Self::Markdown,
+            "sh" | "bash" => Self::Shell,
+            "sql" => Self::Sql,
+            "lua" => Self::Lua,
             _ => Self::Other,
         }
     }
@@ -112,7 +146,106 @@ fn keywords(lang: LangKind) -> &'static [&'static str] {
             "setTimeout", "return", "if", "else", "for", "true", "false",
             "null",
         ],
+        LangKind::Python => &[
+            "def", "class", "return", "if", "else", "elif", "for", "while",
+            "import", "from", "as", "try", "except", "finally", "raise",
+            "with", "lambda", "pass", "break", "continue", "in", "is",
+            "not", "and", "or", "None", "True", "False", "self", "async",
+            "await",
+        ],
+        LangKind::C => &[
+            "int", "float", "double", "char", "bool", "void", "struct",
+            "enum", "typedef", "union", "static", "const", "extern",
+            "return", "if", "else", "for", "while", "do", "switch",
+            "case", "break", "continue", "sizeof", "true", "false",
+            "NULL", "include",
+        ],
+        LangKind::CSharp => &[
+            "class", "interface", "enum", "struct", "namespace", "using",
+            "public", "private", "protected", "internal", "static",
+            "virtual", "override", "abstract", "sealed", "return", "if",
+            "else", "for", "foreach", "while", "new", "var", "async",
+            "await", "try", "catch", "finally", "throw", "true", "false",
+            "null", "this",
+        ],
+        LangKind::Java => &[
+            "class", "interface", "enum", "package", "import", "public",
+            "private", "protected", "static", "final", "abstract",
+            "extends", "implements", "return", "if", "else", "for",
+            "while", "new", "try", "catch", "finally", "throw",
+            "throws", "true", "false", "null", "this", "void", "int",
+        ],
+        LangKind::Swift => &[
+            "func", "class", "struct", "enum", "protocol", "extension",
+            "import", "let", "var", "return", "if", "else", "for",
+            "while", "guard", "switch", "case", "break", "continue",
+            "in", "as", "is", "try", "catch", "throw", "throws",
+            "async", "await", "true", "false", "nil", "self",
+        ],
+        LangKind::Kotlin => &[
+            "fun", "class", "interface", "object", "val", "var", "return",
+            "if", "else", "for", "while", "when", "import", "package",
+            "try", "catch", "finally", "throw", "true", "false", "null",
+            "this", "is", "in", "as",
+        ],
+        LangKind::Ruby => &[
+            "def", "class", "module", "end", "return", "if", "else",
+            "elsif", "for", "while", "do", "require", "include",
+            "yield", "break", "next", "true", "false", "nil", "self",
+            "begin", "rescue", "ensure", "raise",
+        ],
+        LangKind::Php => &[
+            "function", "class", "interface", "trait", "namespace",
+            "use", "return", "if", "else", "elseif", "for", "foreach",
+            "while", "new", "echo", "try", "catch", "finally", "throw",
+            "true", "false", "null", "this",
+        ],
+        LangKind::Html => &[
+            "html", "head", "body", "div", "span", "script", "style",
+            "table", "form", "input", "button", "class", "href",
+        ],
+        LangKind::Css => &[
+            "color", "background", "margin", "padding", "border",
+            "display", "position", "width", "height", "font",
+        ],
+        LangKind::Json => &["true", "false", "null"],
+        LangKind::Toml => &["true", "false"],
+        LangKind::Yaml => &["true", "false", "null"],
+        LangKind::Markdown => &[],
+        LangKind::Shell => &[
+            "if", "then", "else", "elif", "fi", "for", "while", "do",
+            "done", "case", "esac", "function", "return", "break",
+            "continue", "in", "export", "local", "echo", "true",
+            "false",
+        ],
+        LangKind::Sql => &[
+            "select", "from", "where", "join", "left", "right",
+            "inner", "outer", "on", "group", "order", "by", "having",
+            "insert", "into", "values", "update", "set", "delete",
+            "create", "table", "alter", "drop", "and", "or", "not",
+            "null", "as", "limit",
+        ],
+        LangKind::Lua => &[
+            "function", "local", "return", "if", "then", "else",
+            "elseif", "end", "for", "while", "do", "break", "in",
+            "true", "false", "nil",
+        ],
         LangKind::Other => &[],
+    }
+}
+
+pub fn line_comment(lang: LangKind) -> Option<&'static str> {
+    match lang {
+        LangKind::Laml => Some("~"),
+        LangKind::Html => Some("<!--"),
+        LangKind::Python
+        | LangKind::Ruby
+        | LangKind::Shell
+        | LangKind::Toml
+        | LangKind::Yaml => Some("#"),
+        LangKind::Lua | LangKind::Sql => Some("--"),
+        LangKind::Markdown | LangKind::Json | LangKind::Css => None,
+        _ => Some("//"),
     }
 }
 
@@ -135,27 +268,17 @@ pub fn highlight(lang: LangKind, line: &str) -> Vec<Span> {
     let mut i = 0;
     while i < bytes.len() {
         let b = bytes[i];
-        if lang == LangKind::Laml && b == b'~' {
-            push_other(&mut spans, &mut other_start, i);
-            spans.push(Span {
-                start: i,
-                len: bytes.len() - i,
-                kind: TokenKind::Comment,
-            });
-            break;
-        }
-        if lang != LangKind::Laml
-            && b == b'/'
-            && i + 1 < bytes.len()
-            && bytes[i + 1] == b'/'
-        {
-            push_other(&mut spans, &mut other_start, i);
-            spans.push(Span {
-                start: i,
-                len: bytes.len() - i,
-                kind: TokenKind::Comment,
-            });
-            break;
+        if let Some(marker) = line_comment(lang) {
+            let mb = marker.as_bytes();
+            if i + mb.len() <= bytes.len() && &bytes[i..i + mb.len()] == mb {
+                push_other(&mut spans, &mut other_start, i);
+                spans.push(Span {
+                    start: i,
+                    len: bytes.len() - i,
+                    kind: TokenKind::Comment,
+                });
+                break;
+            }
         }
         if b == b'"' {
             push_other(&mut spans, &mut other_start, i);
@@ -385,6 +508,55 @@ pub fn lsp_servers(lang: LangKind) -> Vec<LspServer> {
         LangKind::Cpp => &[("clangd", "clangd", &["--background-index"])],
         LangKind::Go => &[("gopls", "gopls", &["serve"])],
         LangKind::Rust => &[("rust-analyzer", "rust-analyzer", &[])],
+        LangKind::Python => &[("pyright", "pyright", &["--stdio"])],
+        LangKind::C => &[("clangd", "clangd", &["--background-index"])],
+        LangKind::CSharp => &[("csharp-ls", "csharp-language-server", &[])],
+        LangKind::Java => &[("jdtls", "jdtls", &[])],
+        LangKind::Swift => &[("sourcekit-lsp", "sourcekit-lsp", &[])],
+        LangKind::Kotlin => &[(
+            "kotlin-language-server",
+            "kotlin-language-server",
+            &[],
+        )],
+        LangKind::Ruby => &[("solargraph", "solargraph", &["stdio"])],
+        LangKind::Php => &[("phpactor", "phpactor", &["language-server"])],
+        LangKind::Html => &[(
+            "html-ls",
+            "vscode-html-language-server",
+            &["--stdio"],
+        )],
+        LangKind::Css => &[(
+            "css-ls",
+            "vscode-css-language-server",
+            &["--stdio"],
+        )],
+        LangKind::Json => &[(
+            "json-ls",
+            "vscode-json-language-server",
+            &["--stdio"],
+        )],
+        LangKind::Toml => &[("taplo", "taplo", &["lsp", "stdio"])],
+        LangKind::Yaml => &[(
+            "yaml-ls",
+            "yaml-language-server",
+            &["--stdio"],
+        )],
+        LangKind::Markdown => &[("marksman", "marksman", &["server"])],
+        LangKind::Shell => &[(
+            "bash-ls",
+            "bash-language-server",
+            &["start"],
+        )],
+        LangKind::Sql => &[(
+            "sql-ls",
+            "sql-language-server",
+            &["up", "--method", "stdio"],
+        )],
+        LangKind::Lua => &[(
+            "lua-ls",
+            "lua-language-server",
+            &["--stdio"],
+        )],
         LangKind::Laml | LangKind::Other => &[],
     };
     defs.iter()
@@ -417,6 +589,17 @@ pub fn spawn_lsp(server: &LspServer) -> anyhow::Result<std::process::Child> {
 pub fn symbols_for(lang: LangKind, lines: &[String]) -> Vec<String> {
     let kinds: &[&str] = match lang {
         LangKind::Rust => &["fn", "struct", "enum", "impl", "trait", "mod"],
+        LangKind::Python => &["def", "class"],
+        LangKind::C => &["struct", "enum", "typedef"],
+        LangKind::CSharp => &["class", "interface", "enum", "struct"],
+        LangKind::Java => &["class", "interface", "enum"],
+        LangKind::Swift => &["func", "class", "struct", "enum"],
+        LangKind::Kotlin => &["fun", "class", "interface", "object"],
+        LangKind::Ruby => &["def", "class", "module"],
+        LangKind::Php => &["function", "class"],
+        LangKind::Shell => &[],
+        LangKind::Sql => &[],
+        LangKind::Lua => &["function"],
         LangKind::TypeScript | LangKind::Tsx | LangKind::JavaScript => {
             &["function", "class", "interface"]
         }
@@ -428,10 +611,29 @@ pub fn symbols_for(lang: LangKind, lines: &[String]) -> Vec<String> {
     if kinds.is_empty() {
         return Vec::new();
     }
+    if lang == LangKind::Markdown {
+        let mut out = Vec::new();
+        for line in lines.iter().take(200) {
+            let t = line.trim_start();
+            if let Some(title) = t.strip_prefix('#') {
+                let title = title.trim_start_matches('#').trim();
+                if !title.is_empty() {
+                    out.push(format!("# {title}"));
+                }
+                if out.len() >= 50 {
+                    break;
+                }
+            }
+        }
+        return out;
+    }
     let mut out = Vec::new();
     for line in lines.iter().take(200) {
         let t = line.trim_start();
-        if t.starts_with("//") || t.starts_with('~') || t.starts_with('#') {
+        if line_comment(lang)
+            .map(|m| t.starts_with(m))
+            .unwrap_or(false)
+        {
             continue;
         }
         let words: Vec<&str> = t
