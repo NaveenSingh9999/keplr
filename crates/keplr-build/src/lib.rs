@@ -171,6 +171,10 @@ pub struct RunReport {
     pub skipped: bool,
     pub output: String,
     pub hash: String,
+    #[serde(default)]
+    pub failed: bool,
+    #[serde(default)]
+    pub cancelled: bool,
 }
 
 fn resolve_under(workdir: &Path, pat: &str) -> PathBuf {
@@ -389,6 +393,8 @@ fn run_ordered(
                 skipped: true,
                 output,
                 hash: fp,
+                failed: false,
+                cancelled: false,
             });
             continue;
         }
@@ -407,6 +413,8 @@ fn run_ordered(
             skipped: false,
             output: out,
             hash: fp,
+            failed: false,
+            cancelled: false,
         });
     }
     Ok(reports)
@@ -524,6 +532,8 @@ pub fn run_graph_parallel(
                             skipped: false,
                             output: text.clone(),
                             hash: fp,
+                            failed: false,
+                            cancelled: false,
                         });
                     }
                     Some(Err(e)) => {
@@ -533,6 +543,221 @@ pub fn run_graph_parallel(
                     None => {
                         save_journal(workdir, &journal)?;
                         anyhow::bail!("task `{name}` produced no result");
+                    }
+                }
+            }
+        }
+    }
+    Ok(reports)
+}
+
+fn cancelled_entries(
+    order: &[String],
+    from: usize,
+    cause: &str,
+    fps: &BTreeMap<String, String>,
+) -> Vec<RunReport> {
+    order[from..]
+        .iter()
+        .map(|n| RunReport {
+            task: n.clone(),
+            skipped: true,
+            output: format!("cancelled: {cause}"),
+            hash: fps.get(n).cloned().unwrap_or_default(),
+            failed: false,
+            cancelled: true,
+        })
+        .collect()
+}
+
+fn level_index(order: &[String], name: &str) -> usize {
+    order.iter().position(|n| n == name).unwrap_or(order.len())
+}
+
+pub fn run_graph_settled(
+    tasks: &BTreeMap<String, TaskDef>,
+    workdir: &Path,
+    targets: &[String],
+    jobs: usize,
+    force: bool,
+) -> anyhow::Result<Vec<RunReport>> {
+    let jobs = jobs.clamp(1, 32);
+    let levels = if targets.is_empty() {
+        let all: BTreeSet<String> = tasks.keys().cloned().collect();
+        topo_levels(tasks, &all)?
+    } else {
+        let wanted = closure(tasks, targets)?;
+        topo_levels(tasks, &wanted)?
+    };
+    let order: Vec<String> = levels.iter().flatten().cloned().collect();
+    let fps = graph_fingerprints(tasks, workdir);
+    let mut journal = load_journal(workdir);
+    let cas = keplr_sync::Cas::new(workdir.join(".keplr/cas"));
+    let mut reports: Vec<RunReport> = Vec::new();
+
+    if jobs == 1 {
+        for (i, name) in order.iter().enumerate() {
+            let task = tasks
+                .get(name)
+                .ok_or_else(|| anyhow::anyhow!("unknown task {name}"))?;
+            let fp = fps.get(name).cloned().unwrap_or_default();
+            let fresh = force || journal.get(name).map(|e| e.hash != fp).unwrap_or(true);
+            if !fresh {
+                let restored = restore_outputs(&cas, workdir, &journal[name]);
+                let mut output = String::from("up to date");
+                if !restored.is_empty() {
+                    output.push_str(&format!(" (restored {})", restored.join(", ")));
+                }
+                reports.push(RunReport {
+                    task: name.clone(),
+                    skipped: true,
+                    output,
+                    hash: fp,
+                    failed: false,
+                    cancelled: false,
+                });
+                continue;
+            }
+            match run_task(task, workdir) {
+                Ok(out) => {
+                    let stored = store_outputs(&cas, workdir, task);
+                    journal.insert(
+                        name.clone(),
+                        JournalEntry {
+                            hash: fp.clone(),
+                            outputs: stored,
+                        },
+                    );
+                    save_journal(workdir, &journal)?;
+                    reports.push(RunReport {
+                        task: name.clone(),
+                        skipped: false,
+                        output: out,
+                        hash: fp,
+                        failed: false,
+                        cancelled: false,
+                    });
+                }
+                Err(e) => {
+                    let msg = format!("{e:#}");
+                    save_journal(workdir, &journal)?;
+                    reports.push(RunReport {
+                        task: name.clone(),
+                        skipped: false,
+                        output: msg,
+                        hash: fp,
+                        failed: true,
+                        cancelled: false,
+                    });
+                    let cause = format!("{name} failed");
+                    reports.extend(cancelled_entries(&order, i + 1, &cause, &fps));
+                    return Ok(reports);
+                }
+            }
+        }
+        return Ok(reports);
+    }
+
+    for level in &levels {
+        let mut dirty: Vec<String> = Vec::new();
+        for name in level {
+            let fp = fps.get(name).cloned().unwrap_or_default();
+            let fresh = force || journal.get(name).map(|e| e.hash != fp).unwrap_or(true);
+            if !fresh {
+                let restored = restore_outputs(&cas, workdir, &journal[name]);
+                let mut output = String::from("up to date");
+                if !restored.is_empty() {
+                    output.push_str(&format!(" (restored {})", restored.join(", ")));
+                }
+                reports.push(RunReport {
+                    task: name.clone(),
+                    skipped: true,
+                    output,
+                    hash: fp,
+                    failed: false,
+                    cancelled: false,
+                });
+            } else {
+                dirty.push(name.clone());
+            }
+        }
+        for batch in dirty.chunks(jobs) {
+            let batch_out: BTreeMap<String, anyhow::Result<String>> =
+                std::thread::scope(|s| {
+                    let mut handles = Vec::new();
+                    let mut early: BTreeMap<String, anyhow::Result<String>> =
+                        BTreeMap::new();
+                    for name in batch {
+                        let Some(task) = tasks.get(name).cloned() else {
+                            early.insert(
+                                name.clone(),
+                                Err(anyhow::anyhow!("unknown task {name}")),
+                            );
+                            continue;
+                        };
+                        let dir = workdir.to_path_buf();
+                        handles.push((name.clone(), s.spawn(move || run_task(&task, &dir))));
+                    }
+                    let mut out = early;
+                    for (name, h) in handles {
+                        match h.join() {
+                            Ok(r) => {
+                                out.insert(name, r);
+                            }
+                            Err(_) => {
+                                out.insert(
+                                    name.clone(),
+                                    Err(anyhow::anyhow!("task `{name}` panicked")),
+                                );
+                            }
+                        }
+                    }
+                    out
+                });
+            for name in batch {
+                let idx = level_index(&order, name);
+                match batch_out.get(name) {
+                    Some(Ok(text)) => {
+                        let task = tasks
+                            .get(name)
+                            .ok_or_else(|| anyhow::anyhow!("unknown task {name}"))?;
+                        let stored = store_outputs(&cas, workdir, task);
+                        let fp = fps.get(name).cloned().unwrap_or_default();
+                        journal.insert(
+                            name.clone(),
+                            JournalEntry {
+                                hash: fp.clone(),
+                                outputs: stored,
+                            },
+                        );
+                        save_journal(workdir, &journal)?;
+                        reports.push(RunReport {
+                            task: name.clone(),
+                            skipped: false,
+                            output: text.clone(),
+                            hash: fp,
+                            failed: false,
+                            cancelled: false,
+                        });
+                    }
+                    _ => {
+                        let msg = match batch_out.get(name) {
+                            Some(Err(e)) => format!("{e:#}"),
+                            _ => format!("task `{name}` produced no result"),
+                        };
+                        let fp = fps.get(name).cloned().unwrap_or_default();
+                        save_journal(workdir, &journal)?;
+                        reports.push(RunReport {
+                            task: name.clone(),
+                            skipped: false,
+                            output: msg,
+                            hash: fp,
+                            failed: true,
+                            cancelled: false,
+                        });
+                        let cause = format!("{name} failed");
+                        reports.extend(cancelled_entries(&order, idx + 1, &cause, &fps));
+                        return Ok(reports);
                     }
                 }
             }
