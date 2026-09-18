@@ -1182,7 +1182,7 @@ git commit -m "feat(lang): lsp probe plus diagnostics/highlight CLI and serve ro
 - Modify: `crates/keplr-sync/src/lib.rs` (append; keep `Cas` byte-identical)
 
 **Interfaces:**
-- Consumes: `yrs::{Doc, GetString, ReadTxn, StateVector, Transact, Update}`
+- Consumes: `yrs::{Doc, GetString, ReadTxn, StateVector, Transact, Update, updates::{decoder::Decode, encoder::Encode}, Text}`
 - Produces: `pub struct SyncDoc`, `impl SyncDoc { pub fn new(name: &str) -> Self; pub fn name(&self) -> &str; pub fn from_text(name: &str, text: &str) -> Self; pub fn push(&self, text: &str); pub fn insert(&self, index: u32, text: &str); pub fn content(&self) -> String; pub fn state_vector(&self) -> Vec<u8>; pub fn encode_update(&self) -> Vec<u8>; pub fn encode_update_since(&self, since: &[u8]) -> anyhow::Result<Vec<u8>>; pub fn apply_update(&self, bytes: &[u8]) -> anyhow::Result<()> }`
 
 - [ ] **Step 1: Check `crates/keplr-sync/Cargo.toml`**, then add `yrs.workspace = true` (and `serde.workspace = true` if absent) under `[dependencies]`.
@@ -1190,7 +1190,11 @@ git commit -m "feat(lang): lsp probe plus diagnostics/highlight CLI and serve ro
 - [ ] **Step 2: Append SyncDoc code** (end of file; keep `Cas` untouched):
 
 ```rust
-use yrs::{Doc, GetString, ReadTxn, StateVector, Transact, Update};
+use yrs::{
+    Doc, GetString, ReadTxn, StateVector, Transact, Update,
+    updates::{decoder::Decode, encoder::Encode},
+    Text,
+};
 
 pub struct SyncDoc {
     name: String,

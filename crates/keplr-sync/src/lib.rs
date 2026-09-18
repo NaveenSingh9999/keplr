@@ -34,7 +34,11 @@ impl Cas {
     }
 }
 
-use yrs::{Doc, GetString, ReadTxn, StateVector, Transact, Update};
+use yrs::{
+    Doc, GetString, ReadTxn, StateVector, Transact, Update,
+    updates::{decoder::Decode, encoder::Encode},
+    Text,
+};
 
 pub struct SyncDoc {
     name: String,
