@@ -1109,7 +1109,7 @@ async fn highlight(
     let line: usize = params.get("line").and_then(|v| v.parse().ok()).unwrap_or(1);
     let full = state.root.join(&rel);
     let lang = keplr_lang::LangKind::from_path(&full);
-    let text = keplr_core::buffer::Buffer::load(&full)
+    let text = keplr_core::buffer::Buffer::load(full)
         .ok()
         .and_then(|b| b.line(line))
         .unwrap_or_default();
@@ -1123,21 +1123,14 @@ async fn highlight(
 }
 ```
 
-Serve needs the `keplr-lang` dependency. `crates/keplr-serve/Cargo.toml` old:
-
-```toml
-keplr-core = { path = "../keplr-core" }
-keplr-build = { path = "../keplr-build" }
-keplr-render = { path = "../keplr-render" }
-```
-
-New (append one line):
+Serve needs the `keplr-lang` and `keplr-sync` dependencies. `crates/keplr-serve/Cargo.toml` new lines:
 
 ```toml
 keplr-core = { path = "../keplr-core" }
 keplr-build = { path = "../keplr-build" }
 keplr-render = { path = "../keplr-render" }
 keplr-lang = { path = "../keplr-lang" }
+keplr-sync = { path = "../keplr-sync" }
 ```
 
 Register the routes. Old:
@@ -1514,7 +1507,7 @@ New:
         )
 ```
 
-Serve already depends on `keplr-sync` (CLI-era dep) — no Cargo change needed. `HashMap` is already imported.
+The `keplr-sync` dep was added with the `keplr-lang` dep in Task D2-3. `HashMap` is already imported.
 
 - [ ] **Step 2: README** — append after the D2 usage block:
 

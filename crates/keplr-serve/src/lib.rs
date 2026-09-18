@@ -198,7 +198,7 @@ async fn highlight(
     let line: usize = params.get("line").and_then(|v| v.parse().ok()).unwrap_or(1);
     let full = state.root.join(&rel);
     let lang = keplr_lang::LangKind::from_path(&full);
-    let text = keplr_core::buffer::Buffer::load(&full)
+    let text = keplr_core::buffer::Buffer::load(full)
         .ok()
         .and_then(|b| b.line(line))
         .unwrap_or_default();
