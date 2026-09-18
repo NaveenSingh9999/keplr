@@ -10,6 +10,7 @@ Plan B canvas: `docs/superpowers/plans/2026-09-18-keplr-plan-b-canvas-foundation
 Plan C builds: `docs/superpowers/plans/2026-09-18-keplr-build-dag.md`
 Plan D index/lang/sync: `docs/superpowers/plans/2026-09-18-keplr-plan-d-index-lang-sync.md`
 Plan E Zed depth: `docs/superpowers/plans/2026-09-18-keplr-plan-e-zed-depth.md`
+Plan F save/bench/auth/tui/gpu: `docs/superpowers/plans/2026-09-18-keplr-plan-f-save-bench-auth-tui-gpu.md`
 
 ## Use (foundation CLI, production)
 
@@ -81,5 +82,20 @@ cargo run -p keplr-cli -- --root . scene --open crates/keplr-cli/src/main.rs --b
 curl '127.0.0.1:7137/scene?open=Cargo.toml&left=search&search=clap&width=100'
 curl '127.0.0.1:7137/scene?palette_mode=commands&palette=run'
 ```
+
+## Use (Plan F save/bench/auth/tui/gpu, production)
+
+```bash
+echo 'hello keplr' | cargo run -p keplr-cli -- --root . save notes.txt --stdin
+cargo run -p keplr-cli -- --root . save notes.txt --content "hello" --task lint
+curl -X POST 127.0.0.1:7137/save -H 'Content-Type: application/json' -d '{"path":"notes.txt","content":"hi"}'
+cargo run -p keplr-cli -- --root /tmp/bench bench --files 2000 --lines 40
+cargo run -p keplr-cli -- --root . token --save
+cargo run -p keplr-cli -- --root . serve --port 7137  # KEPLR_TOKEN=... or --token ...
+cargo run -p keplr-cli -- --root . edit Cargo.toml
+cargo run -p keplr-cli --features desktop -- --root . desktop --open Cargo.toml  # native window; falls back to ANSI without GPU
+```
+
+WASM browser parity is deferred: `notify`/`ignore` are not wasm-safe, so the workspace needs dep surgery first. The browser contract is already live — `Scene` serde JSON over `keplr serve` (see `/scene`).
 
 CI runs `cargo test --workspace --all-targets`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo build --workspace` on every push.

@@ -126,6 +126,13 @@ enum Cmd {
         #[arg(long, default_value_t = 100)]
         width: u16,
     },
+    #[cfg(feature = "desktop")]
+    Desktop {
+        #[arg(long)]
+        open: Option<PathBuf>,
+        #[arg(long, default_value = "")]
+        query: String,
+    },
 }
 
 #[tokio::main]
@@ -522,6 +529,32 @@ async fn main() -> anyhow::Result<()> {
             };
             let scene = keplr_render::build_scene(&spec);
             println!("{}", serde_json::to_string_pretty(&scene)?);
+        }
+        #[cfg(feature = "desktop")]
+        Cmd::Desktop { open, query } => {
+            match keplr_render::gpu::run_desktop(cli.root.clone(), open.clone(), query.clone())
+            {
+                Ok(()) => {}
+                Err(e) => {
+                    eprintln!("keplr: gpu unavailable ({e:#}); software fallback");
+                    let mut ui = keplr_ui::UiState::new(cli.root.clone());
+                    if let Some(path) = open.clone() {
+                        ui.open_file(path);
+                    }
+                    if !query.is_empty() {
+                        ui.palette_query = query.clone();
+                    }
+                    let scene = ui.to_scene(100);
+                    print!(
+                        "{}",
+                        keplr_render::PaintBackend::paint(
+                            &keplr_render::AnsiBackend,
+                            &scene,
+                            100
+                        )
+                    );
+                }
+            }
         }
     }
     Ok(())
