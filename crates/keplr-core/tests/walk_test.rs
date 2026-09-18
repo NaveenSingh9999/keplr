@@ -1,5 +1,5 @@
 use keplr_core::Workspace;
-use std::{fs, path::PathBuf};
+use std::fs;
 
 #[test]
 fn walk_skips_git_target_and_caps_limit() {

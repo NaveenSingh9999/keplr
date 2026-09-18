@@ -1,5 +1,5 @@
 use keplr_core::buffer::Buffer;
-use std::{fs, path::PathBuf};
+use std::fs;
 
 #[test]
 fn buffer_load_line_save_roundtrip() {

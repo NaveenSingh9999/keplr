@@ -1,5 +1,4 @@
 use keplr_build::{load_tasks, run_task};
-use std::path::PathBuf;
 
 #[test]
 fn load_and_run_echo_task() {

@@ -1,4 +1,4 @@
-use std::{net::TcpListener, path::PathBuf};
+use std::net::TcpListener;
 
 #[tokio::test]
 async fn health_and_search_respond() {
