@@ -5,6 +5,7 @@ use std::{
 
 pub mod buffer;
 pub mod search;
+pub mod git;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Workspace {

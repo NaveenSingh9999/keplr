@@ -16,6 +16,21 @@ struct Cli {
 }
 
 #[derive(Subcommand)]
+enum GitCmd {
+    Status,
+    Log {
+        #[arg(long, default_value_t = 20)]
+        limit: usize,
+    },
+    Branches,
+    Diff,
+    Commit {
+        #[arg(short, long)]
+        message: String,
+    },
+}
+
+#[derive(Subcommand)]
 enum Cmd {
     Files {
         query: String,
@@ -87,6 +102,10 @@ enum Cmd {
     Snippets {
         lang: String,
         prefix: Option<String>,
+    },
+    Git {
+        #[command(subcommand)]
+        cmd: GitCmd,
     },
     Serve {
         #[arg(long, default_value_t = 7137)]
@@ -481,6 +500,30 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
         }
+        Cmd::Git { cmd } => match cmd {
+            GitCmd::Status => {
+                for e in keplr_core::git::status(&cli.root)? {
+                    println!("{}{} {}", e.staged, e.unstaged, e.path);
+                }
+            }
+            GitCmd::Log { limit } => {
+                for e in keplr_core::git::log(&cli.root, limit)? {
+                    println!("{} {} {} {}", &e.hash[..8.min(e.hash.len())], e.date, e.author, e.message);
+                }
+            }
+            GitCmd::Branches => {
+                for b in keplr_core::git::branches(&cli.root)? {
+                    let mark = if b.current { "*" } else { " " };
+                    println!("{mark} {}", b.name);
+                }
+            }
+            GitCmd::Diff => {
+                print!("{}", keplr_core::git::diff_stat(&cli.root)?);
+            }
+            GitCmd::Commit { message } => {
+                print!("{}", keplr_core::git::commit(&cli.root, &message)?);
+            }
+        },
         Cmd::Serve { port, token } => {
             let resolved = keplr_serve::resolve_token(&cli.root, &token);
             if resolved.is_empty() {

@@ -345,6 +345,38 @@ async fn snippets(Query(params): Query<HashMap<String, String>>) -> Json<serde_j
     }
 }
 
+async fn git_status(State(state): State<AppState>) -> Json<serde_json::Value> {
+    match keplr_core::git::status(&state.root) {
+        Ok(entries) => Json(serde_json::json!({ "entries": entries })),
+        Err(e) => Json(serde_json::json!({ "error": format!("{e:#}") })),
+    }
+}
+
+async fn git_log(
+    State(state): State<AppState>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Json<serde_json::Value> {
+    let limit: usize = params.get("limit").and_then(|v| v.parse().ok()).unwrap_or(20);
+    match keplr_core::git::log(&state.root, limit) {
+        Ok(entries) => Json(serde_json::json!({ "entries": entries })),
+        Err(e) => Json(serde_json::json!({ "error": format!("{e:#}") })),
+    }
+}
+
+async fn git_branches(State(state): State<AppState>) -> Json<serde_json::Value> {
+    match keplr_core::git::branches(&state.root) {
+        Ok(entries) => Json(serde_json::json!({ "entries": entries })),
+        Err(e) => Json(serde_json::json!({ "error": format!("{e:#}") })),
+    }
+}
+
+async fn git_diff(State(state): State<AppState>) -> Json<serde_json::Value> {
+    match keplr_core::git::diff_stat(&state.root) {
+        Ok(stat) => Json(serde_json::json!({ "stat": stat })),
+        Err(e) => Json(serde_json::json!({ "error": format!("{e:#}") })),
+    }
+}
+
 async fn lfs_pointer(
     State(state): State<AppState>,
     Query(params): Query<HashMap<String, String>>,
@@ -479,6 +511,10 @@ pub async fn serve_with_token(root: PathBuf, port: u16, token: String) -> anyhow
         .route("/diagnostics", get(diagnostics))
         .route("/highlight", get(highlight))
         .route("/snippets", get(snippets))
+        .route("/git/status", get(git_status))
+        .route("/git/log", get(git_log))
+        .route("/git/branches", get(git_branches))
+        .route("/git/diff", get(git_diff))
         .route("/lfs/pointer", get(lfs_pointer))
         .route("/sync/merge", post(sync_merge))
         .route(
