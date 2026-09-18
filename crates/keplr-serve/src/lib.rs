@@ -343,6 +343,24 @@ async fn index_status(State(state): State<AppState>) -> Json<serde_json::Value> 
     }))
 }
 
+async fn symbols(
+    State(state): State<AppState>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Json<serde_json::Value> {
+    let rel = params.get("path").cloned().unwrap_or_default();
+    let full = state.root.join(&rel);
+    let lang = keplr_lang::LangKind::from_path(&full);
+    let text = keplr_core::buffer::Buffer::load(full)
+        .map(|b| b.rope.to_string())
+        .unwrap_or_default();
+    let lines: Vec<String> = text.lines().map(str::to_string).collect();
+    Json(serde_json::json!({
+        "file": rel,
+        "lang": format!("{lang:?}"),
+        "symbols": keplr_lang::symbols_detailed(lang, &lines),
+    }))
+}
+
 async fn diagnostics(
     State(state): State<AppState>,
     Query(params): Query<HashMap<String, String>>,
@@ -643,6 +661,7 @@ pub async fn serve_full(
         .route("/index/status", get(index_status))
         .route("/diagnostics", get(diagnostics))
         .route("/highlight", get(highlight))
+        .route("/symbols", get(symbols))
         .route("/snippets", get(snippets))
         .route("/git/status", get(git_status))
         .route("/git/log", get(git_log))

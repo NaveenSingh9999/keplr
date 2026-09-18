@@ -8,12 +8,15 @@
   :root {
     --bg: #0e1116;
     --surface: #161b22;
+    --surface2: #1c2330;
     --border: #2a3340;
     --text: #e6edf3;
     --dim: #8b949e;
     --accent: #58a6ff;
     --error: #f85149;
+    --warn: #d29922;
     --ok: #3fb950;
+    --mono: "SF Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
@@ -21,103 +24,110 @@
     margin: 0;
     background: var(--bg);
     color: var(--text);
-    font-family: "SF Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-family: var(--mono);
     font-size: 13px;
     display: flex;
     flex-direction: column;
     height: 100vh;
+    overflow: hidden;
   }
-  header {
+  /* ---- titlebar ---- */
+  #titlebar {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 8px 12px;
+    gap: 10px;
+    padding: 6px 12px;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
+    flex: none;
   }
-  header .logo { color: var(--accent); font-weight: bold; }
-  header #root { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-  header input {
+  #titlebar .logo { color: var(--accent); font-weight: bold; }
+  #titlebar #root { color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px; }
+  #finder {
+    flex: 1;
+    max-width: 520px;
+    margin: 0 auto;
     background: var(--bg);
     color: var(--text);
     border: 1px solid var(--border);
     border-radius: 6px;
-    padding: 4px 8px;
+    padding: 4px 12px;
     font: inherit;
-    width: 220px;
+    text-align: center;
+  }
+  #finder::placeholder { color: var(--dim); }
+  #titlebar .spacer { flex: 1; }
+  #titlebar input#token {
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 4px 8px; font: inherit; width: 170px;
   }
   #dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); flex: none; }
   #dot.ok { background: var(--ok); }
   #dot.bad { background: var(--error); }
-  main { display: flex; flex: 1; min-height: 0; }
-  #left {
-    width: 260px;
-    flex: none;
-    background: var(--surface);
-    border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-  }
-  #left input, #needle {
-    margin: 8px;
-    background: var(--bg);
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 5px 8px;
-    font: inherit;
-  }
-  #files { overflow-y: auto; flex: 1; padding: 0 4px 8px; }
-  #files div {
-    padding: 3px 8px;
-    border-radius: 4px;
-    cursor: pointer;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  #files div:hover { background: var(--border); }
-  #files div.sel { background: var(--border); color: var(--accent); }
-  #center { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-  #pathbar { padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--dim); }
-  #pathbar b { color: var(--text); font-weight: normal; }
-  #pathbar button, #bbody .task button {
-    background: var(--border); color: var(--text); border: none;
-    border-radius: 4px; font: inherit; padding: 2px 10px; cursor: pointer;
-  }
-  #pathbar button.on { color: var(--accent); }
-  #editor {
-    flex: 1; display: none; background: var(--bg); color: var(--text);
-    border: none; outline: none; resize: none; padding: 8px 12px;
-    font: inherit; line-height: 1.5; white-space: pre;
-  }
-  #code { flex: 1; overflow: auto; margin: 0; padding: 8px 0 16px; }
-  #code .ln { display: flex; }
-  #code .no { width: 52px; flex: none; text-align: right; padding-right: 12px; color: var(--dim); user-select: none; }
-  #code .tx { white-space: pre; }
-  #code .ln.cur { background: #1c2530; }
-  .kw { color: var(--accent); font-weight: bold; }
-  .st { color: var(--ok); }
-  .cm { color: var(--dim); }
-  .nu { color: #d29922; }
-  #bottom {
-    height: 180px;
-    flex: none;
-    border-top: 1px solid var(--border);
-    background: var(--surface);
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-  }
-  #btabs { display: flex; gap: 4px; padding: 6px 12px 0; }
-  #btabs button {
+  .iconbtn {
     background: none; border: none; color: var(--dim);
-    font: inherit; padding: 4px 10px; cursor: pointer;
+    font: inherit; cursor: pointer; padding: 2px 6px; border-radius: 4px;
+  }
+  .iconbtn:hover, .iconbtn.on { color: var(--text); background: var(--border); }
+  /* ---- workbench ---- */
+  #workbench { display: flex; flex: 1; min-height: 0; }
+  .dock { background: var(--surface); display: flex; flex-direction: column; min-height: 0; flex: none; }
+  .dock.hidden { display: none; }
+  #left { width: 270px; border-right: 1px solid var(--border); resize: horizontal; overflow: auto; min-width: 170px; max-width: 480px; }
+  #right { width: 230px; border-left: 1px solid var(--border); resize: horizontal; overflow: auto; min-width: 150px; max-width: 420px; direction: rtl; }
+  #right > * { direction: ltr; }
+  .docktabs { display: flex; gap: 2px; padding: 6px 8px 0; flex: none; }
+  .docktabs button {
+    background: none; border: none; color: var(--dim);
+    font: inherit; font-size: 12px; padding: 4px 8px; cursor: pointer;
     border-bottom: 2px solid transparent;
   }
-  #btabs button.sel { color: var(--text); border-bottom-color: var(--accent); }
-  #bbody { flex: 1; overflow: auto; padding: 8px 12px; }
+  .docktabs button.sel { color: var(--text); border-bottom-color: var(--accent); }
+  .dockbody { flex: 1; overflow: auto; padding: 4px 4px 10px; min-height: 0; }
+  /* file tree */
+  .tnode { user-select: none; }
+  .trow {
+    display: flex; align-items: center; gap: 6px;
+    padding: 2px 6px; border-radius: 4px; cursor: pointer;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .trow:hover { background: var(--border); }
+  .trow.sel { background: var(--border); color: var(--accent); }
+  .trow svg { flex: none; }
+  .tkids { margin-left: 14px; }
+  .tkids.closed { display: none; }
+  .tri { color: var(--dim); font-size: 10px; width: 12px; flex: none; text-align: center; }
+  /* ---- center ---- */
+  #center { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg); }
+  #tabsbar {
+    display: flex; align-items: stretch; gap: 2px;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 4px 8px 0; overflow-x: auto; flex: none;
+  }
+  .tab {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 8px 5px 12px; cursor: pointer; white-space: nowrap;
+    color: var(--dim); border-bottom: 2px solid transparent; font-size: 12px;
+  }
+  .tab.sel { color: var(--text); border-bottom-color: var(--accent); background: var(--bg); border-radius: 6px 6px 0 0; }
+  .tab .dirty { color: var(--warn); }
+  .tab .x { color: var(--dim); border-radius: 4px; padding: 0 4px; }
+  .tab .x:hover { color: var(--error); background: var(--border); }
+  #crumbs { padding: 5px 14px; color: var(--dim); font-size: 12px; border-bottom: 1px solid var(--border); flex: none; }
+  #crumbs b { color: var(--text); font-weight: normal; }
+  #editorwrap { flex: 1; min-height: 0; overflow: hidden; position: relative; }
+  #editorwrap .cm-editor { height: 100%; }
+  #editorwrap .cm-scroller { overflow: auto; }
+  #fallback {
+    display: none; width: 100%; height: 100%; background: var(--bg); color: var(--text);
+    border: none; outline: none; resize: none; padding: 8px 12px;
+    font: inherit; line-height: 1.55; white-space: pre;
+  }
+  /* ---- bottom dock ---- */
+  #bottom { height: 190px; flex: none; background: var(--surface); border-top: 1px solid var(--border); display: flex; flex-direction: column; resize: vertical; overflow: auto; min-height: 90px; max-height: 60vh; }
+  #bottom.hidden { display: none; }
+  #bbody { flex: 1; overflow: auto; padding: 6px 14px; min-height: 0; }
   #bbody .hit { cursor: pointer; padding: 2px 0; }
   #bbody .hit:hover { color: var(--accent); }
   #bbody .task { display: flex; gap: 10px; align-items: baseline; padding: 3px 0; }
@@ -126,352 +136,805 @@
     border-radius: 4px; font: inherit; padding: 2px 10px; cursor: pointer;
   }
   #bbody pre { white-space: pre-wrap; margin: 6px 0 0; color: var(--dim); }
+  #bbody .prob { cursor: pointer; padding: 2px 0; }
+  #bbody .prob:hover { color: var(--accent); }
+  #bbody .logline { padding: 1px 0; color: var(--dim); }
+  /* ---- statusbar ---- */
   #statusbar {
-    display: flex; gap: 14px; padding: 4px 12px;
+    display: flex; gap: 14px; padding: 4px 12px; flex: none;
     background: var(--surface); border-top: 1px solid var(--border);
-    color: var(--dim); font-size: 12px;
+    color: var(--dim); font-size: 12px; align-items: center;
   }
+  #statusbar .right { margin-left: auto; display: flex; gap: 14px; }
   .err { color: var(--error); }
+  /* ---- palette ---- */
+  #palwrap {
+    display: none; position: fixed; top: 64px; left: 50%; transform: translateX(-50%);
+    width: min(560px, 90vw); background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 8px; z-index: 10;
+    box-shadow: 0 12px 40px rgba(0,0,0,.55); overflow: hidden;
+  }
+  #palwrap.open { display: block; }
+  #palinput {
+    width: 100%; background: transparent; color: var(--text);
+    border: none; outline: none; padding: 10px 14px; font: inherit; font-size: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  #palist { max-height: 300px; overflow: auto; padding: 4px; }
+  #palist div { padding: 6px 10px; border-radius: 4px; cursor: pointer; }
+  #palist div.sel { background: var(--border); color: var(--accent); }
+  #palist .cmd { color: var(--dim); font-size: 12px; margin-left: 8px; }
 </style>
+<script type="importmap">
+{"imports": {
+  "codemirror": "https://esm.sh/codemirror@6.0.1",
+  "@codemirror/": "https://esm.sh/@codemirror/"
+}}
+</script>
 </head>
 <body>
-<header>
+<header id="titlebar">
   <span class="logo">keplr</span>
   <span id="root">…</span>
+  <input id="finder" placeholder="find files…  (ctrl+p)" autocomplete="off" spellcheck="false">
+  <span class="spacer"></span>
+  <button class="iconbtn" id="t-left" title="project panel">◧</button>
+  <button class="iconbtn" id="t-right" title="outline">◨</button>
+  <button class="iconbtn" id="t-bottom" title="panel">◩</button>
   <input id="token" type="password" placeholder="token (if gated)" autocomplete="off">
   <span id="dot"></span>
 </header>
-<main>
-  <div id="left">
-    <input id="fquery" placeholder="find files…" autocomplete="off" spellcheck="false">
-    <div id="files"></div>
+<div id="workbench">
+  <div class="dock" id="left">
+    <div class="docktabs">
+      <button data-ltab="project" class="sel">project</button>
+      <button data-ltab="search">search</button>
+    </div>
+    <div class="dockbody" id="leftbody"></div>
   </div>
   <div id="center">
-    <div id="pathbar"><b>(no file)</b><span id="ebtns" style="float:right;display:none"><button id="btn-edit">edit</button> <button id="btn-save" style="display:none">save</button> <button id="btn-cancel" style="display:none">cancel</button></span></div>
-    <pre id="code"></pre>
-    <textarea id="editor" spellcheck="false"></textarea>
+    <div id="tabsbar"></div>
+    <div id="crumbs"><b>(no file)</b></div>
+    <div id="editorwrap"><textarea id="fallback" spellcheck="false"></textarea></div>
   </div>
-</main>
-<div id="bottom">
-  <div id="btabs">
-    <button id="tab-search" class="sel">search</button>
-    <button id="tab-tasks">tasks</button>
+  <div class="dock hidden" id="right">
+    <div class="docktabs"><button class="sel">symbols</button></div>
+    <div class="dockbody" id="symbols"></div>
   </div>
-  <div style="padding:0 12px;"><input id="needle" placeholder="search content…" autocomplete="off" spellcheck="false" style="width:100%;margin:8px 0;"></div>
+</div>
+<div id="bottom" class="hidden">
+  <div class="docktabs">
+    <button data-btab="search" class="sel">search</button>
+    <button data-btab="problems">problems</button>
+    <button data-btab="tasks">tasks</button>
+    <button data-btab="console">console</button>
+  </div>
+  <div style="padding:0 12px;"><input id="needle" placeholder="search content…" autocomplete="off" spellcheck="false" style="width:100%;margin:6px 0;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font:inherit;"></div>
   <div id="bbody"></div>
 </div>
-<div id="statusbar"><span id="sbranch">branch: …</span><span id="sfiles">files: …</span><span id="smsg"></span></div>
-<script>
-(function () {
-  "use strict";
-  var token = "";
-  var openPath = "";
-  var openLine = 0;
-  var rawText = "";
-  var editing = false;
-  var editDirty = false;
-  var wsRoot = "";
+<div id="statusbar">
+  <span id="sbranch">branch: …</span><span id="serrors">errors: 0</span>
+  <span class="right"><span id="slang">–</span><span id="scursor">–</span><span id="sfiles">files: …</span></span>
+</div>
+<div id="palwrap"><input id="palinput" placeholder="type a command or filename…" autocomplete="off" spellcheck="false"><div id="palist"></div></div>
+<script type="module">
+import { EditorView, basicSetup } from "codemirror";
+import { EditorState, Compartment } from "@codemirror/state";
+import { oneDark } from "@codemirror/theme-one-dark";
+import { keymap } from "@codemirror/view";
 
-  function rel(p) {
-    if (wsRoot && (p === wsRoot || p.indexOf(wsRoot + "/") === 0)) {
-      return p.slice(wsRoot.length + 1) || p;
+/* ============ transport ============ */
+let token = "";
+let wsRoot = "";
+function url(path) {
+  const q = token ? ((path.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(token)) : "";
+  return path + q;
+}
+async function get(path) {
+  const r = await fetch(url(path));
+  if (!r.ok) throw new Error("http " + r.status);
+  return r.json();
+}
+async function post(path, body) {
+  const r = await fetch(url(path), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) throw new Error("http " + r.status);
+  return r.json();
+}
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function rel(p) {
+  if (wsRoot && (p === wsRoot || p.startsWith(wsRoot + "/"))) {
+    return p.slice(wsRoot.length + 1) || p;
+  }
+  return p;
+}
+
+/* ============ icons (inline SVG, no assets) ============ */
+const LANG_COLORS = {
+  rust: "#dea584", python: "#3572A5", typescript: "#3178c6", tsx: "#3178c6",
+  javascript: "#f1e05a", cpp: "#f34b7d", c: "#555555", csharp: "#178600",
+  go: "#00ADD8", java: "#b07219", swift: "#F05138", kotlin: "#A97BFF",
+  ruby: "#701516", php: "#4F5D95", html: "#e34c26", css: "#563d7c",
+  json: "#cbcb41", toml: "#9c4221", yaml: "#cb171e", markdown: "#083fa1",
+  shell: "#89e051", sql: "#e38c00", lua: "#000080", laml: "#58a6ff", text: "#8b949e"
+};
+function fileIcon(lang, name) {
+  const c = LANG_COLORS[lang] || LANG_COLORS.text;
+  const label = (lang || "txt").slice(0, 3);
+  return `<svg width="14" height="14" viewBox="0 0 16 16"><rect x="3" y="1.5" width="10" height="13" rx="1.5" fill="none" stroke="${c}" stroke-width="1.4"/><text x="8" y="10.5" font-size="5" text-anchor="middle" fill="${c}" font-family="monospace">${esc(label)}</text></svg>`;
+}
+const FOLDER_CLOSED = `<svg width="14" height="14" viewBox="0 0 16 16"><path d="M1.5 4.5c0-.8.7-1.5 1.5-1.5h3l1.5 2h6c.8 0 1.5.7 1.5 1.5v5c0 .8-.7 1.5-1.5 1.5h-11c-.8 0-1.5-.7-1.5-1.5z" fill="none" stroke="#8b949e" stroke-width="1.3"/></svg>`;
+const FOLDER_OPEN = `<svg width="14" height="14" viewBox="0 0 16 16"><path d="M1.5 3h4l1.5 2h7.5c.8 0 1.5.7 1.5 1.5v1h-13v-3c0-.8.7-1.5 1.5-1.5z" fill="#2a3340" stroke="#8b949e" stroke-width="1.1"/><rect x="1.5" y="7.5" width="13" height="5" rx="1" fill="#2a3340" stroke="#8b949e" stroke-width="1.1"/></svg>`;
+
+/* ============ state ============ */
+const S = {
+  tabs: [],            // {path, lang, text, saved, sel}
+  active: -1,
+  files: [],           // rel paths
+  leftTab: "project",
+  bottomTab: "search",
+  problems: [],
+  palSel: 0,
+  palItems: [],
+  log: [],
+  docks: { left: true, right: false, bottom: false },
+};
+function saveLayout() {
+  try { localStorage.setItem("keplr-layout", JSON.stringify(S.docks)); } catch (e) {}
+}
+function loadLayout() {
+  try {
+    const l = JSON.parse(localStorage.getItem("keplr-layout") || "null");
+    if (l) S.docks = Object.assign(S.docks, l);
+  } catch (e) {}
+}
+function langOf(path) {
+  const ext = (path.split(".").pop() || "").toLowerCase();
+  const map = {
+    ts: "typescript", tsx: "tsx", js: "javascript", jsx: "javascript",
+    cpp: "cpp", cc: "cpp", cxx: "cpp", h: "cpp", hpp: "cpp",
+    go: "go", rs: "rust", lm: "laml", py: "python", c: "c", cs: "csharp",
+    java: "java", swift: "swift", kt: "kotlin", kts: "kotlin", rb: "ruby",
+    php: "php", html: "html", htm: "html", css: "css", json: "json",
+    toml: "toml", yaml: "yaml", yml: "yaml", md: "markdown", sh: "shell",
+    bash: "shell", sql: "sql", lua: "lua"
+  };
+  return map[ext] || "text";
+}
+
+/* ============ editor (CodeMirror, textarea fallback) ============ */
+let ED = null; // adapter or null
+function langExt(label, mods) {
+  switch (label) {
+    case "rust": return mods.rust ? mods.rust() : [];
+    case "python": return mods.python ? mods.python() : [];
+    case "javascript": return mods.javascript ? mods.javascript() : [];
+    case "typescript": return mods.javascript ? mods.javascript({ typescript: true }) : [];
+    case "tsx": return mods.javascript ? mods.javascript({ typescript: true, jsx: true }) : [];
+    case "cpp": case "c": case "csharp": case "java": case "kotlin":
+      return mods.cpp ? mods.cpp() : [];
+    case "go": return mods.go ? mods.go() : [];
+    case "html": case "php": return mods.html ? mods.html() : [];
+    case "css": return mods.css ? mods.css() : [];
+    case "json": return mods.json ? mods.json() : [];
+    case "markdown": return mods.markdown ? mods.markdown() : [];
+    case "sql": return mods.sql ? mods.sql() : [];
+    default: return [];
+  }
+}
+async function bootEditor() {
+  const wrap = document.getElementById("editorwrap");
+  try {
+    const cm = await import("codemirror");
+    const state = await import("@codemirror/state");
+    const view = await import("@codemirror/view");
+    const theme = await import("@codemirror/theme-one-dark");
+    const mods = {};
+    const loads = {
+      rust: "@codemirror/lang-rust", python: "@codemirror/lang-python",
+      javascript: "@codemirror/lang-javascript", cpp: "@codemirror/lang-cpp",
+      go: "@codemirror/lang-go", html: "@codemirror/lang-html",
+      css: "@codemirror/lang-css", json: "@codemirror/lang-json",
+      markdown: "@codemirror/lang-markdown", sql: "@codemirror/lang-sql",
+      php: "@codemirror/lang-php", java: "@codemirror/lang-java"
+    };
+    for (const k of Object.keys(loads)) {
+      try { mods[k.replace("javascript", "javascript")] = await import(loads[k]); }
+      catch (e) { /* language stays plain on CDN failure */ }
     }
-    return p;
-  }
-
-  function url(path) {
-    var q = token ? ((path.indexOf("?") >= 0 ? "&" : "?") + "token=" + encodeURIComponent(token)) : "";
-    return path + q;
-  }
-  function get(path) {
-    return fetch(url(path)).then(function (r) {
-      if (!r.ok) throw new Error("http " + r.status);
-      return r.json();
+    const langConf = new state.Compartment();
+    const onChange = view.EditorView.updateListener.of(v => {
+      if (v.docChanged) markDirty(true);
+      const s = v.state.selection.main;
+      const line = v.state.doc.lineAt(s.head);
+      setCursor(line.number, s.head - line.from + 1);
     });
-  }
-  function post(path, body) {
-    return fetch(url(path), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    }).then(function (r) {
-      if (!r.ok) throw new Error("http " + r.status);
-      return r.json();
+    const saveKey = { key: "Mod-s", preventDefault: true, run: () => { saveActive(); return true; } };
+    const ed = new cm.EditorView({
+      doc: "",
+      extensions: [
+        cm.basicSetup, theme.oneDark, view.EditorView.lineWrapping,
+        langConf.of([]), view.keymap.of([saveKey]), onChange
+      ],
+      parent: wrap
     });
-  }
-  function esc(s) {
-    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  }
-  function setDot(ok) {
-    var d = document.getElementById("dot");
-    d.className = ok ? "ok" : "bad";
-  }
-  function msg(t, isErr) {
-    var el = document.getElementById("smsg");
-    el.textContent = t;
-    el.className = isErr ? "err" : "";
-  }
-
-  function paint(codeEl, text) {
-    codeEl.innerHTML = "";
-    var lines = text.split("\n");
-    lines.forEach(function (line, i) {
-      var row = document.createElement("div");
-      row.className = "ln" + ((i + 1) === openLine ? " cur" : "");
-      var no = document.createElement("span");
-      no.className = "no";
-      no.textContent = i + 1;
-      var tx = document.createElement("span");
-      tx.className = "tx";
-      tx.innerHTML = colorize(line);
-      row.appendChild(no);
-      row.appendChild(tx);
-      codeEl.appendChild(row);
+    ED = {
+      cm: true, view: ed, langConf, mods, state,
+      async setLang(label) {
+        const ext = langExt(label, mods);
+        ed.dispatch({ effects: langConf.reconfigure(ext) });
+      },
+      setDoc(text) { ed.dispatch({ changes: { from: 0, to: ed.state.doc.length, insert: text } }); },
+      getDoc() { return ed.state.doc.toString(); },
+      goto(line) {
+        try {
+          const l = ed.state.doc.line(Math.max(1, Math.min(line, ed.state.doc.lines)));
+          ed.dispatch({ selection: { anchor: l.from }, effects: view.EditorView.scrollIntoView(l.from, { y: "center" }) });
+          ed.focus();
+        } catch (e) {}
+      },
+      focus() { ed.focus(); }
+    };
+    log("console", "editor: CodeMirror 6");
+  } catch (e) {
+    const ta = document.getElementById("fallback");
+    ta.style.display = "block";
+    ta.addEventListener("input", () => markDirty(true));
+    ta.addEventListener("keydown", ev => {
+      if ((ev.ctrlKey || ev.metaKey) && ev.key === "s") { ev.preventDefault(); saveActive(); }
+      else if (ev.key === "Tab") {
+        ev.preventDefault();
+        const s = ta.selectionStart;
+        ta.value = ta.value.slice(0, s) + "  " + ta.value.slice(ta.selectionEnd);
+        ta.selectionStart = ta.selectionEnd = s + 2;
+        markDirty(true);
+      }
     });
-    var cur = codeEl.querySelector(".cur");
-    if (cur) cur.scrollIntoView({ block: "center" });
+    ED = {
+      cm: false,
+      async setLang() {},
+      setDoc(t) { ta.value = t; },
+      getDoc() { return ta.value; },
+      goto(line) {
+        const lines = ta.value.split("\n");
+        let pos = 0;
+        for (let i = 0; i < Math.min(line - 1, lines.length); i++) pos += lines[i].length + 1;
+        ta.focus();
+        ta.selectionStart = ta.selectionEnd = pos;
+        setCursor(line, 1);
+      },
+      focus() { ta.focus(); }
+    };
+    log("console", "editor: offline fallback (CDN unreachable)");
   }
+}
 
-  // tiny client-side highlighter (server /highlight spans shade single lines too)
-  var KEYWORDS = ("fn let mut pub struct enum impl trait use mod return if else match for while loop "
-    + "function const var class extends new import export from interface type async await try catch "
-    + "def class func var const type map go select package nil "
-    + "serve on send broadcast members async return true false null").split(" ");
-  function colorize(line) {
-    var out = "";
-    var i = 0;
-    function flushPlain(s) { out += esc(s); }
-    while (i < line.length) {
-      var two = line.slice(i, i + 2);
-      if (two === "//" || line[i] === "~" || line[i] === "#") {
-        out += '<span class="cm">' + esc(line.slice(i)) + "</span>";
-        break;
-      }
-      if (line[i] === '"') {
-        var j = i + 1;
-        while (j < line.length && line[j] !== '"') { j += (line[j] === "\\" ? 2 : 1); }
-        j = Math.min(line.length, j + 1);
-        out += '<span class="st">' + esc(line.slice(i, j)) + "</span>";
-        i = j;
-        continue;
-      }
-      var m = /^[A-Za-z_][A-Za-z0-9_]*/.exec(line.slice(i));
-      if (m) {
-        var w = m[0];
-        if (KEYWORDS.indexOf(w) >= 0) out += '<span class="kw">' + esc(w) + "</span>";
-        else out += esc(w);
-        i += w.length;
-        continue;
-      }
-      var n = /^[0-9][0-9A-Za-z_.]*/.exec(line.slice(i));
-      if (n) {
-        out += '<span class="nu">' + esc(n[0]) + "</span>";
-        i += n[0].length;
-        continue;
-      }
-      out += esc(line[i]);
-      i += 1;
+/* ============ tabs ============ */
+function markDirty(d) {
+  const t = S.tabs[S.active];
+  if (!t) return;
+  t.dirty = d;
+  renderTabs();
+}
+function renderTabs() {
+  const bar = document.getElementById("tabsbar");
+  bar.innerHTML = "";
+  S.tabs.forEach((t, i) => {
+    const d = document.createElement("div");
+    d.className = "tab" + (i === S.active ? " sel" : "");
+    const nm = document.createElement("span");
+    nm.textContent = rel(t.path).split("/").pop() + (t.dirty ? " ●" : "");
+    if (t.dirty) nm.classList.add("dirty");
+    const x = document.createElement("span");
+    x.className = "x";
+    x.textContent = "×";
+    x.onclick = ev => { ev.stopPropagation(); closeTab(i); };
+    d.appendChild(nm);
+    d.appendChild(x);
+    d.onclick = () => activateTab(i);
+    d.title = rel(t.path);
+    bar.appendChild(d);
+  });
+  const crumbs = document.getElementById("crumbs");
+  const t = S.tabs[S.active];
+  if (!t) { crumbs.innerHTML = "<b>(no file)</b>"; return; }
+  const parts = rel(t.path).split("/");
+  crumbs.innerHTML = parts.map((p, i) =>
+    i === parts.length - 1 ? "<b>" + esc(p) + "</b>" : esc(p)
+  ).join(" <span style='opacity:.5'>›</span> ");
+  document.getElementById("slang").textContent = t.lang;
+}
+function snapshotTab() {
+  const t = S.tabs[S.active];
+  if (!t || !ED) return;
+  t.text = ED.getDoc();
+  try {
+    if (ED.cm) {
+      const s = ED.view.state.selection.main;
+      t.sel = s.head;
     }
-    return out;
+  } catch (e) {}
+}
+function activateTab(i) {
+  if (i < 0 || i >= S.tabs.length) return;
+  snapshotTab();
+  S.active = i;
+  const t = S.tabs[i];
+  if (ED.cm) {
+    ED.setDoc(t.text);
+    ED.setLang(t.lang);
+    try {
+      const pos = Math.min(t.sel || 0, ED.view.state.doc.length);
+      ED.view.dispatch({ selection: { anchor: pos } });
+    } catch (e) {}
+  } else {
+    ED.setDoc(t.text);
   }
+  renderTabs();
+  renderProblems();
+  loadSymbols(t.path);
+  ED.focus();
+}
+function closeTab(i) {
+  const t = S.tabs[i];
+  if (t && t.dirty && !confirm("Close without saving " + rel(t.path) + "?")) return;
+  S.tabs.splice(i, 1);
+  if (S.active >= S.tabs.length) S.active = S.tabs.length - 1;
+  if (S.tabs.length === 0) {
+    if (ED) ED.setDoc("");
+    renderTabs();
+    renderProblems();
+    document.getElementById("symbols").innerHTML = "";
+    return;
+  }
+  const j = S.active;
+  S.active = -1;
+  activateTab(Math.min(j, S.tabs.length - 1));
+}
+async function openFile(path, line) {
+  const found = S.tabs.findIndex(t => t.path === path);
+  if (found >= 0) {
+    activateTab(found);
+  } else {
+    const j = await get("/open?path=" + encodeURIComponent(path));
+    if (j.error) throw new Error(j.error);
+    const lang = langOf(path);
+    S.tabs.push({ path, lang, text: j.text || "", saved: j.text || "", sel: 0, dirty: false });
+    S.active = -1;
+    activateTab(S.tabs.length - 1);
+  }
+  if (line) gotoLine(line);
+  document.querySelectorAll("#leftbody .trow").forEach(d => {
+    d.classList.toggle("sel", d.dataset.path === path);
+  });
+  if (langOf(path) === "laml") loadProblems(path);
+  else renderProblems();
+  loadSymbols(path);
+  setDot(true);
+  msg("");
+}
+function gotoLine(line) {
+  if (ED) ED.goto(line || 1);
+}
+async function saveActive() {
+  const t = S.tabs[S.active];
+  if (!t || !ED) return;
+  snapshotTab();
+  try {
+    const j = await post("/save", { path: t.path, content: t.text });
+    if (!j.ok) throw new Error(j.error || "save failed");
+    t.saved = t.text;
+    t.dirty = false;
+    renderTabs();
+    const r = j.report || {};
+    msg("saved " + (r.bytes || 0) + "b · " + String(r.hash || "").slice(0, 12) + " · git=" + (r.git_committed ? "committed" : "skipped"));
+    log("console", "saved " + rel(t.path));
+    if (t.lang === "laml") loadProblems(t.path);
+    setDot(true);
+  } catch (e) { setDot(false); msg(String(e), true); }
+}
 
-  function openFile(path, line) {
-    openPath = path;
-    openLine = line || 0;
-    exitEdit();
-    document.querySelectorAll("#files div").forEach(function (d) {
-      d.classList.toggle("sel", d.dataset.path === path);
+/* ============ file tree ============ */
+function buildTree(paths) {
+  const root = {};
+  paths.forEach(p => {
+    const parts = rel(p).split("/");
+    let node = root;
+    parts.forEach((part, i) => {
+      const last = i === parts.length - 1;
+      node[part] = node[part] || { __kids: null, __full: null };
+      if (last) node[part].__full = p;
+      else {
+        node[part].__kids = node[part].__kids || {};
+        node = node[part].__kids;
+      }
     });
-    get("/open?path=" + encodeURIComponent(path) + (line ? "&line=0" : ""))
-      .then(function (j) {
-        if (j.error) throw new Error(j.error);
-        document.querySelector("#pathbar b").textContent = rel(path);
-        document.getElementById("ebtns").style.display = "";
-        rawText = j.text || "";
-        paint(document.getElementById("code"), rawText);
-        setDot(true);
-        msg("");
-      })
-      .catch(function (e) { setDot(false); msg(String(e), true); });
-  }
-
-  function setEdit(on) {
-    editing = on;
-    editDirty = false;
-    document.getElementById("code").style.display = on ? "none" : "";
-    var ta = document.getElementById("editor");
-    ta.style.display = on ? "block" : "none";
-    document.getElementById("btn-edit").style.display = on ? "none" : "";
-    document.getElementById("btn-save").style.display = on ? "" : "none";
-    document.getElementById("btn-cancel").style.display = on ? "" : "none";
-    if (on) {
-      ta.value = rawText;
-      ta.focus();
-      msg("editing — ctrl+s to save, esc to cancel");
+  });
+  return root;
+}
+function renderTree(box, node, depth) {
+  const names = Object.keys(node).sort((a, b) => {
+    const da = node[a].__kids ? 0 : 1, db = node[b].__kids ? 0 : 1;
+    return da - db || (a < b ? -1 : 1);
+  });
+  names.forEach(name => {
+    const n = node[name];
+    const row = document.createElement("div");
+    row.className = "trow";
+    row.style.paddingLeft = (6 + depth * 14) + "px";
+    if (n.__kids) {
+      row.innerHTML = '<span class="tri">▸</span>' + FOLDER_CLOSED + "<span></span>";
+      row.lastChild.textContent = name;
+      const kids = document.createElement("div");
+      kids.className = "tkids closed";
+      let open = false;
+      row.onclick = () => {
+        open = !open;
+        kids.classList.toggle("closed", !open);
+        row.querySelector(".tri").textContent = open ? "▾" : "▸";
+      };
+      box.appendChild(row);
+      box.appendChild(kids);
+      renderTree(kids, n.__kids, depth + 1);
     } else {
-      msg("");
+      const lang = langOf(n.__full || name);
+      row.innerHTML = '<span class="tri"></span>' + fileIcon(lang) + "<span></span>";
+      row.lastChild.textContent = name;
+      row.dataset.path = n.__full;
+      if (n.__full === (S.tabs[S.active] || {}).path) row.classList.add("sel");
+      row.onclick = () => openFile(n.__full, 0).catch(e => msg(String(e), true));
+      box.appendChild(row);
     }
-  }
-
-  function exitEdit() {
-    if (!editing) return;
-    setEdit(false);
-  }
-
-  function saveEdit() {
-    var ta = document.getElementById("editor");
-    post("/save", { path: openPath, content: ta.value }).then(function (j) {
-      if (!j.ok) throw new Error(j.error || "save failed");
-      rawText = ta.value;
-      editDirty = false;
-      setEdit(false);
-      paint(document.getElementById("code"), rawText);
-      var r = j.report || {};
-      msg("saved " + (r.bytes || 0) + "b hash=" + String(r.hash || "").slice(0, 12) + " git=" + (r.git_committed ? "committed" : "skipped"));
+  });
+}
+function loadFiles() {
+  const q = "";
+  get("/files?query=" + encodeURIComponent(q) + "&limit=5000")
+    .then(list => {
+      S.files = (list || []).map(f => f.path);
+      const box = document.getElementById("leftbody");
+      box.innerHTML = "";
+      renderTree(box, buildTree(S.files), 0);
+      document.getElementById("sfiles").textContent = "files: " + S.files.length;
       setDot(true);
-    }).catch(function (e) { setDot(false); msg(String(e), true); });
-  }
+    })
+    .catch(e => { setDot(false); msg(String(e), true); });
+}
 
-  function loadFiles() {
-    var q = document.getElementById("fquery").value;
-    get("/files?query=" + encodeURIComponent(q) + "&limit=100")
-      .then(function (list) {
-        var box = document.getElementById("files");
-        box.innerHTML = "";
-        (list || []).forEach(function (f) {
-          var relp = rel(f.path);
-          var d = document.createElement("div");
-          d.textContent = relp;
-          d.dataset.path = f.path;
-          if (f.path === openPath) d.classList.add("sel");
-          d.onclick = function () { openFile(f.path, 0); };
-          box.appendChild(d);
-        });
-        setDot(true);
-      })
-      .catch(function (e) { setDot(false); msg(String(e), true); });
-  }
-
-  var searchTimer = 0;
-  function runSearch() {
-    var q = document.getElementById("needle").value;
-    var body = document.getElementById("bbody");
-    if (!q) { body.innerHTML = ""; return; }
-    get("/search?needle=" + encodeURIComponent(q) + "&limit=50")
-      .then(function (hits) {
-        body.innerHTML = "";
-        (hits || []).forEach(function (h) {
-          var d = document.createElement("div");
-          d.className = "hit";
-          d.textContent = rel(h.path) + ":" + h.line + ": " + h.preview;
-          d.onclick = function () { openFile(h.path, h.line); };
-          body.appendChild(d);
-        });
-        setDot(true);
-      })
-      .catch(function (e) { setDot(false); msg(String(e), true); });
-  }
-
-  function showTasks() {
-    var body = document.getElementById("bbody");
-    get("/tasks").then(function (tasks) {
+/* ============ search / problems / symbols / tasks / console ============ */
+let searchTimer = 0;
+function runSearch() {
+  const q = document.getElementById("needle").value;
+  const body = document.getElementById("bbody");
+  if (S.bottomTab !== "search") return;
+  if (!q) { body.innerHTML = ""; return; }
+  get("/search?needle=" + encodeURIComponent(q) + "&limit=50")
+    .then(hits => {
       body.innerHTML = "";
-      Object.keys(tasks || {}).forEach(function (name) {
-        var row = document.createElement("div");
-        row.className = "task";
-        var btn = document.createElement("button");
-        btn.textContent = "run";
-        btn.onclick = function () { runTask(name, row); };
-        var label = document.createElement("span");
-        label.textContent = name + "  " + (tasks[name].cmd || "");
-        row.appendChild(btn);
-        row.appendChild(label);
-        body.appendChild(row);
+      (hits || []).forEach(h => {
+        const d = document.createElement("div");
+        d.className = "hit";
+        d.textContent = rel(h.path) + ":" + h.line + ": " + h.preview;
+        d.onclick = () => openFile(h.path, h.line);
+        body.appendChild(d);
       });
-    }).catch(function (e) { msg(String(e), true); });
-  }
-
-  function runTask(name, row) {
-    var pre = document.createElement("pre");
-    pre.textContent = "running…";
-    row.appendChild(pre);
-    post("/tasks/run", { target: name, jobs: 1 }).then(function (j) {
-      if (!j.ok && j.error) { pre.textContent = j.error; return; }
-      pre.textContent = (j.reports || []).map(function (r) {
-        return "=== " + r.task + " (" + (r.skipped ? "skipped" : r.failed ? "failed" : "ok") + ") ===\n" + r.output;
-      }).join("\n");
-    }).catch(function (e) { pre.textContent = String(e); });
-  }
-
-  function health() {
-    get("/health").then(function (h) {
-      wsRoot = h.root || "";
-      document.getElementById("root").textContent = wsRoot;
-      document.getElementById("sbranch").textContent = "branch: " + (h.branch || "?");
-      return get("/tasks/graph").catch(function () { return null; });
-    }).then(function (g) {
-      if (g && g.order) document.getElementById("sfiles").textContent = "tasks: " + g.order.length;
-      return get("/index/status").catch(function () { return null; });
-    }).then(function (s) {
-      if (s) document.getElementById("sfiles").textContent += " · files: " + s.files;
       setDot(true);
-    }).catch(function (e) { setDot(false); msg(String(e), true); });
+    })
+    .catch(e => { setDot(false); msg(String(e), true); });
+}
+function loadProblems(path) {
+  get("/diagnostics?path=" + encodeURIComponent(path))
+    .then(j => {
+      S.problems = (j.diagnostics || []).filter(d => d.severity === "error");
+      document.getElementById("serrors").textContent = "errors: " + S.problems.length;
+      renderProblems();
+    })
+    .catch(() => {});
+}
+function renderProblems() {
+  if (S.bottomTab !== "problems") return;
+  const body = document.getElementById("bbody");
+  body.innerHTML = "";
+  const t = S.tabs[S.active];
+  const list = t && t.lang === "laml" ? S.problems : [];
+  if (!list.length) {
+    body.innerHTML = '<div class="logline">(no problems)</div>';
+    return;
   }
+  list.forEach(d => {
+    const el = document.createElement("div");
+    el.className = "prob err";
+    el.textContent = rel(d.path) + ":" + d.line + ":" + d.col + " " + d.message;
+    el.onclick = () => { openFile(d.path, 0).then(() => gotoLine(d.line)); };
+    body.appendChild(el);
+  });
+}
+function loadSymbols(path) {
+  get("/symbols?path=" + encodeURIComponent(path))
+    .then(j => {
+      const box = document.getElementById("symbols");
+      box.innerHTML = "";
+      (j.symbols || []).forEach(s => {
+        const d = document.createElement("div");
+        d.className = "trow";
+        d.innerHTML = "<span></span>";
+        d.lastChild.textContent = s.kind + " " + s.name;
+        d.title = "line " + s.line;
+        d.onclick = () => gotoLine(s.line);
+        box.appendChild(d);
+      });
+      if (!(j.symbols || []).length) box.innerHTML = '<div class="logline">(no symbols)</div>';
+    })
+    .catch(() => {});
+}
+function showTasks() {
+  const body = document.getElementById("bbody");
+  get("/tasks").then(tasks => {
+    body.innerHTML = "";
+    Object.keys(tasks || {}).forEach(name => {
+      const row = document.createElement("div");
+      row.className = "task";
+      const btn = document.createElement("button");
+      btn.textContent = "run";
+      btn.onclick = () => runTask(name, row);
+      const label = document.createElement("span");
+      label.textContent = name + "  " + (tasks[name].cmd || "");
+      row.appendChild(btn);
+      row.appendChild(label);
+      body.appendChild(row);
+    });
+  }).catch(e => msg(String(e), true));
+}
+function runTask(name, row) {
+  const pre = document.createElement("pre");
+  pre.textContent = "running…";
+  row.appendChild(pre);
+  log("console", "$ keplr run " + name);
+  post("/tasks/run", { target: name, jobs: 1 }).then(j => {
+    if (!j.ok && j.error) { pre.textContent = j.error; log("console", name + ": " + j.error); return; }
+    pre.textContent = (j.reports || []).map(r =>
+      "=== " + r.task + " (" + (r.skipped ? "skipped" : r.failed ? "failed" : "ok") + ") ===\n" + r.output
+    ).join("\n");
+    log("console", name + ": done");
+  }).catch(e => { pre.textContent = String(e); });
+}
+function log(tab, line) {
+  if (tab !== "console") return;
+  S.log.push(line);
+  if (S.log.length > 200) S.log.splice(0, S.log.length - 200);
+  if (S.bottomTab === "console") {
+    const body = document.getElementById("bbody");
+    const d = document.createElement("div");
+    d.className = "logline";
+    d.textContent = line;
+    body.appendChild(d);
+    body.scrollTop = body.scrollHeight;
+  }
+}
+function renderConsole() {
+  const body = document.getElementById("bbody");
+  body.innerHTML = "";
+  if (!S.log.length) body.innerHTML = '<div class="logline">(console is empty — task output lands here)</div>';
+  S.log.forEach(l => {
+    const d = document.createElement("div");
+    d.className = "logline";
+    d.textContent = l;
+    body.appendChild(d);
+  });
+}
+function setBottomTab(t, silent) {
+  S.bottomTab = t;
+  document.querySelectorAll("#bottom .docktabs button").forEach(b => {
+    b.classList.toggle("sel", b.dataset.btab === t);
+  });
+  if (!S.docks.bottom) toggleDock("bottom", true);
+  if (silent) return;
+  if (t === "problems") renderProblems();
+  else if (t === "tasks") showTasks();
+  else if (t === "search") runSearch();
+  else renderConsole();
+}
 
-  document.getElementById("token").addEventListener("change", function (e) {
-    token = e.target.value.trim();
-    health();
-    loadFiles();
+/* ============ docks ============ */
+function toggleDock(which, force) {
+  const on = force !== undefined ? force : !S.docks[which];
+  S.docks[which] = on;
+  document.getElementById(which === "bottom" ? "bottom" : which).classList.toggle("hidden", !on);
+  document.getElementById("t-" + which).classList.toggle("on", on);
+  saveLayout();
+}
+function setLeftTab(t) {
+  document.querySelectorAll("#left .docktabs button").forEach(b => {
+    b.classList.toggle("sel", b.dataset.ltab === t);
   });
-  document.getElementById("fquery").addEventListener("input", loadFiles);
-  document.getElementById("needle").addEventListener("input", function () {
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(runSearch, 180);
-  });
-  document.getElementById("tab-search").onclick = function () {
-    document.getElementById("tab-search").classList.add("sel");
-    document.getElementById("tab-tasks").classList.remove("sel");
-    document.getElementById("needle").style.display = "";
-    runSearch();
-  };
-  document.getElementById("tab-tasks").onclick = function () {
-    document.getElementById("tab-tasks").classList.add("sel");
-    document.getElementById("tab-search").classList.remove("sel");
-    document.getElementById("needle").style.display = "none";
-    showTasks();
-  };
+  const body = document.getElementById("leftbody");
+  if (t === "project") loadFiles();
+  else {
+    body.innerHTML = "";
+    const input = document.createElement("input");
+    input.placeholder = "search content… (bottom panel)";
+    input.style.cssText = "width:100%;margin:4px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font:inherit;";
+    input.onkeydown = e => {
+      if (e.key === "Enter") {
+        document.getElementById("needle").value = input.value;
+        setBottomTab("search");
+        runSearch();
+      }
+    };
+    body.appendChild(input);
+  }
+}
 
-  document.getElementById("btn-edit").onclick = function () {
-    if (openPath) setEdit(true);
-  };
-  document.getElementById("btn-save").onclick = saveEdit;
-  document.getElementById("btn-cancel").onclick = function () { setEdit(false); };
-  document.getElementById("editor").addEventListener("input", function () {
-    editDirty = true;
+/* ============ palette ============ */
+const COMMANDS = [
+  ["open file…", () => setLeftTab("project") || true, "finder"],
+  ["toggle project panel", () => toggleDock("left"), "view"],
+  ["toggle outline", () => toggleDock("right"), "view"],
+  ["toggle panel", () => toggleDock("bottom"), "view"],
+  ["run all tasks", () => runAllTasks(), "task"],
+  ["show problems", () => setBottomTab("problems"), "view"],
+  ["show tasks", () => setBottomTab("tasks"), "view"],
+  ["save file", () => saveActive(), "file"],
+  ["close tab", () => closeActive(), "file"],
+];
+function runAllTasks() {
+  setBottomTab("tasks");
+  post("/tasks/run", { all: true, jobs: 4 }).then(j => {
+    const body = document.getElementById("bbody");
+    body.innerHTML = "";
+    (j.reports || []).forEach(r => {
+      const d = document.createElement("div");
+      d.className = "task";
+      d.innerHTML = "<span></span>";
+      d.lastChild.textContent = r.task + " (" + (r.skipped ? "skipped" : r.failed ? "failed" : "ok") + ")";
+      body.appendChild(d);
+    });
+    log("console", "run --all done");
+  }).catch(e => msg(String(e), true));
+}
+function closeActive() {
+  if (S.active >= 0) closeTab(S.active);
+}
+function palFilter(q) {
+  q = q.toLowerCase();
+  const files = S.files
+    .filter(p => !q || rel(p).toLowerCase().includes(q))
+    .slice(0, 12)
+    .map(p => ({ label: rel(p), hint: "file", run: () => openFile(p, 0) }));
+  const cmds = COMMANDS
+    .filter(c => !q || c[0].toLowerCase().includes(q))
+    .map(c => ({ label: c[0], hint: c[2], run: c[1] }));
+  return cmds.concat(files).slice(0, 20);
+}
+function palRender() {
+  const q = document.getElementById("palinput").value;
+  S.palItems = palFilter(q);
+  if (S.palSel >= S.palItems.length) S.palSel = 0;
+  const box = document.getElementById("palist");
+  box.innerHTML = "";
+  S.palItems.forEach((it, i) => {
+    const d = document.createElement("div");
+    if (i === S.palSel) d.classList.add("sel");
+    d.innerHTML = "<span></span><span class='cmd'></span>";
+    d.firstChild.textContent = it.label;
+    d.lastChild.textContent = it.hint;
+    d.onclick = () => { palClose(); it.run(); };
+    box.appendChild(d);
   });
-  document.getElementById("editor").addEventListener("keydown", function (e) {
-    if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+}
+function palOpen(withFinder) {
+  document.getElementById("palwrap").classList.add("open");
+  const inp = document.getElementById("palinput");
+  inp.value = "";
+  S.palSel = 0;
+  palRender();
+  inp.focus();
+  if (withFinder) inp.placeholder = "find files…";
+  else inp.placeholder = "type a command or filename…";
+}
+function palClose() {
+  document.getElementById("palwrap").classList.remove("open");
+  if (ED) ED.focus();
+}
+
+/* ============ status/misc ============ */
+function setDot(ok) {
+  document.getElementById("dot").className = ok ? "ok" : "bad";
+}
+function msg(t, isErr) {
+  const el = document.getElementById("smsg");
+  el.textContent = t;
+  el.className = isErr ? "err" : "";
+}
+function setCursor(line, col) {
+  document.getElementById("scursor").textContent = line + ":" + col;
+}
+function health() {
+  get("/health").then(h => {
+    wsRoot = h.root || "";
+    document.getElementById("root").textContent = wsRoot;
+    document.getElementById("sbranch").textContent = "branch: " + (h.branch || "?");
+    return get("/index/status").catch(() => null);
+  }).then(s => {
+    if (s) document.getElementById("sfiles").textContent = "files: " + s.files;
+    setDot(true);
+  }).catch(e => { setDot(false); msg(String(e), true); });
+}
+
+/* ============ wiring ============ */
+document.getElementById("token").addEventListener("change", e => {
+  token = e.target.value.trim();
+  health();
+  loadFiles();
+});
+document.getElementById("finder").addEventListener("focus", e => {
+  e.target.select();
+  palOpen(true);
+});
+document.getElementById("finder").addEventListener("keydown", e => {
+  if (e.key === "Enter") palOpen(true);
+});
+document.getElementById("needle").addEventListener("input", () => {
+  setBottomTab("search", true);
+  clearTimeout(window.__st);
+  window.__st = setTimeout(runSearch, 180);
+});
+document.getElementById("t-left").onclick = () => toggleDock("left");
+document.getElementById("t-right").onclick = () => toggleDock("right");
+document.getElementById("t-bottom").onclick = () => toggleDock("bottom");
+document.querySelectorAll("#left .docktabs button").forEach(b => {
+  b.onclick = () => setLeftTab(b.dataset.ltab);
+});
+document.querySelectorAll("#bottom .docktabs button").forEach(b => {
+  b.onclick = () => setBottomTab(b.dataset.btab);
+});
+document.getElementById("palinput").addEventListener("input", () => { S.palSel = 0; palRender(); });
+document.getElementById("palinput").addEventListener("keydown", e => {
+  if (e.key === "Escape") palClose();
+  else if (e.key === "ArrowDown") { e.preventDefault(); S.palSel = Math.min(S.palSel + 1, S.palItems.length - 1); palRender(); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); S.palSel = Math.max(S.palSel - 1, 0); palRender(); }
+  else if (e.key === "Enter") {
+    const it = S.palItems[S.palSel];
+    palClose();
+    if (it) Promise.resolve(it.run()).catch(err => msg(String(err), true));
+  }
+});
+document.addEventListener("keydown", e => {
+  const mod = e.ctrlKey || e.metaKey;
+  if (mod && e.key.toLowerCase() === "p") { e.preventDefault(); palOpen(e.shiftKey); }
+  else if (mod && e.key.toLowerCase() === "k") { e.preventDefault(); palOpen(false); }
+  else if (mod && e.key.toLowerCase() === "b") { e.preventDefault(); toggleDock("left"); }
+  else if (mod && e.key.toLowerCase() === "s") {
+    if (document.activeElement && document.activeElement.id !== "editorwrap" && !document.activeElement.classList.contains("cm-content")) {
       e.preventDefault();
-      saveEdit();
-    } else if (e.key === "Escape") {
-      setEdit(false);
-    } else if (e.key === "Tab") {
-      e.preventDefault();
-      var ta = e.target;
-      var s = ta.selectionStart, t = ta.selectionEnd;
-      ta.value = ta.value.slice(0, s) + "  " + ta.value.slice(t);
-      ta.selectionStart = ta.selectionEnd = s + 2;
-      editDirty = true;
+      saveActive();
     }
-  });
+  } else if (e.key === "Escape") {
+    if (document.getElementById("palwrap").classList.contains("open")) palClose();
+  }
+});
 
-  var m = /[?&]token=([^&]*)/.exec(location.search);
+/* ============ boot ============ */
+(async function boot() {
+  loadLayout();
+  toggleDock("left", S.docks.left);
+  toggleDock("right", S.docks.right);
+  toggleDock("bottom", S.docks.bottom);
+  const m = /[?&]token=([^&]*)/.exec(location.search);
   if (m) {
     token = decodeURIComponent(m[1]);
     document.getElementById("token").value = token;
   }
+  await bootEditor();
   health();
   loadFiles();
+  renderProblems();
+  log("console", "keplr web ui ready");
 })();
 </script>
 </body>

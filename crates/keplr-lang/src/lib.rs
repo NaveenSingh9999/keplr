@@ -611,6 +611,20 @@ pub fn spawn_lsp(_server: &LspServer) -> anyhow::Result<()> {
 }
 
 pub fn symbols_for(lang: LangKind, lines: &[String]) -> Vec<String> {
+    symbols_detailed(lang, lines)
+        .into_iter()
+        .map(|s| format!("{} {}", s.kind, s.name))
+        .collect()
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct SymbolInfo {
+    pub line: u64,
+    pub kind: String,
+    pub name: String,
+}
+
+pub fn symbols_detailed(lang: LangKind, lines: &[String]) -> Vec<SymbolInfo> {
     let kinds: &[&str] = match lang {
         LangKind::Rust => &["fn", "struct", "enum", "impl", "trait", "mod"],
         LangKind::Python => &["def", "class"],
@@ -643,12 +657,16 @@ pub fn symbols_for(lang: LangKind, lines: &[String]) -> Vec<String> {
     }
     if lang == LangKind::Markdown {
         let mut out = Vec::new();
-        for line in lines.iter().take(200) {
+        for (idx, line) in lines.iter().take(200).enumerate() {
             let t = line.trim_start();
             if let Some(title) = t.strip_prefix('#') {
                 let title = title.trim_start_matches('#').trim();
                 if !title.is_empty() {
-                    out.push(format!("# {title}"));
+                    out.push(SymbolInfo {
+                        line: (idx + 1) as u64,
+                        kind: String::from("#"),
+                        name: title.to_string(),
+                    });
                 }
                 if out.len() >= 50 {
                     break;
@@ -658,7 +676,7 @@ pub fn symbols_for(lang: LangKind, lines: &[String]) -> Vec<String> {
         return out;
     }
     let mut out = Vec::new();
-    for line in lines.iter().take(200) {
+    for (idx, line) in lines.iter().take(200).enumerate() {
         let t = line.trim_start();
         if line_comment(lang)
             .map(|m| t.starts_with(m))
@@ -683,7 +701,11 @@ pub fn symbols_for(lang: LangKind, lines: &[String]) -> Vec<String> {
             }
         }
         if let Some((k, n)) = found {
-            out.push(format!("{k} {n}"));
+            out.push(SymbolInfo {
+                line: (idx + 1) as u64,
+                kind: k.to_string(),
+                name: n.to_string(),
+            });
             if out.len() >= 50 {
                 break;
             }
