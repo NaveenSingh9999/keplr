@@ -1,3 +1,4 @@
 /target/
 .keplr/
+.bench-corpus/
 *.log

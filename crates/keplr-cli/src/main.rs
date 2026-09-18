@@ -32,6 +32,16 @@ enum Cmd {
         #[arg(long, default_value_t = 500)]
         debounce_ms: u64,
     },
+    Bench {
+        #[arg(long, default_value_t = 1000)]
+        files: usize,
+        #[arg(long, default_value_t = 40)]
+        lines: usize,
+        #[arg(long)]
+        reuse: bool,
+        #[arg(long)]
+        json: bool,
+    },
     Open {
         file: PathBuf,
         #[arg(long, default_value_t = 0)]
@@ -174,6 +184,106 @@ async fn main() -> anyhow::Result<()> {
                     println!("{:?} {}", c.kind, c.path.display());
                 }
                 index.save(&ws)?;
+            }
+        }
+        Cmd::Bench {
+            files,
+            lines,
+            reuse,
+            json,
+        } => {
+            let corpus = cli.root.join(".bench-corpus");
+            if !reuse || !corpus.exists() {
+                let _ = std::fs::remove_dir_all(&corpus);
+                std::fs::create_dir_all(&corpus)?;
+            }
+            let t0 = std::time::Instant::now();
+            let made = if reuse && corpus.exists() {
+                keplr_core::Workspace::new(corpus.clone()).walk_files(100_000).len()
+            } else {
+                keplr_core::synth_tree(&corpus, files, lines)?.len()
+            };
+            let gen_ms = t0.elapsed().as_millis();
+            let bws = keplr_core::Workspace::new(corpus.clone());
+            let t0 = std::time::Instant::now();
+            let walked = bws.walk_files(100_000).len();
+            let walk_ms = t0.elapsed().as_millis();
+            let t0 = std::time::Instant::now();
+            let bindex = {
+                let b = keplr_core::Index::build(&bws);
+                let _ = b.save(&bws);
+                b
+            };
+            let index_ms = t0.elapsed().as_millis();
+            let queries = ["serve", "config", "fn alpha", "route", "zzzz_no_match_zzz"];
+            let mut fuzzy_ns = Vec::new();
+            let mut grep_ns = Vec::new();
+            for _ in 0..4 {
+                for q in queries {
+                    let t = std::time::Instant::now();
+                    let paths: Vec<PathBuf> =
+                        bindex.files().iter().map(|e| e.path.clone()).collect();
+                    let _ = keplr_core::search::fuzzy_paths(&paths, q, 10);
+                    fuzzy_ns.push(t.elapsed().as_nanos());
+                    let t = std::time::Instant::now();
+                    let _ = bws.grep_trigram(q, 10);
+                    grep_ns.push(t.elapsed().as_nanos());
+                }
+            }
+            let t0 = std::time::Instant::now();
+            let cas = keplr_sync::Cas::new(bws.cas_dir());
+            let blob = vec![7u8; 4096];
+            let mut puts = 0;
+            while t0.elapsed().as_millis() < 500 {
+                let _ = cas.put(&blob)?;
+                puts += 1;
+            }
+            let cas_ms = t0.elapsed().as_millis().max(1);
+            let bench_json = cli.root.join(".bench-corpus/keplr.json");
+            std::fs::write(
+                &bench_json,
+                r#"{"tasks":{"gen":{"cmd":"echo gen","outputs":[]},"wrap":{"cmd":"echo wrap","outputs":[],"deps":["gen"]}}}"#,
+            )?;
+            let btasks = keplr_build::load_tasks(&bench_json)?;
+            let r1 = keplr_build::run_graph(&btasks, &corpus, &[], false)?;
+            let r2 = keplr_build::run_graph(&btasks, &corpus, &[], false)?;
+            let skipped = r2.iter().filter(|r| r.skipped).count();
+            if json {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::json!({
+                        "files_made": made,
+                        "files_walked": walked,
+                        "gen_ms": gen_ms,
+                        "walk_ms": walk_ms,
+                        "index_ms": index_ms,
+                        "fuzzy_p50_us": keplr_core::percentile_ns(&fuzzy_ns, 50.0) / 1000,
+                        "fuzzy_p95_us": keplr_core::percentile_ns(&fuzzy_ns, 95.0) / 1000,
+                        "grep_p50_us": keplr_core::percentile_ns(&grep_ns, 50.0) / 1000,
+                        "grep_p95_us": keplr_core::percentile_ns(&grep_ns, 95.0) / 1000,
+                        "cas_put_per_s": (puts as u128 * 1000) / cas_ms as u128,
+                        "build_rerun": r1.len(),
+                        "build_skipped": skipped,
+                    }))?
+                );
+            } else {
+                println!(
+                    "bench files_made={} walked={} gen_ms={} walk_ms={} index_ms={}",
+                    made, walked, gen_ms, walk_ms, index_ms
+                );
+                println!(
+                    "fuzzy_p50_us={} fuzzy_p95_us={} grep_p50_us={} grep_p95_us={}",
+                    keplr_core::percentile_ns(&fuzzy_ns, 50.0) / 1000,
+                    keplr_core::percentile_ns(&fuzzy_ns, 95.0) / 1000,
+                    keplr_core::percentile_ns(&grep_ns, 50.0) / 1000,
+                    keplr_core::percentile_ns(&grep_ns, 95.0) / 1000
+                );
+                println!(
+                    "cas_put_per_s={} build_rerun={} build_skipped={}",
+                    (puts as u128 * 1000) / cas_ms as u128,
+                    r1.len(),
+                    skipped
+                );
             }
         }
         Cmd::Open { file, line } => {

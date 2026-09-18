@@ -502,3 +502,52 @@ pub fn save_buffer(ws: &Workspace, path: &Path, content: &str) -> anyhow::Result
         git_output,
     })
 }
+
+fn lcg_next(state: &mut u64) -> u64 {
+    *state = state
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
+    *state >> 33
+}
+
+pub fn synth_tree(root: &Path, files: usize, lines_per: usize) -> anyhow::Result<Vec<PathBuf>> {
+    const WORDS: &[&str] = &[
+        "fn", "let", "mut", "config", "serve", "render", "index", "alpha", "beta",
+        "route", "query", "cache", "state", "value", "window", "buffer", "task",
+    ];
+    let files = files.clamp(1, 50_000);
+    let lines_per = lines_per.clamp(1, 500);
+    let mut state: u64 = 0x9E3779B97F4A7C15;
+    let mut out = Vec::new();
+    for i in 0..files {
+        let dir = root.join(format!("bench/mod_{:03}", i % 64));
+        std::fs::create_dir_all(&dir)?;
+        let path = dir.join(format!("file_{i:05}.rs"));
+        let mut text = String::new();
+        for l in 0..lines_per {
+            let w1 = WORDS[(lcg_next(&mut state) as usize) % WORDS.len()];
+            let w2 = WORDS[(lcg_next(&mut state) as usize) % WORDS.len()];
+            let n = lcg_next(&mut state) % 1000;
+            if l % 8 == 0 {
+                text.push_str(&format!("fn {w1}_{w2}_{n}() {{\n"));
+            } else if l % 8 == 7 {
+                text.push_str("}\n");
+            } else {
+                text.push_str(&format!("    let {w1}_{n} = \"{w2} {n}\"; // {w2}\n"));
+            }
+        }
+        std::fs::write(&path, &text)?;
+        out.push(path);
+    }
+    Ok(out)
+}
+
+pub fn percentile_ns(samples: &[u128], pct: f64) -> u128 {
+    if samples.is_empty() {
+        return 0;
+    }
+    let mut sorted = samples.to_vec();
+    sorted.sort_unstable();
+    let rank = (pct / 100.0 * sorted.len() as f64).ceil() as usize;
+    sorted[rank.clamp(1, sorted.len()) - 1]
+}
