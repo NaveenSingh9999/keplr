@@ -373,6 +373,16 @@ pub fn build_scene(spec: &SceneSpec) -> Scene {
         None => (false, String::new(), Vec::new()),
     };
 
+    let right_lines: Vec<String> = {
+        let lang = keplr_lang::LangKind::from_path(Path::new(&center_path));
+        let syms = keplr_lang::symbols_for(lang, &center_lines);
+        if syms.is_empty() {
+            vec![String::from("(no symbols)")]
+        } else {
+            syms
+        }
+    };
+
     Scene {
         titlebar: TitleBar {
             root: root.display().to_string(),
@@ -403,15 +413,7 @@ pub fn build_scene(spec: &SceneSpec) -> Scene {
             title: String::from("right"),
             tabs: vec![String::from("symbols")],
             active_tab: spec.right_tab.to_string(),
-            lines: {
-                let lang = keplr_lang::LangKind::from_path(Path::new(&center_path));
-                let syms = keplr_lang::symbols_for(lang, &center_lines);
-                if syms.is_empty() {
-                    vec![String::from("(no symbols)")]
-                } else {
-                    syms
-                }
-            },
+            lines: right_lines,
         },
         bottom: BottomPane {
             title: String::from("bottom"),

@@ -777,28 +777,29 @@ So the E2 left arm for outline is:
         }
 ```
 
-- [ ] **Step 3: Symbols on the right** — replace the right `lines` construction. Old:
+- [ ] **Step 3: Symbols on the right** — hoist the computation above the `Scene` literal (field moves would otherwise borrow after move), then use it. Insert before `Scene {`:
 
 ```rust
-            lines: if outline.is_empty() {
-                vec![String::from("(no symbols)")]
-            } else {
-                outline
-            },
+    let right_lines: Vec<String> = {
+        let lang = keplr_lang::LangKind::from_path(Path::new(&center_path));
+        let syms = keplr_lang::symbols_for(lang, &center_lines);
+        if syms.is_empty() {
+            vec![String::from("(no symbols)")]
+        } else {
+            syms
+        }
+    };
 ```
 
-New:
+And set the right pane to `lines: right_lines,`:
 
 ```rust
-            lines: {
-                let lang = keplr_lang::LangKind::from_path(Path::new(&center_path));
-                let syms = keplr_lang::symbols_for(lang, &center_lines);
-                if syms.is_empty() {
-                    vec![String::from("(no symbols)")]
-                } else {
-                    syms
-                }
-            },
+        right: DockPane {
+            title: String::from("right"),
+            tabs: vec![String::from("symbols")],
+            active_tab: spec.right_tab.to_string(),
+            lines: right_lines,
+        },
 ```
 
 `center_path` may be `"(no file)"` — `from_path` gives `Other`, `symbols_for` returns empty, honestly labeled. `Path` is already imported in render lib.

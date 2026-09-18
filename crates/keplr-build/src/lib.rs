@@ -476,6 +476,8 @@ pub fn run_graph_parallel(
                     skipped: true,
                     output,
                     hash: fp,
+                    failed: false,
+                    cancelled: false,
                 });
             } else {
                 dirty.push(name.clone());
