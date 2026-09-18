@@ -420,3 +420,85 @@ impl Workspace {
         hits
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct SaveReport {
+    pub path: String,
+    pub bytes: u64,
+    pub hash: String,
+    pub cas_stored: bool,
+    pub index_files: usize,
+    pub git_committed: bool,
+    pub git_output: String,
+}
+
+fn git_commit_file(ws: &Workspace, full: &Path) -> (bool, String) {
+    if !ws.root.join(".git").exists() {
+        return (false, String::from("no git repo"));
+    }
+    let rel = full.strip_prefix(&ws.root).unwrap_or(full);
+    match std::process::Command::new("git")
+        .arg("-C")
+        .arg(&ws.root)
+        .arg("add")
+        .arg(rel)
+        .output()
+    {
+        Ok(o) if o.status.success() => {}
+        Ok(o) => {
+            return (
+                false,
+                format!("git add failed: {}", String::from_utf8_lossy(&o.stderr)),
+            )
+        }
+        Err(e) => return (false, format!("git add failed to spawn: {e}")),
+    }
+    match std::process::Command::new("git")
+        .arg("-C")
+        .arg(&ws.root)
+        .arg("commit")
+        .arg("-m")
+        .arg(format!("keplr: save {}", rel.display()))
+        .output()
+    {
+        Ok(o) => {
+            let out = format!(
+                "{}{}",
+                String::from_utf8_lossy(&o.stdout),
+                String::from_utf8_lossy(&o.stderr)
+            );
+            (o.status.success(), out.chars().take(300).collect())
+        }
+        Err(e) => (false, format!("git commit failed to spawn: {e}")),
+    }
+}
+
+pub fn save_buffer(ws: &Workspace, path: &Path, content: &str) -> anyhow::Result<SaveReport> {
+    let full = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        ws.root.join(path)
+    };
+    if let Some(parent) = full.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(&full, content)?;
+    let bytes = content.len() as u64;
+    let hash = fingerprint_bytes(content.as_bytes());
+    let cas = keplr_sync::Cas::new(ws.cas_dir());
+    let cas_stored = cas.put(content.as_bytes()).is_ok();
+    let mut index = Index::load(ws);
+    index.apply(ws, &full);
+    let _ = index.save(ws);
+    let index_files = index.len();
+    let (git_committed, git_output) = git_commit_file(ws, &full);
+    Ok(SaveReport {
+        path: full.display().to_string(),
+        bytes,
+        hash,
+        cas_stored,
+        index_files,
+        git_committed,
+        git_output,
+    })
+}

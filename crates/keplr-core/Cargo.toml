@@ -14,3 +14,4 @@ nucleo-matcher.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
+keplr-sync = { path = "../keplr-sync" }
