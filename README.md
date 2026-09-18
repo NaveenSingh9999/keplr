@@ -127,7 +127,7 @@ curl '127.0.0.1:7137/tasks/log?name=lint'
 cargo run -p keplr-cli -- --root ~/LAML serve --port 7137
 ```
 
-Open `http://127.0.0.1:7137/` — file tree, highlighted editor, content search, task list with run buttons, git-backed files. If a token is configured, paste it into the token box (or open `/?token=...`); the page itself is public, the API stays gated.
+Open `http://127.0.0.1:7137/` — file tree, highlighted editor, content search, task list with run buttons, git-backed files, and a real terminal tab (PTY shell parsed by `alacritty_terminal`, painted on canvas in the Zed theme — no xterm.js). If a token is configured, paste it into the token box (or open `/?token=...`); the page itself is public, the API stays gated.
 
 In a Codespace: run the same command in a terminal, then open the **Ports** panel, forward port `7137`, and **Open in Browser`.
 

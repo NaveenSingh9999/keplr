@@ -571,6 +571,271 @@ async fn ui_root() -> axum::response::Html<&'static str> {
     axum::response::Html(include_str!("ui.html"))
 }
 
+async fn ui_root() -> axum::response::Html<&'static str> {
+    axum::response::Html(include_str!("ui.html"))
+}
+
+#[derive(Clone, Copy, Debug)]
+struct TermSize {
+    cols: usize,
+    rows: usize,
+}
+
+impl alacritty_terminal::grid::Dimensions for TermSize {
+    fn total_lines(&self) -> usize {
+        self.rows
+    }
+
+    fn screen_lines(&self) -> usize {
+        self.rows
+    }
+
+    fn columns(&self) -> usize {
+        self.cols
+    }
+}
+
+#[derive(Clone, Debug)]
+struct TermListener;
+
+impl alacritty_terminal::event::EventListener for TermListener {
+    fn send_event(&self, _event: alacritty_terminal::event::Event) {}
+}
+
+fn term_css(c: &alacritty_terminal::term::color::Color) -> Option<String> {
+    use alacritty_terminal::term::color::{AnsiColor, Color};
+    match c {
+        Color::Named(n) => Some(
+            match n {
+                AnsiColor::Black => "#000000",
+                AnsiColor::Red => "#f85149",
+                AnsiColor::Green => "#3fb950",
+                AnsiColor::Yellow => "#d29922",
+                AnsiColor::Blue => "#58a6ff",
+                AnsiColor::Magenta => "#bc8cff",
+                AnsiColor::Cyan => "#39c5cf",
+                AnsiColor::White => "#e6edf3",
+                AnsiColor::BrightBlack => "#6e7681",
+                AnsiColor::BrightRed => "#ff7b72",
+                AnsiColor::BrightGreen => "#7ee787",
+                AnsiColor::BrightYellow => "#ffa657",
+                AnsiColor::BrightBlue => "#79c0ff",
+                AnsiColor::BrightMagenta => "#d2a8ff",
+                AnsiColor::BrightCyan => "#56d4dd",
+                AnsiColor::BrightWhite => "#ffffff",
+                AnsiColor::Foreground => "#e6edf3",
+                AnsiColor::Background => return None,
+                AnsiColor::Cursor => "#58a6ff",
+                _ => "#e6edf3",
+            }
+            .to_string(),
+        ),
+        Color::Indexed(i) => Some(indexed_css(*i)),
+        Color::Rgb(rgb) => Some(format!("#{:02x}{:02x}{:02x}", rgb.r, rgb.g, rgb.b)),
+    }
+}
+
+fn indexed_css(i: u8) -> String {
+    const BASE: [&str; 16] = [
+        "#000000", "#f85149", "#3fb950", "#d29922", "#58a6ff", "#bc8cff", "#39c5cf",
+        "#e6edf3", "#6e7681", "#ff7b72", "#7ee787", "#ffa657", "#79c0ff", "#d2a8ff",
+        "#56d4dd", "#ffffff",
+    ];
+    if i < 16 {
+        return BASE[i as usize].to_string();
+    }
+    if i < 232 {
+        let v = i - 16;
+        let levels = [0, 95, 135, 175, 215, 255];
+        return format!(
+            "#{:02x}{:02x}{:02x}",
+            levels[(v / 36) as usize],
+            levels[((v % 36) / 6) as usize],
+            levels[(v % 6) as usize]
+        );
+    }
+    let g = 8 + (i - 232) * 10;
+    format!("#{:02x}{:02x}{:02x}", g, g, g)
+}
+
+fn term_snapshot(
+    term: &alacritty_terminal::term::Term<TermListener>,
+    cols: usize,
+    rows: usize,
+) -> serde_json::Value {
+    use alacritty_terminal::index::{Column, Line};
+    use alacritty_terminal::term::cell::Flags;
+    use alacritty_terminal::term::TermMode;
+    let content = term.renderable_content();
+    let show = content.mode.contains(TermMode::SHOW_CURSOR);
+    let cur = content.cursor.point;
+    let mut cells = Vec::with_capacity(rows);
+    for l in 0..rows {
+        let mut row = Vec::with_capacity(cols);
+        for c in 0..cols {
+            let cell = &term.grid()[Line(l as i32)][Column(c)];
+            let mut flags = 0u8;
+            if cell.flags.contains(Flags::BOLD) {
+                flags |= 1;
+            }
+            if cell.flags.contains(Flags::ITALIC) {
+                flags |= 2;
+            }
+            if cell.flags.contains(Flags::INVERSE) {
+                flags |= 4;
+            }
+            row.push(serde_json::json!([
+                cell.c.to_string(),
+                term_css(&cell.fg),
+                term_css(&cell.bg),
+                flags
+            ]));
+        }
+        cells.push(row);
+    }
+    serde_json::json!({
+        "cols": cols,
+        "rows": rows,
+        "cursor": [cur.line.0, cur.column.0],
+        "show": show,
+        "cells": cells,
+    })
+}
+
+async fn term_ws(
+    State(state): State<AppState>,
+    Query(params): Query<HashMap<String, String>>,
+    ws: axum::extract::ws::WebSocketUpgrade,
+) -> impl axum::response::IntoResponse {
+    let cols: usize = params
+        .get("cols")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(80);
+    let rows: usize = params
+        .get("rows")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(24);
+    let root = state.root.clone();
+    ws.on_upgrade(move |socket| term_loop(root, cols.max(1), rows.max(1), socket))
+}
+
+async fn term_loop(
+    root: PathBuf,
+    cols: usize,
+    rows: usize,
+    mut socket: axum::extract::ws::WebSocket,
+) {
+    use alacritty_terminal::event::EventListener as _;
+    use alacritty_terminal::term::{Config, Term};
+    use alacritty_terminal::vte::Parser;
+    use axum::extract::ws::Message;
+    use std::io::{Read, Write};
+    let pty_system = portable_pty::native_pty_system();
+    let pair = match pty_system.openpty(portable_pty::PtySize {
+        rows: rows as u16,
+        cols: cols as u16,
+        pixel_width: 0,
+        pixel_height: 0,
+    }) {
+        Ok(p) => p,
+        Err(_) => return,
+    };
+    let writer = match pair.master.take_writer() {
+        Ok(w) => w,
+        Err(_) => return,
+    };
+    let mut cmd = portable_pty::CommandBuilder::new("sh");
+    cmd.cwd(&root);
+    let _child = match pair.slave.spawn_command(cmd) {
+        Ok(c) => c,
+        Err(_) => return,
+    };
+    drop(pair.slave);
+    let master = pair.master;
+    let reader = match master.try_clone_reader() {
+        Ok(r) => r,
+        Err(_) => return,
+    };
+    let size = TermSize { cols, rows };
+    let mut term = Term::new(Config::default(), &size, TermListener);
+    let mut parser = Parser::new();
+    let (fwd_tx, mut fwd_rx) = tokio::sync::mpsc::unbounded_channel::<Vec<u8>>();
+    std::thread::spawn(move || {
+        let mut reader = reader;
+        let mut buf = [0u8; 4096];
+        loop {
+            match reader.read(&mut buf) {
+                Ok(0) | Err(_) => break,
+                Ok(n) => {
+                    if fwd_tx.send(buf[..n].to_vec()).is_err() {
+                        break;
+                    }
+                }
+            }
+        }
+    });
+    let mut writer = writer;
+    let mut cols = cols;
+    let mut rows = rows;
+    let push = |socket: &mut axum::extract::ws::WebSocket,
+                term: &alacritty_terminal::term::Term<TermListener>,
+                cols: usize,
+                rows: usize| {
+        let frame = term_snapshot(term, cols, rows);
+        let text = serde_json::to_string(&frame).unwrap_or_default();
+        socket.send(Message::Text(text.into()))
+    };
+    loop {
+        tokio::select! {
+            out = fwd_rx.recv() => {
+                match out {
+                    Some(bytes) => {
+                        parser.advance(&mut term, &bytes);
+                        if push(&mut socket, &term, cols, rows).await.is_err() {
+                            break;
+                        }
+                    }
+                    None => break,
+                }
+            }
+            msg = socket.recv() => {
+                match msg {
+                    Some(Ok(Message::Binary(b))) => {
+                        if writer.write_all(&b).is_err() {
+                            break;
+                        }
+                        let _ = writer.flush();
+                    }
+                    Some(Ok(Message::Text(t))) => {
+                        let s = t.to_string();
+                        if let Some(dim) = s.strip_prefix("resize:") {
+                            let mut it = dim.split('x');
+                            if let (Some(c), Some(r)) = (it.next(), it.next()) {
+                                if let (Ok(nc), Ok(nr)) = (c.parse::<usize>(), r.parse::<usize>()) {
+                                    cols = nc.max(1);
+                                    rows = nr.max(1);
+                                    let _ = master.resize(portable_pty::PtySize {
+                                        rows: rows as u16,
+                                        cols: cols as u16,
+                                        pixel_width: 0,
+                                        pixel_height: 0,
+                                    });
+                                    term.resize(TermSize { cols, rows });
+                                    if push(&mut socket, &term, cols, rows).await.is_err() {
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    _ => break,
+                }
+            }
+        }
+    }
+    // dropping master closes the pty; the shell exits on SIGHUP
+}
+
 pub async fn serve(root: PathBuf, port: u16) -> anyhow::Result<()> {
     serve_with_token(root, port, String::new()).await
 }
@@ -678,6 +943,7 @@ pub async fn serve_full(
         .route("/daemons/restart", post(daemon_restart))
         .route("/tasks/log", get(task_log))
         .route("/sync/channel", get(sync_channel))
+        .route("/terms/ws", get(term_ws))
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             require_token,

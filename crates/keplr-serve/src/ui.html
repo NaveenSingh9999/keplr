@@ -139,6 +139,7 @@
   #bbody .prob { cursor: pointer; padding: 2px 0; }
   #bbody .prob:hover { color: var(--accent); }
   #bbody .logline { padding: 1px 0; color: var(--dim); }
+  #termcanvas { display: block; width: 100%; height: 100%; outline: none; cursor: text; }
   /* ---- statusbar ---- */
   #statusbar {
     display: flex; gap: 14px; padding: 4px 12px; flex: none;
@@ -208,6 +209,7 @@
     <button data-btab="problems">problems</button>
     <button data-btab="tasks">tasks</button>
     <button data-btab="console">console</button>
+    <button data-btab="terminal">terminal</button>
   </div>
   <div style="padding:0 12px;"><input id="needle" placeholder="search content…" autocomplete="off" spellcheck="false" style="width:100%;margin:6px 0;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font:inherit;"></div>
   <div id="bbody"></div>
@@ -724,9 +726,192 @@ function renderConsole() {
     const d = document.createElement("div");
     d.className = "logline";
     d.textContent = l;
-    body.appendChild(d);
-  });
+    body.appendChild(d);  });
 }
+    body.appendChild(d);  });
+}
+
+/* ============ terminal (canvas, alacritty_terminal grid) ============ */
+const TERM = { canvas: null, ctx: null, socket: null, grid: null, cursor: [0, 0], show: true, ready: false, cellW: 8, cellH: 16, font: "" };
+
+function termFont(px) {
+  return px + 'px "SF Mono","JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace';
+}
+
+function termMeasure() {
+  const c = document.createElement("canvas").getContext("2d");
+  c.font = termFont(13);
+  TERM.cellW = Math.max(5, Math.ceil(c.measureText("M").width));
+  TERM.cellH = Math.ceil(13 * 1.4);
+  TERM.font = termFont(13);
+}
+
+function termDims() {
+  const body = document.getElementById("bbody");
+  const w = Math.max(80, body.clientWidth - 28);
+  const h = Math.max(60, body.clientHeight - 16);
+  return {
+    cols: Math.max(20, Math.floor(w / TERM.cellW)),
+    rows: Math.max(5, Math.floor(h / TERM.cellH)),
+    w: w,
+    h: h
+  };
+}
+
+function termDraw() {
+  const g = TERM.grid;
+  if (!TERM.ctx || !g) return;
+  const ctx = TERM.ctx;
+  const dpr = window.devicePixelRatio || 1;
+  const W = g.cols * TERM.cellW, H = g.rows * TERM.cellH;
+  if (TERM.canvas.width !== Math.round(W * dpr) || TERM.canvas.height !== Math.round(H * dpr)) {
+    TERM.canvas.width = Math.round(W * dpr);
+    TERM.canvas.height = Math.round(H * dpr);
+    TERM.canvas.style.width = W + "px";
+    TERM.canvas.style.height = H + "px";
+  }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = "#161b22";
+  ctx.fillRect(0, 0, W, H);
+  ctx.font = TERM.font;
+  ctx.textBaseline = "top";
+  for (let l = 0; l < g.rows; l++) {
+    const row = g.cells[l];
+    if (!row) continue;
+    for (let c = 0; c < g.cols; c++) {
+      const cell = row[c];
+      if (!cell) continue;
+      const x = c * TERM.cellW, y = l * TERM.cellH;
+      const ch = cell[0], fg = cell[1], bg = cell[2], fl = cell[3];
+      let fgc = fg || "#e6edf3";
+      let bgc = bg;
+      if (fl & 4) { const t = fgc; fgc = bgc || "#161b22"; bgc = t === "#e6edf3" ? null : t; }
+      if (bgc) { ctx.fillStyle = bgc; ctx.fillRect(x, y, TERM.cellW, TERM.cellH); }
+      if (ch && ch !== " ") {
+        ctx.fillStyle = fgc;
+        if (fl & 1) ctx.font = "bold " + TERM.font;
+        else if (fl & 2) ctx.font = "italic " + TERM.font;
+        else ctx.font = TERM.font;
+        ctx.fillText(ch, x, y + 1);
+      }
+    }
+  }
+  if (g.show) {
+    const cl = Math.min(g.cursor[0], g.rows - 1), cc = Math.min(g.cursor[1], g.cols - 1);
+    ctx.fillStyle = "#58a6ff";
+    ctx.fillRect(cc * TERM.cellW, cl * TERM.cellH, TERM.cellW, TERM.cellH);
+    const cell = (g.cells[cl] || [])[cc];
+    if (cell && cell[0] && cell[0] !== " ") {
+      ctx.fillStyle = "#161b22";
+      ctx.font = TERM.font;
+      ctx.fillText(cell[0], cc * TERM.cellW, cl * TERM.cellH + 1);
+    }
+  }
+}
+
+function termSend(data) {
+  if (TERM.socket && TERM.socket.readyState === 1) TERM.socket.send(data);
+}
+
+function termKey(e) {
+  if (e.key === "Control" || e.key === "Shift" || e.key === "Alt" || e.key === "Meta") return;
+  e.preventDefault();
+  const k = e.key, ctrl = e.ctrlKey || e.metaKey, alt = e.altKey;
+  let s = null;
+  if (k === "Enter") s = "\r";
+  else if (k === "Backspace") s = "\x7f";
+  else if (k === "Tab") s = "\t";
+  else if (k === "Escape") s = "\x1b";
+  else if (k === "ArrowUp") s = "\x1b[A";
+  else if (k === "ArrowDown") s = "\x1b[B";
+  else if (k === "ArrowRight") s = "\x1b[C";
+  else if (k === "ArrowLeft") s = "\x1b[D";
+  else if (k === "Home") s = "\x1b[H";
+  else if (k === "End") s = "\x1b[F";
+  else if (k === "PageUp") s = "\x1b[5~";
+  else if (k === "PageDown") s = "\x1b[6~";
+  else if (k === "Insert") s = "\x1b[2~";
+  else if (k === "Delete") s = "\x1b[3~";
+  else if (k.startsWith("F") && /^F\d+$/.test(k)) {
+    const n = parseInt(k.slice(1), 10);
+    s = ["\x1bOP", "\x1bOQ", "\x1bOR", "\x1bOS", "\x1b[15~", "\x1b[17~", "\x1b[18~", "\x1b[19~", "\x1b[20~", "\x1b[21~", "\x1b[23~", "\x1b[24~"][n - 1] || null;
+  } else if (ctrl && k.length === 1) {
+    s = String.fromCharCode(k.toLowerCase().charCodeAt(0) - 96);
+  } else if (alt && k.length === 1) {
+    s = "\x1b" + k;
+  } else if (k.length === 1) {
+    s = k;
+  }
+  if (s === null || s === undefined) return;
+  termSend(new TextEncoder().encode(s));
+}
+
+function showTerminal() {
+  const body = document.getElementById("bbody");
+  body.innerHTML = "";
+  let cv = document.getElementById("termcanvas");
+  if (!cv) {
+    cv = document.createElement("canvas");
+    cv.id = "termcanvas";
+    cv.tabIndex = 0;
+  }
+  body.appendChild(cv);
+  TERM.canvas = cv;
+  TERM.ctx = cv.getContext("2d");
+  termMeasure();
+  cv.onkeydown = termKey;
+  cv.onpaste = e => {
+    e.preventDefault();
+    const t = (e.clipboardData || window.clipboardData).getData("text");
+    if (t) termSend(new TextEncoder().encode(t));
+  };
+  cv.onclick = () => cv.focus();
+  if (TERM.ready && TERM.socket && TERM.socket.readyState <= 1) {
+    fitTerminal();
+    cv.focus();
+    return;
+  }
+  connectTerminal();
+}
+
+function fitTerminal() {
+  if (!TERM.canvas || !TERM.socket || TERM.socket.readyState !== 1) return;
+  const d = termDims();
+  TERM.socket.send("resize:" + d.cols + "x" + d.rows);
+}
+
+function connectTerminal() {
+  const d = termDims();
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  let wsUrl = proto + "//" + location.host + "/terms/ws?cols=" + d.cols + "&rows=" + d.rows;
+  if (token) wsUrl += "&token=" + encodeURIComponent(token);
+  let sock;
+  try {
+    sock = new WebSocket(wsUrl);
+  } catch (e) {
+    TERM.canvas.outerHTML = '<div class="logline err">terminal: cannot open socket</div>';
+    return;
+  }
+  sock.binaryType = "arraybuffer";
+  TERM.socket = sock;
+  sock.onopen = () => { TERM.ready = true; TERM.canvas.focus(); };
+  sock.onmessage = ev => {
+    try {
+      const frame = JSON.parse(ev.data);
+      TERM.grid = frame;
+      termDraw();
+    } catch (e) {}
+  };
+  const dead = () => {
+    TERM.ready = false;
+    log("console", "terminal disconnected — reselect terminal to reconnect");
+    msg("terminal disconnected", true);
+  };
+  sock.onclose = dead;
+  sock.onerror = dead;
+  window.onresize = () => { if (S.bottomTab === "terminal") fitTerminal(); };
+}
+
 function setBottomTab(t, silent) {
   S.bottomTab = t;
   document.querySelectorAll("#bottom .docktabs button").forEach(b => {
@@ -737,6 +922,7 @@ function setBottomTab(t, silent) {
   if (t === "problems") renderProblems();
   else if (t === "tasks") showTasks();
   else if (t === "search") runSearch();
+  else if (t === "terminal") showTerminal();
   else renderConsole();
 }
 
@@ -779,6 +965,7 @@ const COMMANDS = [
   ["run all tasks", () => runAllTasks(), "task"],
   ["show problems", () => setBottomTab("problems"), "view"],
   ["show tasks", () => setBottomTab("tasks"), "view"],
+  ["show terminal", () => setBottomTab("terminal"), "view"],
   ["save file", () => saveActive(), "file"],
   ["close tab", () => closeActive(), "file"],
 ];
