@@ -669,7 +669,12 @@ async fn daemons(State(state): State<AppState>) -> Json<serde_json::Value> {
     let list: Vec<serde_json::Value> = map
         .iter()
         .map(|(name, (s, _))| {
-            serde_json::json!({ "name": name, "cmd": s.cmd, "pid": s.pid })
+            let uptime = s
+                .started
+                .elapsed()
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            serde_json::json!({ "name": name, "cmd": s.cmd, "pid": s.pid, "uptime_secs": uptime })
         })
         .collect();
     Json(serde_json::json!({ "daemons": list }))
