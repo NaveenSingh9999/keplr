@@ -74,6 +74,12 @@ enum Cmd {
     Serve {
         #[arg(long, default_value_t = 7137)]
         port: u16,
+        #[arg(long, default_value = "")]
+        token: String,
+    },
+    Token {
+        #[arg(long)]
+        save: bool,
     },
     Ui {
         #[arg(long)]
@@ -419,8 +425,34 @@ async fn main() -> anyhow::Result<()> {
                 }))?
             );
         }
-        Cmd::Serve { port } => {
-            keplr_serve::serve(cli.root, port).await?;
+        Cmd::Serve { port, token } => {
+            let resolved = keplr_serve::resolve_token(&cli.root, &token);
+            if resolved.is_empty() {
+                eprintln!("keplr: no token configured — serving open on 127.0.0.1");
+            } else {
+                eprintln!("keplr: token gate enabled");
+            }
+            keplr_serve::serve_with_token(cli.root, port, resolved).await?;
+        }
+        Cmd::Token { save } => {
+            let token = keplr_serve::new_token();
+            if save {
+                let dir = cli.root.join(".keplr");
+                std::fs::create_dir_all(&dir)?;
+                let path = dir.join("token");
+                std::fs::write(&path, format!("{token}\n"))?;
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    let _ = std::fs::set_permissions(
+                        &path,
+                        std::fs::Permissions::from_mode(0o600),
+                    );
+                }
+                println!("saved to {}", path.display());
+            } else {
+                println!("{token}");
+            }
         }
         Cmd::Ui {
             open,
