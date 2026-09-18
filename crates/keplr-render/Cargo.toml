@@ -10,7 +10,7 @@ serde_json.workspace = true
 keplr-core = { path = "../keplr-core" }
 keplr-lang = { path = "../keplr-lang" }
 winit = { workspace = true, optional = true }
-wgpu = { workspace = true, optional = true, features = ["wgsl", "winit"] }
+wgpu = { workspace = true, optional = true, features = ["wgsl"] }
 pollster = { workspace = true, optional = true }
 
 [features]

@@ -1294,11 +1294,11 @@ gpu = ["dep:winit", "dep:wgpu", "dep:pollster"]
 [dependencies]
 # ... existing ...
 winit = { workspace = true, optional = true }
-wgpu = { workspace = true, optional = true, features = ["wgsl", "winit"] }
+wgpu = { workspace = true, optional = true, features = ["wgsl"] }
 pollster = { workspace = true, optional = true }
 ```
 
-(Read the file first and append exactly; keep existing lines byte-identical. If cargo reports the `winit` feature does not exist on `wgpu 22`, drop `, "winit"` and retry.)
+(Read the file first and append exactly; keep existing lines byte-identical. `wgpu 22` has no `winit` feature — use `features = ["wgsl"]` only.)
 
 - [ ] **Step 3: `mod` line.** In `crates/keplr-render/src/lib.rs` after `pub mod search;`-style lines (check exact lines first — the file starts with `pub mod buffer; pub mod search;`):
 
