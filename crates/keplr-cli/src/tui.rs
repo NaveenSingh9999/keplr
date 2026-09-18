@@ -5,7 +5,7 @@ use crossterm::{
     style::Print,
     terminal::{self, Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use std::io::stdout;
+use std::io::{stdout, Write};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 

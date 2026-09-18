@@ -800,7 +800,7 @@ use crossterm::{
     style::Print,
     terminal::{self, Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use std::io::stdout;
+use std::io::{stdout, Write};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -1465,6 +1465,7 @@ impl Gpu {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs",
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
                 buffers: &[wgpu::VertexBufferLayout {
                     array_stride: 24,
                     step_mode: wgpu::VertexStepMode::Vertex,
@@ -1485,6 +1486,7 @@ impl Gpu {
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
                 entry_point: "fs",
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
                 targets: &[Some(wgpu::ColorTargetState {
                     format,
                     blend: Some(wgpu::BlendState::REPLACE),
@@ -1647,13 +1649,13 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::RedrawRequested => {
+                if self.scene.is_none() || self.dirty {
+                    self.rebuild();
+                }
                 let mut failed: Option<String> = None;
                 if let (Some(gpu), Some(window)) =
                     (self.gpu.as_mut(), self.window.as_ref())
                 {
-                    if self.scene.is_none() || self.dirty {
-                        self.rebuild();
-                    }
                     if let Some(scene) = &self.scene {
                         let quads = layout_quads(scene, gpu.size.0, gpu.size.1);
                         let n = quads.len() / 6;
