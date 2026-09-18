@@ -21,6 +21,16 @@ enum Cmd {
         needle: String,
         #[arg(long, default_value_t = 100)]
         limit: usize,
+        #[arg(long, default_value = "walk")]
+        via: String,
+    },
+    Index {
+        #[arg(long)]
+        refresh: bool,
+    },
+    Watch {
+        #[arg(long, default_value_t = 500)]
+        debounce_ms: u64,
     },
     Open {
         file: PathBuf,
@@ -77,9 +87,61 @@ async fn main() -> anyhow::Result<()> {
                 println!("{}", p.display());
             }
         }
-        Cmd::Search { needle, limit } => {
-            for hit in ws.grep(&needle, limit) {
+        Cmd::Search { needle, limit, via } => {
+            let hits = match via.as_str() {
+                "index" => {
+                    let mut index = keplr_core::Index::load(&ws);
+                    if index.is_empty() {
+                        index = keplr_core::Index::build(&ws);
+                        let _ = index.save(&ws);
+                    }
+                    index.grep(&needle, limit)
+                }
+                "trigram" => ws.grep_trigram(&needle, limit),
+                _ => ws.grep(&needle, limit),
+            };
+            for hit in hits {
                 println!("{}:{}:{}: {}", hit.path.display(), hit.line, hit.col, hit.preview);
+            }
+        }
+        Cmd::Index { refresh } => {
+            let mut index = keplr_core::Index::load(&ws);
+            if refresh && !index.is_empty() {
+                let changed = index.refresh(&ws);
+                index.save(&ws)?;
+                println!(
+                    "index files={} changed={} path={}",
+                    index.len(),
+                    changed.len(),
+                    ws.root.join(".keplr/index.json").display()
+                );
+            } else {
+                index = keplr_core::Index::build(&ws);
+                index.save(&ws)?;
+                println!(
+                    "index files={} path={}",
+                    index.len(),
+                    ws.root.join(".keplr/index.json").display()
+                );
+            }
+        }
+        Cmd::Watch { debounce_ms } => {
+            let mut index = keplr_core::Index::load(&ws);
+            if index.is_empty() {
+                index = keplr_core::Index::build(&ws);
+                index.save(&ws)?;
+            }
+            println!("watching {} (Ctrl-C to stop)", cli.root.display());
+            loop {
+                let changes = keplr_core::poll_changes(&cli.root, debounce_ms)?;
+                if changes.is_empty() {
+                    continue;
+                }
+                for c in &changes {
+                    index.apply(&ws, &c.path);
+                    println!("{:?} {}", c.kind, c.path.display());
+                }
+                index.save(&ws)?;
             }
         }
         Cmd::Open { file, line } => {

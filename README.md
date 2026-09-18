@@ -8,6 +8,7 @@ Spec: `docs/superpowers/specs/2026-09-17-keplr-design.md`
 Plan foundation: `docs/superpowers/plans/2026-09-18-keplr-production-foundation.md`
 Plan B canvas: `docs/superpowers/plans/2026-09-18-keplr-plan-b-canvas-foundation.md`
 Plan C builds: `docs/superpowers/plans/2026-09-18-keplr-build-dag.md`
+Plan D index/lang/sync: `docs/superpowers/plans/2026-09-18-keplr-plan-d-index-lang-sync.md`
 
 ## Use (foundation CLI, production)
 
@@ -40,6 +41,17 @@ cargo run -p keplr-cli -- --root . run lint --force
 cargo run -p keplr-cli -- --root . run --all --watch
 curl '127.0.0.1:7137/tasks/graph'
 curl -X POST 127.0.0.1:7137/tasks/run -H 'Content-Type: application/json' -d '{"all":true,"jobs":4}'
+```
+
+## Use (Plan D index + watcher, production)
+
+```bash
+cargo run -p keplr-cli -- --root . index
+cargo run -p keplr-cli -- --root . index --refresh
+cargo run -p keplr-cli -- --root . search --via trigram "broadcast" --limit 20
+cargo run -p keplr-cli -- --root . search --via index "broadcast" --limit 20
+cargo run -p keplr-cli -- --root . watch --debounce-ms 500
+curl '127.0.0.1:7137/index/status'
 ```
 
 CI runs `cargo test --workspace --all-targets`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo build --workspace` on every push.

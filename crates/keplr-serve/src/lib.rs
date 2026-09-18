@@ -159,6 +159,17 @@ async fn tasks_run(
     }
 }
 
+async fn index_status(State(state): State<AppState>) -> Json<serde_json::Value> {
+    let ws = keplr_core::Workspace::new(state.root.clone());
+    let index = keplr_core::Index::load(&ws);
+    let path = ws.root.join(".keplr/index.json");
+    Json(serde_json::json!({
+        "files": index.len(),
+        "stored": path.exists(),
+        "path": path.display().to_string(),
+    }))
+}
+
 pub async fn serve(root: PathBuf, port: u16) -> anyhow::Result<()> {
     let app = Router::new()
         .route("/health", get(health))
@@ -169,6 +180,7 @@ pub async fn serve(root: PathBuf, port: u16) -> anyhow::Result<()> {
         .route("/tasks/graph", get(tasks_graph))
         .route("/tasks/run", post(tasks_run))
         .route("/scene", get(scene))
+        .route("/index/status", get(index_status))
         .with_state(AppState { root });
     let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{port}")).await?;
     axum::serve(listener, app).await?;
