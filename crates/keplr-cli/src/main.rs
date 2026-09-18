@@ -1,6 +1,8 @@
 use clap::{Parser, Subcommand};
 use std::{collections::BTreeMap, path::PathBuf};
 
+mod tui;
+
 #[derive(Parser)]
 #[command(name = "keplr", version, about = "Keplr personal IDE")]
 struct Cli {
@@ -46,6 +48,9 @@ enum Cmd {
         file: PathBuf,
         #[arg(long, default_value_t = 0)]
         line: usize,
+    },
+    Edit {
+        file: PathBuf,
     },
     Save {
         file: PathBuf,
@@ -304,6 +309,9 @@ async fn main() -> anyhow::Result<()> {
                 keplr_lang::LangKind::from_path(&file),
                 buf.len_lines()
             );
+        }
+        Cmd::Edit { file } => {
+            tui::edit_file(cli.root, file)?;
         }
         Cmd::Save {
             file,
