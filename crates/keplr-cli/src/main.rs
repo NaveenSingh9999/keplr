@@ -1,5 +1,8 @@
 use clap::{Parser, Subcommand};
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+};
 
 mod tui;
 
@@ -80,6 +83,10 @@ enum Cmd {
         name: String,
         #[arg(long)]
         dir: Option<PathBuf>,
+    },
+    Snippets {
+        lang: String,
+        prefix: Option<String>,
     },
     Serve {
         #[arg(long, default_value_t = 7137)]
@@ -453,6 +460,25 @@ async fn main() -> anyhow::Result<()> {
             } else {
                 let present = keplr_lang::command_present(&name);
                 println!("present={present} hint: {}", keplr_lang::install_hint(&name));
+            }
+        }
+        Cmd::Snippets { lang, prefix } => {
+            let kind = keplr_lang::LangKind::from_path(Path::new(&format!("x.{lang}")));
+            match prefix {
+                Some(p) => match keplr_lang::expand_snippet(kind, &p) {
+                    Some((text, cursor)) => {
+                        println!("{text}");
+                        if let Some(c) = cursor {
+                            eprintln!("cursor={c}");
+                        }
+                    }
+                    None => anyhow::bail!("no snippet `{p}` for {lang}"),
+                },
+                None => {
+                    for s in keplr_lang::snippets_for(kind) {
+                        println!("{} — {}", s.prefix, s.description);
+                    }
+                }
             }
         }
         Cmd::Serve { port, token } => {

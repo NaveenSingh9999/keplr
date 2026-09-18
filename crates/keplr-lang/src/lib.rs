@@ -769,3 +769,123 @@ pub fn install_rust_analyzer(dest_dir: &Path) -> anyhow::Result<PathBuf> {
 pub fn install_rust_analyzer(_dest_dir: &Path) -> anyhow::Result<PathBuf> {
     anyhow::bail!("installer unavailable on wasm")
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Snippet {
+    pub prefix: String,
+    pub body: String,
+    pub description: String,
+}
+
+fn snippet(lang: LangKind, prefix: &str, body: &str, description: &str) -> Snippet {
+    let _ = lang;
+    Snippet {
+        prefix: prefix.to_string(),
+        body: body.to_string(),
+        description: description.to_string(),
+    }
+}
+
+pub fn snippets_for(lang: LangKind) -> Vec<Snippet> {
+    match lang {
+        LangKind::Rust => vec![
+            snippet(lang, "fn", "fn ${1:name}(${2:args}) {\n    $0\n}", "function"),
+            snippet(lang, "struct", "struct ${1:Name} {\n    $0\n}", "struct"),
+            snippet(lang, "match", "match ${1:value} {\n    Ok(v) => $0,\n    Err(e) => return Err(e.into()),\n}", "match result"),
+            snippet(lang, "test", "#[test]\nfn ${1:name}() {\n    $0\n}", "unit test"),
+        ],
+        LangKind::TypeScript | LangKind::Tsx | LangKind::JavaScript => vec![
+            snippet(lang, "fn", "function ${1:name}(${2:args}) {\n  $0\n}", "function"),
+            snippet(lang, "af", "(${1:args}) => {\n  $0\n}", "arrow function"),
+            snippet(lang, "imp", "import { $0 } from \"${1:mod}\";", "import"),
+        ],
+        LangKind::Python => vec![
+            snippet(lang, "def", "def ${1:name}(${2:args}):\n    $0", "function"),
+            snippet(lang, "class", "class ${1:Name}:\n    $0", "class"),
+            snippet(lang, "ifmain", "if __name__ == \"__main__\":\n    $0", "main guard"),
+        ],
+        LangKind::Go => vec![
+            snippet(lang, "func", "func ${1:name}(${2:args}) {\n\t$0\n}", "function"),
+            snippet(lang, "struct", "type ${1:Name} struct {\n\t$0\n}", "struct"),
+        ],
+        LangKind::Laml => vec![
+            snippet(lang, "serve", "serve ${1:port} {\n  $0\n}", "serve block"),
+            snippet(lang, "on", "on ${1:event} {\n  $0\n}", "event handler"),
+            snippet(lang, "send", "send(${1:room}, ${2:msg})", "send"),
+        ],
+        LangKind::Shell => vec![
+            snippet(lang, "if", "if ${1:cond}; then\n  $0\nfi", "if block"),
+            snippet(lang, "for", "for ${1:x} in ${2:list}; do\n  $0\ndone", "for loop"),
+        ],
+        _ => vec![
+            snippet(lang, "todo", "// TODO: $0", "todo marker"),
+        ],
+    }
+}
+
+fn expand_markers(body: &str) -> (String, Option<usize>) {
+    let mut out = String::new();
+    let mut cursor = None;
+    let mut chars = body.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '$' {
+            match chars.peek() {
+                Some('0') => {
+                    chars.next();
+                    if cursor.is_none() {
+                        cursor = Some(out.chars().count());
+                    }
+                }
+                Some('{') => {
+                    chars.next();
+                    let mut num = String::new();
+                    while let Some(d) = chars.peek() {
+                        if d.is_ascii_digit() {
+                            num.push(*d);
+                            chars.next();
+                        } else {
+                            break;
+                        }
+                    }
+                    if chars.peek() == Some(&':') {
+                        chars.next();
+                        let mut depth = 0;
+                        for tc in chars.by_ref() {
+                            if tc == '{' {
+                                depth += 1;
+                                out.push(tc);
+                            } else if tc == '}' {
+                                if depth == 0 {
+                                    break;
+                                }
+                                depth -= 1;
+                                out.push(tc);
+                            } else {
+                                out.push(tc);
+                            }
+                        }
+                    } else if chars.peek() == Some(&'}') {
+                        chars.next();
+                    } else {
+                        out.push('$');
+                        out.push('{');
+                        out.push_str(&num);
+                    }
+                }
+                _ => {
+                    out.push('$');
+                }
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    (out, cursor)
+}
+
+pub fn expand_snippet(lang: LangKind, prefix: &str) -> Option<(String, Option<usize>)> {
+    snippets_for(lang)
+        .into_iter()
+        .find(|s| s.prefix == prefix)
+        .map(|s| expand_markers(&s.body))
+}

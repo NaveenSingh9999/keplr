@@ -327,6 +327,24 @@ async fn highlight(
     }))
 }
 
+async fn snippets(Query(params): Query<HashMap<String, String>>) -> Json<serde_json::Value> {
+    let lang = params
+        .get("lang")
+        .map(|l| keplr_lang::LangKind::from_path(Path::new(&format!("x.{l}"))))
+        .unwrap_or(keplr_lang::LangKind::Other);
+    let prefix = params.get("prefix").cloned().unwrap_or_default();
+    if prefix.is_empty() {
+        Json(serde_json::json!({ "snippets": keplr_lang::snippets_for(lang) }))
+    } else {
+        match keplr_lang::expand_snippet(lang, &prefix) {
+            Some((text, cursor)) => {
+                Json(serde_json::json!({ "text": text, "cursor": cursor }))
+            }
+            None => Json(serde_json::json!({ "error": "no such snippet" })),
+        }
+    }
+}
+
 async fn lfs_pointer(
     State(state): State<AppState>,
     Query(params): Query<HashMap<String, String>>,
@@ -460,6 +478,7 @@ pub async fn serve_with_token(root: PathBuf, port: u16, token: String) -> anyhow
         .route("/index/status", get(index_status))
         .route("/diagnostics", get(diagnostics))
         .route("/highlight", get(highlight))
+        .route("/snippets", get(snippets))
         .route("/lfs/pointer", get(lfs_pointer))
         .route("/sync/merge", post(sync_merge))
         .route(
