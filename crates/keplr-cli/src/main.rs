@@ -37,6 +37,15 @@ enum Cmd {
         #[arg(long, default_value_t = 0)]
         line: usize,
     },
+    Save {
+        file: PathBuf,
+        #[arg(long)]
+        content: Option<String>,
+        #[arg(long)]
+        stdin: bool,
+        #[arg(long)]
+        task: Option<String>,
+    },
     Run {
         task: Option<String>,
         #[arg(long)]
@@ -179,6 +188,45 @@ async fn main() -> anyhow::Result<()> {
                 keplr_lang::LangKind::from_path(&file),
                 buf.len_lines()
             );
+        }
+        Cmd::Save {
+            file,
+            content,
+            stdin,
+            task,
+        } => {
+            use std::io::Read;
+            let text = if let Some(c) = content {
+                c
+            } else if stdin {
+                let mut s = String::new();
+                std::io::stdin().read_to_string(&mut s)?;
+                s
+            } else {
+                anyhow::bail!("save needs --content STR or --stdin");
+            };
+            let report = keplr_core::save_buffer(&ws, &file, &text)?;
+            println!(
+                "saved {} bytes={} hash={} cas={} index_files={} git={}",
+                report.path,
+                report.bytes,
+                report.hash,
+                report.cas_stored,
+                report.index_files,
+                report.git_committed
+            );
+            if !report.git_output.trim().is_empty() {
+                println!("git: {}", report.git_output.lines().next().unwrap_or_default());
+            }
+            if let Some(t) = task {
+                let tasks = keplr_build::load_tasks(&cli.root.join("keplr.json"))?;
+                let reports = keplr_build::run_graph(&tasks, &cli.root, &[t], false)?;
+                for r in &reports {
+                    let state = if r.skipped { "skipped" } else { "ok" };
+                    println!("=== {} ({state}) ===", r.task);
+                    print!("{}", r.output);
+                }
+            }
         }
         Cmd::Run {
             task,

@@ -4,7 +4,10 @@ use axum::{
     Json, Router,
 };
 use serde::Serialize;
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 #[derive(Clone)]
 struct AppState {
@@ -308,6 +311,47 @@ async fn sync_snapshot_load(
     }
 }
 
+#[derive(serde::Deserialize)]
+struct SaveReq {
+    path: String,
+    #[serde(default)]
+    content: String,
+    #[serde(default)]
+    task: Option<String>,
+}
+
+async fn save(
+    State(state): State<AppState>,
+    Json(req): Json<SaveReq>,
+) -> Json<serde_json::Value> {
+    let ws = keplr_core::Workspace::new(state.root.clone());
+    let report = match keplr_core::save_buffer(&ws, Path::new(&req.path), &req.content) {
+        Ok(r) => r,
+        Err(e) => return Json(serde_json::json!({"ok": false, "error": format!("{e:#}")})),
+    };
+    if let Some(t) = req.task {
+        let root = state.root.clone();
+        let path = ws.root.join("keplr.json");
+        let done = tokio::task::spawn_blocking(move || {
+            keplr_build::load_tasks(&path)
+                .and_then(|m| keplr_build::run_graph(&m, &root, &[t], false))
+        })
+        .await;
+        match done {
+            Ok(Ok(task_reports)) => {
+                return Json(serde_json::json!({"ok": true, "report": report, "tasks": task_reports}))
+            }
+            Ok(Err(e)) => {
+                return Json(serde_json::json!({"ok": true, "report": report, "task_error": format!("{e:#}")}))
+            }
+            Err(e) => {
+                return Json(serde_json::json!({"ok": true, "report": report, "task_error": format!("join error: {e}")}))
+            }
+        }
+    }
+    Json(serde_json::json!({"ok": true, "report": report}))
+}
+
 pub async fn serve(root: PathBuf, port: u16) -> anyhow::Result<()> {
     let app = Router::new()
         .route("/health", get(health))
@@ -327,6 +371,7 @@ pub async fn serve(root: PathBuf, port: u16) -> anyhow::Result<()> {
             "/sync/snapshot",
             post(sync_snapshot_save).get(sync_snapshot_load),
         )
+        .route("/save", post(save))
         .with_state(AppState { root });
     let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{port}")).await?;
     axum::serve(listener, app).await?;
