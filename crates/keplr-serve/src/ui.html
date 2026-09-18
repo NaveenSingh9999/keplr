@@ -82,6 +82,16 @@
   #center { flex: 1; display: flex; flex-direction: column; min-width: 0; }
   #pathbar { padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--dim); }
   #pathbar b { color: var(--text); font-weight: normal; }
+  #pathbar button, #bbody .task button {
+    background: var(--border); color: var(--text); border: none;
+    border-radius: 4px; font: inherit; padding: 2px 10px; cursor: pointer;
+  }
+  #pathbar button.on { color: var(--accent); }
+  #editor {
+    flex: 1; display: none; background: var(--bg); color: var(--text);
+    border: none; outline: none; resize: none; padding: 8px 12px;
+    font: inherit; line-height: 1.5; white-space: pre;
+  }
   #code { flex: 1; overflow: auto; margin: 0; padding: 8px 0 16px; }
   #code .ln { display: flex; }
   #code .no { width: 52px; flex: none; text-align: right; padding-right: 12px; color: var(--dim); user-select: none; }
@@ -137,8 +147,9 @@
     <div id="files"></div>
   </div>
   <div id="center">
-    <div id="pathbar"><b>(no file)</b></div>
+    <div id="pathbar"><b>(no file)</b><span id="ebtns" style="float:right;display:none"><button id="btn-edit">edit</button> <button id="btn-save" style="display:none">save</button> <button id="btn-cancel" style="display:none">cancel</button></span></div>
     <pre id="code"></pre>
+    <textarea id="editor" spellcheck="false"></textarea>
   </div>
 </main>
 <div id="bottom">
@@ -156,6 +167,9 @@
   var token = "";
   var openPath = "";
   var openLine = 0;
+  var rawText = "";
+  var editing = false;
+  var editDirty = false;
 
   function url(path) {
     var q = token ? ((path.indexOf("?") >= 0 ? "&" : "?") + "token=" + encodeURIComponent(token)) : "";
@@ -256,19 +270,58 @@
   function openFile(path, line) {
     openPath = path;
     openLine = line || 0;
+    exitEdit();
     document.querySelectorAll("#files div").forEach(function (d) {
       d.classList.toggle("sel", d.dataset.path === path);
     });
     get("/open?path=" + encodeURIComponent(path) + (line ? "&line=0" : ""))
       .then(function (j) {
         if (j.error) throw new Error(j.error);
-        document.querySelector("#pathbar").innerHTML =
-          "<b>" + esc(path) + "</b> · " + j.lines + " lines";
-        paint(document.getElementById("code"), j.text || "");
+        document.querySelector("#pathbar b").textContent = path;
+        document.getElementById("ebtns").style.display = "";
+        rawText = j.text || "";
+        paint(document.getElementById("code"), rawText);
         setDot(true);
         msg("");
       })
       .catch(function (e) { setDot(false); msg(String(e), true); });
+  }
+
+  function setEdit(on) {
+    editing = on;
+    editDirty = false;
+    document.getElementById("code").style.display = on ? "none" : "";
+    var ta = document.getElementById("editor");
+    ta.style.display = on ? "block" : "none";
+    document.getElementById("btn-edit").style.display = on ? "none" : "";
+    document.getElementById("btn-save").style.display = on ? "" : "none";
+    document.getElementById("btn-cancel").style.display = on ? "" : "none";
+    if (on) {
+      ta.value = rawText;
+      ta.focus();
+      msg("editing — ctrl+s to save, esc to cancel");
+    } else {
+      msg("");
+    }
+  }
+
+  function exitEdit() {
+    if (!editing) return;
+    setEdit(false);
+  }
+
+  function saveEdit() {
+    var ta = document.getElementById("editor");
+    post("/save", { path: openPath, content: ta.value }).then(function (j) {
+      if (!j.ok) throw new Error(j.error || "save failed");
+      rawText = ta.value;
+      editDirty = false;
+      setEdit(false);
+      paint(document.getElementById("code"), rawText);
+      var r = j.report || {};
+      msg("saved " + (r.bytes || 0) + "b hash=" + String(r.hash || "").slice(0, 12) + " git=" + (r.git_committed ? "committed" : "skipped"));
+      setDot(true);
+    }).catch(function (e) { setDot(false); msg(String(e), true); });
   }
 
   function loadFiles() {
@@ -377,6 +430,30 @@
     document.getElementById("needle").style.display = "none";
     showTasks();
   };
+
+  document.getElementById("btn-edit").onclick = function () {
+    if (openPath) setEdit(true);
+  };
+  document.getElementById("btn-save").onclick = saveEdit;
+  document.getElementById("btn-cancel").onclick = function () { setEdit(false); };
+  document.getElementById("editor").addEventListener("input", function () {
+    editDirty = true;
+  });
+  document.getElementById("editor").addEventListener("keydown", function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+      e.preventDefault();
+      saveEdit();
+    } else if (e.key === "Escape") {
+      setEdit(false);
+    } else if (e.key === "Tab") {
+      e.preventDefault();
+      var ta = e.target;
+      var s = ta.selectionStart, t = ta.selectionEnd;
+      ta.value = ta.value.slice(0, s) + "  " + ta.value.slice(t);
+      ta.selectionStart = ta.selectionEnd = s + 2;
+      editDirty = true;
+    }
+  });
 
   var m = /[?&]token=([^&]*)/.exec(location.search);
   if (m) {
