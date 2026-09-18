@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Query, State},
+    extract::{ConnectInfo, Query, State},
     routing::{get, post},
     Json, Router,
 };
@@ -7,13 +7,27 @@ use axum::response::IntoResponse;
 use serde::Serialize;
 use std::{
     collections::HashMap,
+    net::SocketAddr,
     path::{Path, PathBuf},
+    sync::{Arc, Mutex},
+    time::Instant,
 };
+
+type DaemonMap = Arc<Mutex<HashMap<String, (Supervised, std::process::Child)>>>;
 
 #[derive(Clone)]
 struct AppState {
     root: PathBuf,
     token: String,
+    attempts: Arc<Mutex<HashMap<String, (u32, Instant)>>>,
+    daemons: DaemonMap,
+}
+
+#[derive(Clone)]
+struct Supervised {
+    cmd: String,
+    started: std::time::SystemTime,
+    pid: Option<u32>,
 }
 
 fn timing_safe_eq(a: &[u8], b: &[u8]) -> bool {
@@ -70,13 +84,46 @@ pub fn resolve_token(root: &Path, flag: &str) -> String {
     }
 }
 
+fn locked_out(state: &AppState, addr: &SocketAddr) -> bool {
+    let mut map = state.attempts.lock().unwrap_or_else(|e| e.into_inner());
+    let key = addr.ip().to_string();
+    if let Some((n, since)) = map.get(&key).cloned() {
+        if since.elapsed().as_secs() > 60 {
+            map.remove(&key);
+            return false;
+        }
+        if n >= 10 {
+            return true;
+        }
+    }
+    false
+}
+
+fn record_fail(state: &AppState, addr: &SocketAddr) {
+    let mut map = state.attempts.lock().unwrap_or_else(|e| e.into_inner());
+    let key = addr.ip().to_string();
+    let entry = map.entry(key).or_insert((0, Instant::now()));
+    entry.0 += 1;
+    if entry.0 == 1 {
+        entry.1 = Instant::now();
+    }
+}
+
 async fn require_token(
     State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     req: axum::extract::Request,
     next: axum::middleware::Next,
 ) -> axum::response::Response {
     if state.token.is_empty() {
         return next.run(req).await;
+    }
+    if locked_out(&state, &addr) {
+        return (
+            axum::http::StatusCode::TOO_MANY_REQUESTS,
+            Json(serde_json::json!({"error": "too many attempts"})),
+        )
+            .into_response();
     }
     let header_ok = req
         .headers()
@@ -96,6 +143,7 @@ async fn require_token(
     if header_ok || query_ok.unwrap_or(false) {
         next.run(req).await
     } else {
+        record_fail(&state, &addr);
         (
             axum::http::StatusCode::UNAUTHORIZED,
             Json(serde_json::json!({"error": "unauthorized"})),
@@ -497,7 +545,76 @@ pub async fn serve(root: PathBuf, port: u16) -> anyhow::Result<()> {
 }
 
 pub async fn serve_with_token(root: PathBuf, port: u16, token: String) -> anyhow::Result<()> {
-    let state = AppState { root, token };
+    serve_full(root, port, token, "127.0.0.1", true).await
+}
+
+fn spawn_daemon(
+    root: &Path,
+    def: &keplr_build::TaskDef,
+) -> anyhow::Result<(Supervised, std::process::Child)> {
+    let dir = root.join(".keplr/logs");
+    std::fs::create_dir_all(&dir)?;
+    let log = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(dir.join(format!("{}.log", def.name)))?;
+    let err_log = log.try_clone()?;
+    let cwd = def.cwd.as_ref().map(Path::new).unwrap_or(root);
+    let child = std::process::Command::new("sh")
+        .arg("-c")
+        .arg(&def.cmd)
+        .current_dir(cwd)
+        .stdout(std::process::Stdio::from(log))
+        .stderr(std::process::Stdio::from(err_log))
+        .spawn()?;
+    let pid = Some(child.id());
+    Ok((
+        Supervised {
+            cmd: def.cmd.clone(),
+            started: std::time::SystemTime::now(),
+            pid,
+        },
+        child,
+    ))
+}
+
+pub async fn serve_full(
+    root: PathBuf,
+    port: u16,
+    token: String,
+    bind: &str,
+    allow_open_lan: bool,
+) -> anyhow::Result<()> {
+    let loopback = bind == "127.0.0.1" || bind == "::1" || bind == "localhost";
+    if !loopback && token.is_empty() && !allow_open_lan {
+        anyhow::bail!("refusing to serve LAN without a token (set --token, KEPLR_TOKEN, or pass --allow-open-lan)");
+    }
+    let state = AppState {
+        root: root.clone(),
+        token,
+        attempts: Arc::new(Mutex::new(HashMap::new())),
+        daemons: Arc::new(Mutex::new(HashMap::new())),
+    };
+    if let Ok(tasks) = keplr_build::load_tasks(&root.join("keplr.json")) {
+        for (name, def) in &tasks {
+            if !def.daemon {
+                continue;
+            }
+            match spawn_daemon(&root, def) {
+                Ok((sup, child)) => {
+                    state
+                        .daemons
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .insert(name.clone(), (sup, child));
+                    eprintln!("keplr: daemon {name} started");
+                }
+                Err(e) => {
+                    eprintln!("keplr: daemon {name} failed to start: {e:#}");
+                }
+            }
+        }
+    }
     let app = Router::new()
         .route("/health", get(health))
         .route("/search", get(search))
@@ -522,12 +639,85 @@ pub async fn serve_with_token(root: PathBuf, port: u16, token: String) -> anyhow
             post(sync_snapshot_save).get(sync_snapshot_load),
         )
         .route("/save", post(save))
+        .route("/daemons", get(daemons))
+        .route("/daemons/restart", post(daemon_restart))
+        .route("/tasks/log", get(task_log))
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             require_token,
         ))
-        .with_state(state);
-    let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{port}")).await?;
-    axum::serve(listener, app).await?;
+        .with_state(state.clone());
+    let listener = tokio::net::TcpListener::bind(format!("{bind}:{port}")).await?;
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(async {
+        let _ = tokio::signal::ctrl_c().await;
+    })
+    .await?;
+    let mut daemons = state.daemons.lock().unwrap_or_else(|e| e.into_inner());
+    for (name, (_, child)) in daemons.iter_mut() {
+        let _ = child.kill();
+        eprintln!("keplr: stopped daemon {name}");
+    }
     Ok(())
+}
+
+async fn daemons(State(state): State<AppState>) -> Json<serde_json::Value> {
+    let map = state.daemons.lock().unwrap_or_else(|e| e.into_inner());
+    let list: Vec<serde_json::Value> = map
+        .iter()
+        .map(|(name, (s, _))| {
+            serde_json::json!({ "name": name, "cmd": s.cmd, "pid": s.pid })
+        })
+        .collect();
+    Json(serde_json::json!({ "daemons": list }))
+}
+
+#[derive(serde::Deserialize)]
+struct DaemonReq {
+    name: String,
+}
+
+async fn daemon_restart(
+    State(state): State<AppState>,
+    Json(req): Json<DaemonReq>,
+) -> Json<serde_json::Value> {
+    let path = state.root.join("keplr.json");
+    let tasks = match keplr_build::load_tasks(&path) {
+        Ok(m) => m,
+        Err(e) => return Json(serde_json::json!({"ok": false, "error": format!("{e:#}")})),
+    };
+    let def = match tasks.get(&req.name) {
+        Some(d) => d.clone(),
+        None => return Json(serde_json::json!({"ok": false, "error": "unknown task"})),
+    };
+    let mut map = state.daemons.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some((_, child)) = map.get_mut(&req.name) {
+        let _ = child.kill();
+    }
+    match spawn_daemon(&state.root, &def) {
+        Ok((sup, child)) => {
+            map.insert(req.name.clone(), (sup, child));
+            Json(serde_json::json!({"ok": true, "name": req.name}))
+        }
+        Err(e) => Json(serde_json::json!({"ok": false, "error": format!("{e:#}")})),
+    }
+}
+
+async fn task_log(
+    State(state): State<AppState>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Json<serde_json::Value> {
+    let name = params.get("name").cloned().unwrap_or_default();
+    let journal = keplr_build::load_journal(&state.root);
+    match journal.get(&name) {
+        Some(e) => Json(serde_json::json!({
+            "name": name,
+            "hash": e.hash,
+            "output_tail": e.output_tail,
+        })),
+        None => Json(serde_json::json!({ "error": "no cached log" })),
+    }
 }

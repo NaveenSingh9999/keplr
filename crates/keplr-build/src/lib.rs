@@ -18,6 +18,8 @@ pub struct TaskDef {
     pub watch: Vec<String>,
     #[serde(default)]
     pub fingerprint: Vec<String>,
+    #[serde(default)]
+    pub daemon: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -38,6 +40,8 @@ struct RawTask {
     watch: Vec<String>,
     #[serde(default)]
     fingerprint: Vec<String>,
+    #[serde(default)]
+    daemon: bool,
 }
 
 pub fn load_tasks(path: &Path) -> anyhow::Result<BTreeMap<String, TaskDef>> {
@@ -57,6 +61,7 @@ pub fn load_tasks(path: &Path) -> anyhow::Result<BTreeMap<String, TaskDef>> {
                     deps: raw.deps,
                     watch: raw.watch,
                     fingerprint: raw.fingerprint,
+                    daemon: raw.daemon,
                 },
             )
         })
@@ -163,6 +168,21 @@ pub struct JournalEntry {
     pub hash: String,
     #[serde(default)]
     pub outputs: BTreeMap<String, String>,
+    #[serde(default)]
+    pub output_tail: String,
+}
+
+fn tail_2k(s: &str) -> String {
+    if s.len() <= 2048 {
+        return s.to_string();
+    }
+    s.chars()
+        .rev()
+        .take(2048)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -405,6 +425,7 @@ fn run_ordered(
             JournalEntry {
                 hash: fp.clone(),
                 outputs: stored,
+                output_tail: tail_2k(&out),
             },
         );
         save_journal(workdir, &journal)?;
@@ -526,6 +547,7 @@ pub fn run_graph_parallel(
                             JournalEntry {
                                 hash: fp.clone(),
                                 outputs: stored,
+                                output_tail: tail_2k(text),
                             },
                         );
                         save_journal(workdir, &journal)?;
@@ -628,6 +650,7 @@ pub fn run_graph_settled(
                         JournalEntry {
                             hash: fp.clone(),
                             outputs: stored,
+                            output_tail: tail_2k(&out),
                         },
                     );
                     save_journal(workdir, &journal)?;
@@ -730,6 +753,7 @@ pub fn run_graph_settled(
                             JournalEntry {
                                 hash: fp.clone(),
                                 outputs: stored,
+                                output_tail: tail_2k(text),
                             },
                         );
                         save_journal(workdir, &journal)?;

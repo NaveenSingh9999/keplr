@@ -114,10 +114,16 @@ enum Cmd {
         port: u16,
         #[arg(long, default_value = "")]
         token: String,
+        #[arg(long, default_value = "127.0.0.1")]
+        bind: String,
+        #[arg(long)]
+        allow_open_lan: bool,
     },
     Token {
         #[arg(long)]
         save: bool,
+        #[arg(long)]
+        rotate: bool,
     },
     Ui {
         #[arg(long)]
@@ -526,18 +532,23 @@ async fn main() -> anyhow::Result<()> {
                 print!("{}", keplr_core::git::commit(&cli.root, &message)?);
             }
         },
-        Cmd::Serve { port, token } => {
+        Cmd::Serve {
+            port,
+            token,
+            bind,
+            allow_open_lan,
+        } => {
             let resolved = keplr_serve::resolve_token(&cli.root, &token);
             if resolved.is_empty() {
                 eprintln!("keplr: no token configured — serving open on 127.0.0.1");
             } else {
                 eprintln!("keplr: token gate enabled");
             }
-            keplr_serve::serve_with_token(cli.root, port, resolved).await?;
+            keplr_serve::serve_full(cli.root, port, resolved, &bind, allow_open_lan).await?;
         }
-        Cmd::Token { save } => {
+        Cmd::Token { save, rotate } => {
             let token = keplr_serve::new_token();
-            if save {
+            if rotate || save {
                 let dir = cli.root.join(".keplr");
                 std::fs::create_dir_all(&dir)?;
                 let path = dir.join("token");
@@ -550,7 +561,11 @@ async fn main() -> anyhow::Result<()> {
                         std::fs::Permissions::from_mode(0o600),
                     );
                 }
-                println!("saved to {}", path.display());
+                if rotate {
+                    println!("rotated: {}", path.display());
+                } else {
+                    println!("saved to {}", path.display());
+                }
             } else {
                 println!("{token}");
             }
