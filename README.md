@@ -9,6 +9,7 @@ Plan foundation: `docs/superpowers/plans/2026-09-18-keplr-production-foundation.
 Plan B canvas: `docs/superpowers/plans/2026-09-18-keplr-plan-b-canvas-foundation.md`
 Plan C builds: `docs/superpowers/plans/2026-09-18-keplr-build-dag.md`
 Plan D index/lang/sync: `docs/superpowers/plans/2026-09-18-keplr-plan-d-index-lang-sync.md`
+Plan E Zed depth: `docs/superpowers/plans/2026-09-18-keplr-plan-e-zed-depth.md`
 
 ## Use (foundation CLI, production)
 
@@ -69,6 +70,16 @@ curl '127.0.0.1:7137/lfs/pointer?path=assets/font.woff2'
 curl -X POST 127.0.0.1:7137/sync/merge -H 'Content-Type: application/json' -d '{"name":"notes","seed":"hello","updates":[]}'
 curl -X POST 127.0.0.1:7137/sync/snapshot -H 'Content-Type: application/json' -d '{"name":"notes","update":[1,2,3]}'
 curl '127.0.0.1:7137/sync/snapshot?name=notes'
+```
+
+## Use (Plan E Zed depth, production)
+
+```bash
+cargo run -p keplr-cli -- --root . ui --open Cargo.toml --left-tab search --search "clap" --width 100
+cargo run -p keplr-cli -- --root . ui --palette "run" --palette-mode commands --width 100
+cargo run -p keplr-cli -- --root . scene --open crates/keplr-cli/src/main.rs --bottom-tab tasks | head -n 60
+curl '127.0.0.1:7137/scene?open=Cargo.toml&left=search&search=clap&width=100'
+curl '127.0.0.1:7137/scene?palette_mode=commands&palette=run'
 ```
 
 CI runs `cargo test --workspace --all-targets`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo build --workspace` on every push.

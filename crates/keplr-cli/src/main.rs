@@ -63,6 +63,16 @@ enum Cmd {
         query: String,
         #[arg(long)]
         palette: Option<String>,
+        #[arg(long, default_value = "files")]
+        palette_mode: String,
+        #[arg(long)]
+        search: Option<String>,
+        #[arg(long, default_value = "project")]
+        left_tab: String,
+        #[arg(long, default_value = "symbols")]
+        right_tab: String,
+        #[arg(long, default_value = "terminal")]
+        bottom_tab: String,
         #[arg(long, default_value_t = 100)]
         width: u16,
     },
@@ -73,6 +83,16 @@ enum Cmd {
         query: String,
         #[arg(long)]
         palette: Option<String>,
+        #[arg(long, default_value = "files")]
+        palette_mode: String,
+        #[arg(long)]
+        search: Option<String>,
+        #[arg(long, default_value = "project")]
+        left_tab: String,
+        #[arg(long, default_value = "symbols")]
+        right_tab: String,
+        #[arg(long, default_value = "terminal")]
+        bottom_tab: String,
         #[arg(long, default_value_t = 100)]
         width: u16,
     },
@@ -248,6 +268,11 @@ async fn main() -> anyhow::Result<()> {
             open,
             query,
             palette,
+            palette_mode,
+            search,
+            left_tab,
+            right_tab,
+            bottom_tab,
             width,
         } => {
             let mut ui = keplr_ui::UiState::new(cli.root.clone());
@@ -260,6 +285,13 @@ async fn main() -> anyhow::Result<()> {
             } else if !query.is_empty() {
                 ui.palette_query = query.clone();
             }
+            ui.set_palette_mode(&palette_mode);
+            if let Some(q) = search.clone() {
+                ui.search_query = q;
+            }
+            ui.set_left_tab(&left_tab);
+            ui.set_right_tab(&right_tab);
+            ui.set_bottom_tab(&bottom_tab);
             let scene = ui.to_scene(width);
             let backend = keplr_render::AnsiBackend;
             print!(
@@ -271,15 +303,26 @@ async fn main() -> anyhow::Result<()> {
             open,
             query,
             palette,
+            palette_mode,
+            search,
+            left_tab,
+            right_tab,
+            bottom_tab,
             width,
         } => {
-            let scene = keplr_render::build_scene(
-                &cli.root,
-                open.as_deref(),
-                &query,
-                palette.as_deref(),
+            let spec = keplr_render::SceneSpec {
+                root: &cli.root,
+                open_file: open.as_deref(),
+                query: &query,
+                palette_query: palette.as_deref(),
+                palette_mode: &palette_mode,
+                search_query: search.as_deref(),
+                left_tab: &left_tab,
+                right_tab: &right_tab,
+                bottom_tab: &bottom_tab,
                 width,
-            );
+            };
+            let scene = keplr_render::build_scene(&spec);
             println!("{}", serde_json::to_string_pretty(&scene)?);
         }
     }

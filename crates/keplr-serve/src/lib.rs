@@ -87,15 +87,38 @@ async fn scene(
     let open = params.get("open").cloned();
     let query = params.get("query").cloned().unwrap_or_default();
     let palette = params.get("palette").cloned();
+    let palette_mode = params
+        .get("palette_mode")
+        .cloned()
+        .unwrap_or_else(|| String::from("files"));
+    let search = params.get("search").cloned();
+    let left = params
+        .get("left")
+        .cloned()
+        .unwrap_or_else(|| String::from("project"));
+    let right = params
+        .get("right")
+        .cloned()
+        .unwrap_or_else(|| String::from("symbols"));
+    let bottom = params
+        .get("bottom")
+        .cloned()
+        .unwrap_or_else(|| String::from("terminal"));
     let width: u16 = params.get("width").and_then(|v| v.parse().ok()).unwrap_or(100);
     let open_path: Option<PathBuf> = open.map(PathBuf::from);
-    Json(keplr_render::build_scene(
-        &state.root,
-        open_path.as_deref(),
-        &query,
-        palette.as_deref(),
+    let spec = keplr_render::SceneSpec {
+        root: &state.root,
+        open_file: open_path.as_deref(),
+        query: &query,
+        palette_query: palette.as_deref(),
+        palette_mode: &palette_mode,
+        search_query: search.as_deref(),
+        left_tab: &left,
+        right_tab: &right,
+        bottom_tab: &bottom,
         width,
-    ))
+    };
+    Json(keplr_render::build_scene(&spec))
 }
 
 async fn tasks_graph(State(state): State<AppState>) -> Json<serde_json::Value> {
