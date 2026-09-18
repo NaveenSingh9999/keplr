@@ -605,14 +605,14 @@ pub fn resolve_token(root: &Path, flag: &str) -> String {
             return t.trim().to_string();
         }
     }
-    root.join(".keplr/token")
-        .exists()
-        .then(|| {
-            std::fs::read_to_string(root.join(".keplr/token"))
-                .map(|t| t.trim().to_string())
-                .unwrap_or_default()
-        })
-        .unwrap_or_default()
+    let path = root.join(".keplr/token");
+    if path.exists() {
+        std::fs::read_to_string(&path)
+            .map(|t| t.trim().to_string())
+            .unwrap_or_default()
+    } else {
+        String::new()
+    }
 }
 
 async fn require_token(
@@ -632,7 +632,7 @@ async fn require_token(
         .unwrap_or(false);
     let query_ok = req.uri().query().map(|q| {
         q.split('&').any(|kv| match kv.split_once('=') {
-            Some((k, v)) if k == "token" => {
+            Some(("token", v)) => {
                 timing_safe_eq(v.as_bytes(), state.token.as_bytes())
             }
             _ => false,
