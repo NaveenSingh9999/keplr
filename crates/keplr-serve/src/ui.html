@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>keplr</title>
+<style>
+  :root {
+    --bg: #0e1116;
+    --surface: #161b22;
+    --border: #2a3340;
+    --text: #e6edf3;
+    --dim: #8b949e;
+    --accent: #58a6ff;
+    --error: #f85149;
+    --ok: #3fb950;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "SF Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  header .logo { color: var(--accent); font-weight: bold; }
+  header #root { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  header input {
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font: inherit;
+    width: 220px;
+  }
+  #dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); flex: none; }
+  #dot.ok { background: var(--ok); }
+  #dot.bad { background: var(--error); }
+  main { display: flex; flex: 1; min-height: 0; }
+  #left {
+    width: 260px;
+    flex: none;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  #left input, #needle {
+    margin: 8px;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font: inherit;
+  }
+  #files { overflow-y: auto; flex: 1; padding: 0 4px 8px; }
+  #files div {
+    padding: 3px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #files div:hover { background: var(--border); }
+  #files div.sel { background: var(--border); color: var(--accent); }
+  #center { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #pathbar { padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--dim); }
+  #pathbar b { color: var(--text); font-weight: normal; }
+  #code { flex: 1; overflow: auto; margin: 0; padding: 8px 0 16px; }
+  #code .ln { display: flex; }
+  #code .no { width: 52px; flex: none; text-align: right; padding-right: 12px; color: var(--dim); user-select: none; }
+  #code .tx { white-space: pre; }
+  #code .ln.cur { background: #1c2530; }
+  .kw { color: var(--accent); font-weight: bold; }
+  .st { color: var(--ok); }
+  .cm { color: var(--dim); }
+  .nu { color: #d29922; }
+  #bottom {
+    height: 180px;
+    flex: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  #btabs { display: flex; gap: 4px; padding: 6px 12px 0; }
+  #btabs button {
+    background: none; border: none; color: var(--dim);
+    font: inherit; padding: 4px 10px; cursor: pointer;
+    border-bottom: 2px solid transparent;
+  }
+  #btabs button.sel { color: var(--text); border-bottom-color: var(--accent); }
+  #bbody { flex: 1; overflow: auto; padding: 8px 12px; }
+  #bbody .hit { cursor: pointer; padding: 2px 0; }
+  #bbody .hit:hover { color: var(--accent); }
+  #bbody .task { display: flex; gap: 10px; align-items: baseline; padding: 3px 0; }
+  #bbody .task button {
+    background: var(--border); color: var(--text); border: none;
+    border-radius: 4px; font: inherit; padding: 2px 10px; cursor: pointer;
+  }
+  #bbody pre { white-space: pre-wrap; margin: 6px 0 0; color: var(--dim); }
+  #statusbar {
+    display: flex; gap: 14px; padding: 4px 12px;
+    background: var(--surface); border-top: 1px solid var(--border);
+    color: var(--dim); font-size: 12px;
+  }
+  .err { color: var(--error); }
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">keplr</span>
+  <span id="root">…</span>
+  <input id="token" type="password" placeholder="token (if gated)" autocomplete="off">
+  <span id="dot"></span>
+</header>
+<main>
+  <div id="left">
+    <input id="fquery" placeholder="find files…" autocomplete="off" spellcheck="false">
+    <div id="files"></div>
+  </div>
+  <div id="center">
+    <div id="pathbar"><b>(no file)</b></div>
+    <pre id="code"></pre>
+  </div>
+</main>
+<div id="bottom">
+  <div id="btabs">
+    <button id="tab-search" class="sel">search</button>
+    <button id="tab-tasks">tasks</button>
+  </div>
+  <div style="padding:0 12px;"><input id="needle" placeholder="search content…" autocomplete="off" spellcheck="false" style="width:100%;margin:8px 0;"></div>
+  <div id="bbody"></div>
+</div>
+<div id="statusbar"><span id="sbranch">branch: …</span><span id="sfiles">files: …</span><span id="smsg"></span></div>
+<script>
+(function () {
+  "use strict";
+  var token = "";
+  var openPath = "";
+  var openLine = 0;
+
+  function url(path) {
+    var q = token ? ((path.indexOf("?") >= 0 ? "&" : "?") + "token=" + encodeURIComponent(token)) : "";
+    return path + q;
+  }
+  function get(path) {
+    return fetch(url(path)).then(function (r) {
+      if (!r.ok) throw new Error("http " + r.status);
+      return r.json();
+    });
+  }
+  function post(path, body) {
+    return fetch(url(path), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    }).then(function (r) {
+      if (!r.ok) throw new Error("http " + r.status);
+      return r.json();
+    });
+  }
+  function esc(s) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function setDot(ok) {
+    var d = document.getElementById("dot");
+    d.className = ok ? "ok" : "bad";
+  }
+  function msg(t, isErr) {
+    var el = document.getElementById("smsg");
+    el.textContent = t;
+    el.className = isErr ? "err" : "";
+  }
+
+  function paint(codeEl, text) {
+    codeEl.innerHTML = "";
+    var lines = text.split("\n");
+    lines.forEach(function (line, i) {
+      var row = document.createElement("div");
+      row.className = "ln" + ((i + 1) === openLine ? " cur" : "");
+      var no = document.createElement("span");
+      no.className = "no";
+      no.textContent = i + 1;
+      var tx = document.createElement("span");
+      tx.className = "tx";
+      tx.innerHTML = colorize(line);
+      row.appendChild(no);
+      row.appendChild(tx);
+      codeEl.appendChild(row);
+    });
+    var cur = codeEl.querySelector(".cur");
+    if (cur) cur.scrollIntoView({ block: "center" });
+  }
+
+  // tiny client-side highlighter (server /highlight spans shade single lines too)
+  var KEYWORDS = ("fn let mut pub struct enum impl trait use mod return if else match for while loop "
+    + "function const var class extends new import export from interface type async await try catch "
+    + "def class func var const type map go select package nil "
+    + "serve on send broadcast members async return true false null").split(" ");
+  function colorize(line) {
+    var out = "";
+    var i = 0;
+    function flushPlain(s) { out += esc(s); }
+    while (i < line.length) {
+      var two = line.slice(i, i + 2);
+      if (two === "//" || line[i] === "~" || line[i] === "#") {
+        out += '<span class="cm">' + esc(line.slice(i)) + "</span>";
+        break;
+      }
+      if (line[i] === '"') {
+        var j = i + 1;
+        while (j < line.length && line[j] !== '"') { j += (line[j] === "\\" ? 2 : 1); }
+        j = Math.min(line.length, j + 1);
+        out += '<span class="st">' + esc(line.slice(i, j)) + "</span>";
+        i = j;
+        continue;
+      }
+      var m = /^[A-Za-z_][A-Za-z0-9_]*/.exec(line.slice(i));
+      if (m) {
+        var w = m[0];
+        if (KEYWORDS.indexOf(w) >= 0) out += '<span class="kw">' + esc(w) + "</span>";
+        else out += esc(w);
+        i += w.length;
+        continue;
+      }
+      var n = /^[0-9][0-9A-Za-z_.]*/.exec(line.slice(i));
+      if (n) {
+        out += '<span class="nu">' + esc(n[0]) + "</span>";
+        i += n[0].length;
+        continue;
+      }
+      out += esc(line[i]);
+      i += 1;
+    }
+    return out;
+  }
+
+  function openFile(path, line) {
+    openPath = path;
+    openLine = line || 0;
+    document.querySelectorAll("#files div").forEach(function (d) {
+      d.classList.toggle("sel", d.dataset.path === path);
+    });
+    get("/open?path=" + encodeURIComponent(path) + (line ? "&line=0" : ""))
+      .then(function (j) {
+        if (j.error) throw new Error(j.error);
+        document.querySelector("#pathbar").innerHTML =
+          "<b>" + esc(path) + "</b> · " + j.lines + " lines";
+        paint(document.getElementById("code"), j.text || "");
+        setDot(true);
+        msg("");
+      })
+      .catch(function (e) { setDot(false); msg(String(e), true); });
+  }
+
+  function loadFiles() {
+    var q = document.getElementById("fquery").value;
+    get("/files?query=" + encodeURIComponent(q) + "&limit=100")
+      .then(function (list) {
+        var box = document.getElementById("files");
+        box.innerHTML = "";
+        (list || []).forEach(function (f) {
+          var rel = f.path;
+          var d = document.createElement("div");
+          d.textContent = rel;
+          d.dataset.path = rel;
+          if (rel === openPath) d.classList.add("sel");
+          d.onclick = function () { openFile(rel, 0); };
+          box.appendChild(d);
+        });
+        setDot(true);
+      })
+      .catch(function (e) { setDot(false); msg(String(e), true); });
+  }
+
+  var searchTimer = 0;
+  function runSearch() {
+    var q = document.getElementById("needle").value;
+    var body = document.getElementById("bbody");
+    if (!q) { body.innerHTML = ""; return; }
+    get("/search?needle=" + encodeURIComponent(q) + "&limit=50")
+      .then(function (hits) {
+        body.innerHTML = "";
+        (hits || []).forEach(function (h) {
+          var d = document.createElement("div");
+          d.className = "hit";
+          d.textContent = h.path + ":" + h.line + ": " + h.preview;
+          d.onclick = function () { openFile(h.path, h.line); };
+          body.appendChild(d);
+        });
+        setDot(true);
+      })
+      .catch(function (e) { setDot(false); msg(String(e), true); });
+  }
+
+  function showTasks() {
+    var body = document.getElementById("bbody");
+    get("/tasks").then(function (tasks) {
+      body.innerHTML = "";
+      Object.keys(tasks || {}).forEach(function (name) {
+        var row = document.createElement("div");
+        row.className = "task";
+        var btn = document.createElement("button");
+        btn.textContent = "run";
+        btn.onclick = function () { runTask(name, row); };
+        var label = document.createElement("span");
+        label.textContent = name + "  " + (tasks[name].cmd || "");
+        row.appendChild(btn);
+        row.appendChild(label);
+        body.appendChild(row);
+      });
+    }).catch(function (e) { msg(String(e), true); });
+  }
+
+  function runTask(name, row) {
+    var pre = document.createElement("pre");
+    pre.textContent = "running…";
+    row.appendChild(pre);
+    post("/tasks/run", { target: name, jobs: 1 }).then(function (j) {
+      if (!j.ok && j.error) { pre.textContent = j.error; return; }
+      pre.textContent = (j.reports || []).map(function (r) {
+        return "=== " + r.task + " (" + (r.skipped ? "skipped" : r.failed ? "failed" : "ok") + ") ===\n" + r.output;
+      }).join("\n");
+    }).catch(function (e) { pre.textContent = String(e); });
+  }
+
+  function health() {
+    get("/health").then(function (h) {
+      document.getElementById("root").textContent = h.root || "";
+      return get("/tasks/graph").catch(function () { return null; });
+    }).then(function (g) {
+      if (g && g.order) document.getElementById("sfiles").textContent = "tasks: " + g.order.length;
+      return get("/index/status").catch(function () { return null; });
+    }).then(function (s) {
+      if (s) document.getElementById("sfiles").textContent += " · files: " + s.files;
+      setDot(true);
+    }).catch(function (e) { setDot(false); msg(String(e), true); });
+  }
+
+  document.getElementById("token").addEventListener("change", function (e) {
+    token = e.target.value.trim();
+    health();
+    loadFiles();
+  });
+  document.getElementById("fquery").addEventListener("input", loadFiles);
+  document.getElementById("needle").addEventListener("input", function () {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(runSearch, 180);
+  });
+  document.getElementById("tab-search").onclick = function () {
+    document.getElementById("tab-search").classList.add("sel");
+    document.getElementById("tab-tasks").classList.remove("sel");
+    document.getElementById("needle").style.display = "";
+    runSearch();
+  };
+  document.getElementById("tab-tasks").onclick = function () {
+    document.getElementById("tab-tasks").classList.add("sel");
+    document.getElementById("tab-search").classList.remove("sel");
+    document.getElementById("needle").style.display = "none";
+    showTasks();
+  };
+
+  var m = /[?&]token=([^&]*)/.exec(location.search);
+  if (m) {
+    token = decodeURIComponent(m[1]);
+    document.getElementById("token").value = token;
+  }
+  health();
+  loadFiles();
+})();
+</script>
+</body>
+</html>

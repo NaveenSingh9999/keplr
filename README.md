@@ -119,6 +119,18 @@ curl '127.0.0.1:7137/daemons'
 curl '127.0.0.1:7137/tasks/log?name=lint'
 ```
 
+## Use (browser UI, production)
+
+`keplr serve` also hosts a built-in browser page (no build step, vanilla JS over the same JSON API):
+
+```bash
+cargo run -p keplr-cli -- --root ~/LAML serve --port 7137
+```
+
+Open `http://127.0.0.1:7137/` — file tree, highlighted editor, content search, task list with run buttons, git-backed files. If a token is configured, paste it into the token box (or open `/?token=...`); the page itself is public, the API stays gated.
+
+In a Codespace: run the same command in a terminal, then open the **Ports** panel, forward port `7137`, and **Open in Browser`.
+
 ## Use (Plan H roaming/wasm/gpu-text, production)
 
 ```bash

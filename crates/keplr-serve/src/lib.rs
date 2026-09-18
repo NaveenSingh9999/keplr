@@ -117,7 +117,7 @@ async fn require_token(
     req: axum::extract::Request,
     next: axum::middleware::Next,
 ) -> axum::response::Response {
-    if state.token.is_empty() {
+    if state.token.is_empty() || req.uri().path() == "/" {
         return next.run(req).await;
     }
     if locked_out(&state, &addr) {
@@ -542,6 +542,10 @@ async fn save(
     Json(serde_json::json!({"ok": true, "report": report}))
 }
 
+async fn ui_root() -> axum::response::Html<&'static str> {
+    axum::response::Html(include_str!("ui.html"))
+}
+
 pub async fn serve(root: PathBuf, port: u16) -> anyhow::Result<()> {
     serve_with_token(root, port, String::new()).await
 }
@@ -620,6 +624,7 @@ pub async fn serve_full(
         }
     }
     let app = Router::new()
+        .route("/", get(ui_root))
         .route("/health", get(health))
         .route("/search", get(search))
         .route("/open", get(open))
