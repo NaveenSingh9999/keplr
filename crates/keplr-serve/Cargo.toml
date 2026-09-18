@@ -12,6 +12,7 @@ serde_json.workspace = true
 keplr-core = { path = "../keplr-core" }
 keplr-build = { path = "../keplr-build" }
 keplr-render = { path = "../keplr-render" }
+keplr-lang = { path = "../keplr-lang" }
 
 [dev-dependencies]
 reqwest = { version = "0.12", features = ["json"] }

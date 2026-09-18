@@ -355,3 +355,61 @@ pub fn laml_completions(prefix: &str) -> Vec<String> {
         .map(|k| k.to_string())
         .collect()
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct LspServer {
+    pub name: String,
+    pub cmd: String,
+    pub args: Vec<String>,
+    pub present: bool,
+}
+
+pub fn command_present(cmd: &str) -> bool {
+    if cmd.contains('/') {
+        return Path::new(cmd).exists();
+    }
+    std::env::var_os("PATH")
+        .map(|paths| {
+            std::env::split_paths(&paths).any(|dir| dir.join(cmd).exists())
+        })
+        .unwrap_or(false)
+}
+
+pub fn lsp_servers(lang: LangKind) -> Vec<LspServer> {
+    let defs: &[(&str, &str, &[&str])] = match lang {
+        LangKind::TypeScript | LangKind::Tsx | LangKind::JavaScript => &[(
+            "typescript-language-server",
+            "typescript-language-server",
+            &["--stdio"],
+        )],
+        LangKind::Cpp => &[("clangd", "clangd", &["--background-index"])],
+        LangKind::Go => &[("gopls", "gopls", &["serve"])],
+        LangKind::Rust => &[("rust-analyzer", "rust-analyzer", &[])],
+        LangKind::Laml | LangKind::Other => &[],
+    };
+    defs.iter()
+        .map(|(name, cmd, args)| LspServer {
+            name: name.to_string(),
+            cmd: cmd.to_string(),
+            args: args.iter().map(|a| a.to_string()).collect(),
+            present: command_present(cmd),
+        })
+        .collect()
+}
+
+pub fn spawn_lsp(server: &LspServer) -> anyhow::Result<std::process::Child> {
+    if !server.present {
+        anyhow::bail!(
+            "language server `{}` not found ({}); install it first",
+            server.name,
+            server.cmd
+        );
+    }
+    std::process::Command::new(&server.cmd)
+        .args(&server.args)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| anyhow::anyhow!("failed to start `{}`: {}", server.cmd, e))
+}

@@ -49,6 +49,9 @@ enum Cmd {
         watch: bool,
     },
     Doctor,
+    Diagnostics {
+        file: PathBuf,
+    },
     Serve {
         #[arg(long, default_value_t = 7137)]
         port: u16,
@@ -220,6 +223,23 @@ async fn main() -> anyhow::Result<()> {
             println!("root={}", cli.root.display());
             println!("files={}", ws.walk_files(1000).len());
             println!("laml={:?}", keplr_lang::LamlProbe::binary());
+        }
+        Cmd::Diagnostics { file } => {
+            let lang = keplr_lang::LangKind::from_path(&file);
+            let diagnostics = if lang == keplr_lang::LangKind::Laml {
+                keplr_lang::laml_diagnostics(&file)
+            } else {
+                Vec::new()
+            };
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "file": file.display().to_string(),
+                    "lang": format!("{lang:?}"),
+                    "diagnostics": diagnostics,
+                    "servers": keplr_lang::lsp_servers(lang),
+                }))?
+            );
         }
         Cmd::Serve { port } => {
             keplr_serve::serve(cli.root, port).await?;

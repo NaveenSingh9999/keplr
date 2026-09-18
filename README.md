@@ -54,4 +54,12 @@ cargo run -p keplr-cli -- --root . watch --debounce-ms 500
 curl '127.0.0.1:7137/index/status'
 ```
 
+## Use (Plan D lang, production)
+
+```bash
+cargo run -p keplr-cli -- --root ~/LAML diagnostics ng/src/main.lm
+curl '127.0.0.1:7137/diagnostics?path=Cargo.toml'
+curl '127.0.0.1:7137/highlight?path=Cargo.toml&line=1'
+```
+
 CI runs `cargo test --workspace --all-targets`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo build --workspace` on every push.

@@ -170,6 +170,47 @@ async fn index_status(State(state): State<AppState>) -> Json<serde_json::Value> 
     }))
 }
 
+async fn diagnostics(
+    State(state): State<AppState>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Json<serde_json::Value> {
+    let rel = params.get("path").cloned().unwrap_or_default();
+    let full = state.root.join(&rel);
+    let lang = keplr_lang::LangKind::from_path(&full);
+    let diags = if lang == keplr_lang::LangKind::Laml {
+        keplr_lang::laml_diagnostics(&full)
+    } else {
+        Vec::new()
+    };
+    Json(serde_json::json!({
+        "file": rel,
+        "lang": format!("{lang:?}"),
+        "diagnostics": diags,
+        "servers": keplr_lang::lsp_servers(lang),
+    }))
+}
+
+async fn highlight(
+    State(state): State<AppState>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Json<serde_json::Value> {
+    let rel = params.get("path").cloned().unwrap_or_default();
+    let line: usize = params.get("line").and_then(|v| v.parse().ok()).unwrap_or(1);
+    let full = state.root.join(&rel);
+    let lang = keplr_lang::LangKind::from_path(&full);
+    let text = keplr_core::buffer::Buffer::load(&full)
+        .ok()
+        .and_then(|b| b.line(line))
+        .unwrap_or_default();
+    Json(serde_json::json!({
+        "file": rel,
+        "line": line,
+        "lang": format!("{lang:?}"),
+        "text": text,
+        "spans": keplr_lang::highlight(lang, &text),
+    }))
+}
+
 pub async fn serve(root: PathBuf, port: u16) -> anyhow::Result<()> {
     let app = Router::new()
         .route("/health", get(health))
@@ -181,6 +222,8 @@ pub async fn serve(root: PathBuf, port: u16) -> anyhow::Result<()> {
         .route("/tasks/run", post(tasks_run))
         .route("/scene", get(scene))
         .route("/index/status", get(index_status))
+        .route("/diagnostics", get(diagnostics))
+        .route("/highlight", get(highlight))
         .with_state(AppState { root });
     let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{port}")).await?;
     axum::serve(listener, app).await?;
