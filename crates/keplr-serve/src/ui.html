@@ -170,6 +170,14 @@
   var rawText = "";
   var editing = false;
   var editDirty = false;
+  var wsRoot = "";
+
+  function rel(p) {
+    if (wsRoot && (p === wsRoot || p.indexOf(wsRoot + "/") === 0)) {
+      return p.slice(wsRoot.length + 1) || p;
+    }
+    return p;
+  }
 
   function url(path) {
     var q = token ? ((path.indexOf("?") >= 0 ? "&" : "?") + "token=" + encodeURIComponent(token)) : "";
@@ -277,7 +285,7 @@
     get("/open?path=" + encodeURIComponent(path) + (line ? "&line=0" : ""))
       .then(function (j) {
         if (j.error) throw new Error(j.error);
-        document.querySelector("#pathbar b").textContent = path;
+        document.querySelector("#pathbar b").textContent = rel(path);
         document.getElementById("ebtns").style.display = "";
         rawText = j.text || "";
         paint(document.getElementById("code"), rawText);
@@ -331,12 +339,12 @@
         var box = document.getElementById("files");
         box.innerHTML = "";
         (list || []).forEach(function (f) {
-          var rel = f.path;
+          var relp = rel(f.path);
           var d = document.createElement("div");
-          d.textContent = rel;
-          d.dataset.path = rel;
-          if (rel === openPath) d.classList.add("sel");
-          d.onclick = function () { openFile(rel, 0); };
+          d.textContent = relp;
+          d.dataset.path = f.path;
+          if (f.path === openPath) d.classList.add("sel");
+          d.onclick = function () { openFile(f.path, 0); };
           box.appendChild(d);
         });
         setDot(true);
@@ -355,7 +363,7 @@
         (hits || []).forEach(function (h) {
           var d = document.createElement("div");
           d.className = "hit";
-          d.textContent = h.path + ":" + h.line + ": " + h.preview;
+          d.textContent = rel(h.path) + ":" + h.line + ": " + h.preview;
           d.onclick = function () { openFile(h.path, h.line); };
           body.appendChild(d);
         });
@@ -397,7 +405,9 @@
 
   function health() {
     get("/health").then(function (h) {
-      document.getElementById("root").textContent = h.root || "";
+      wsRoot = h.root || "";
+      document.getElementById("root").textContent = wsRoot;
+      document.getElementById("sbranch").textContent = "branch: " + (h.branch || "?");
       return get("/tasks/graph").catch(function () { return null; });
     }).then(function (g) {
       if (g && g.order) document.getElementById("sfiles").textContent = "tasks: " + g.order.length;

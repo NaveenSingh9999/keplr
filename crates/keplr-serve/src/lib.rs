@@ -158,12 +158,19 @@ async fn require_token(
 struct Health {
     ok: bool,
     root: String,
+    branch: String,
 }
 
 async fn health(State(state): State<AppState>) -> Json<Health> {
+    let branch = keplr_core::git::branches(&state.root)
+        .ok()
+        .and_then(|bs| bs.into_iter().find(|b| b.current))
+        .map(|b| b.name)
+        .unwrap_or_else(|| String::from("no-git"));
     Json(Health {
         ok: true,
         root: state.root.display().to_string(),
+        branch,
     })
 }
 
