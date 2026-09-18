@@ -125,6 +125,7 @@ enum Cmd {
         #[arg(long)]
         rotate: bool,
     },
+    Fonts,
     Ui {
         #[arg(long)]
         open: Option<PathBuf>,
@@ -568,6 +569,18 @@ async fn main() -> anyhow::Result<()> {
                 }
             } else {
                 println!("{token}");
+            }
+        }
+        Cmd::Fonts => {
+            let mut any = false;
+            for p in keplr_render::font_stack() {
+                let present = p.is_file();
+                any = any || present;
+                let mark = if present { "ok" } else { "--" };
+                println!("{mark} {}", p.display());
+            }
+            if !any {
+                println!("no monospace font found; set KEPLR_FONT=/path/to/font.ttf");
             }
         }
         Cmd::Ui {

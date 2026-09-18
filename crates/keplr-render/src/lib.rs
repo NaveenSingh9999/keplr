@@ -723,3 +723,51 @@ impl PaintBackend for AnsiBackend {
         out
     }
 }
+
+fn dirs_home() -> PathBuf {
+    std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_default()
+}
+
+pub fn font_stack() -> Vec<PathBuf> {
+    let mut stack = Vec::new();
+    if let Ok(f) = std::env::var("KEPLR_FONT") {
+        if !f.trim().is_empty() {
+            stack.push(PathBuf::from(f.trim()));
+        }
+    }
+    for sys in [
+        "/Applications/Xcode.app/Contents/SharedSupport/Fonts/SFMono-Regular.otf",
+        "/Library/Fonts/SFMono-Regular.otf",
+        "/System/Library/Fonts/SFMono-Regular.otf",
+        "/System/Library/Fonts/SFNSMono.ttf",
+    ] {
+        stack.push(PathBuf::from(sys));
+    }
+    stack.push(PathBuf::from("assets/fonts/JetBrainsMono-Regular.ttf"));
+    stack.push(PathBuf::from("assets/fonts/JetBrainsMono-Bold.ttf"));
+    let home = dirs_home();
+    if !home.as_os_str().is_empty() {
+        stack.push(home.join(".keplr/fonts/JetBrainsMono-Regular.ttf"));
+        stack.push(home.join(".fonts/JetBrainsMono-Regular.ttf"));
+    }
+    stack.push(PathBuf::from(
+        "/data/data/com.termux/files/home/.fonts/IosevkaTermNerdFontMono-Regular.ttf",
+    ));
+    for dir in [
+        "/usr/share/fonts",
+        "/usr/local/share/fonts",
+        "/system/fonts",
+    ] {
+        let dir = PathBuf::from(dir);
+        stack.push(dir.join("JetBrainsMono-Regular.ttf"));
+        stack.push(dir.join("DejaVuSansMono.ttf"));
+        stack.push(dir.join("DroidSansMono.ttf"));
+    }
+    stack
+}
+
+pub fn discover_font() -> Option<PathBuf> {
+    font_stack().into_iter().find(|p| p.is_file())
+}
