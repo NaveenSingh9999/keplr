@@ -251,7 +251,7 @@ pub fn task_fingerprint(task: &TaskDef, workdir: &Path) -> String {
         h.update(&[0]);
     }
     hash_listed(&mut h, workdir, &task.fingerprint);
-    h.to_hex().to_string()
+    h.finalize().to_hex().to_string()
 }
 
 fn fingerprint_inner(
@@ -281,7 +281,7 @@ fn fingerprint_inner(
         h.update(&[0]);
     }
     stack.pop();
-    let s = h.to_hex().to_string();
+    let s = h.finalize().to_hex().to_string();
     memo.insert(name.to_string(), s.clone());
     s
 }
@@ -497,7 +497,7 @@ pub fn run_graph_parallel(
                                 out.insert(name, r);
                             }
                             Err(_) => {
-                                out.insert(name, Err(anyhow::anyhow!("task `{name}` panicked")));
+                                out.insert(name.clone(), Err(anyhow::anyhow!("task `{name}` panicked")));
                             }
                         }
                     }
