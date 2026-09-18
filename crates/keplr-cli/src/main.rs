@@ -609,7 +609,7 @@ async fn main() -> anyhow::Result<()> {
                 doc.push(&seed);
             }
             sink.send(tokio_tungstenite::tungstenite::Message::Binary(
-                doc.encode_update(),
+                doc.encode_update().into(),
             ))
             .await?;
             let mut last_write = file
@@ -662,7 +662,7 @@ async fn main() -> anyhow::Result<()> {
                                     let fresh = keplr_sync::SyncDoc::from_text(&name, &text);
                                     let update = fresh.encode_update();
                                     doc.apply_update(&update)?;
-                                    sink.send(tokio_tungstenite::tungstenite::Message::Binary(update)).await?;
+                                    sink.send(tokio_tungstenite::tungstenite::Message::Binary(update.into())).await?;
                                     println!("sync: sent file change");
                                 }
                                 last_write = std::fs::metadata(f).ok().and_then(|m| m.modified().ok());
