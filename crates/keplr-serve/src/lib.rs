@@ -771,7 +771,7 @@ async fn channel_loop(
             msg = socket.recv() => {
                 match msg {
                     Some(Ok(Message::Binary(bytes))) => {
-                        let mut docs = state.sync_docs.lock().unwrap_or_else(|e| e.into_inner());
+                        let docs = state.sync_docs.lock().unwrap_or_else(|e| e.into_inner());
                         if let Some(doc) = docs.get(&name) {
                             if doc.apply_update(&bytes).is_ok() {
                                 let merged = doc.encode_update();
