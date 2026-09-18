@@ -279,7 +279,7 @@ async fn main() -> anyhow::Result<()> {
                         "fuzzy_p95_us": keplr_core::percentile_ns(&fuzzy_ns, 95.0) / 1000,
                         "grep_p50_us": keplr_core::percentile_ns(&grep_ns, 50.0) / 1000,
                         "grep_p95_us": keplr_core::percentile_ns(&grep_ns, 95.0) / 1000,
-                        "cas_put_per_s": (puts as u128 * 1000) / cas_ms as u128,
+                        "cas_put_per_s": (puts as u128 * 1000) / cas_ms,
                         "build_rerun": r1.len(),
                         "build_skipped": skipped,
                     }))?
@@ -298,7 +298,7 @@ async fn main() -> anyhow::Result<()> {
                 );
                 println!(
                     "cas_put_per_s={} build_rerun={} build_skipped={}",
-                    (puts as u128 * 1000) / cas_ms as u128,
+                    (puts as u128 * 1000) / cas_ms,
                     r1.len(),
                     skipped
                 );

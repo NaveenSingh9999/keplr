@@ -62,34 +62,37 @@ impl Doc {
     }
 }
 
-fn draw(
-    doc: &Doc,
-    file_label: &str,
-    branch: &str,
-    lang: &str,
+struct Frame<'a> {
+    doc: &'a Doc,
+    file_label: &'a str,
+    branch: &'a str,
+    lang: &'a str,
     cursor: (usize, usize),
     top: usize,
     dirty: bool,
-    status: &str,
+    status: &'a str,
     palette_open: bool,
-    palette_query: &str,
-    palette_hits: &[String],
+    palette_query: &'a str,
+    palette_hits: &'a [String],
     palette_sel: usize,
-) -> anyhow::Result<()> {
+}
+
+fn draw(f: &Frame) -> anyhow::Result<()> {
     let (cols, rows) = terminal::size()?;
     let mut out = stdout();
     execute!(out, MoveTo(0, 0), Clear(ClearType::All))?;
-    let dot = if dirty { "●" } else { " " };
+    let dot = if f.dirty { "●" } else { " " };
     execute!(
         out,
         Print(format!(
-            "\x1b[1;36mkeplr\x1b[0m {file_label} {dot} \x1b[2m{branch} {lang}\x1b[0m\r\n"
+            "\x1b[1;36mkeplr\x1b[0m {} {dot} \x1b[2m{} {}\x1b[0m\r\n",
+            f.file_label, f.branch, f.lang
         ))
     )?;
     let height = rows.saturating_sub(3) as usize;
     for i in 0..height {
-        let idx = top + i;
-        if let Some(line) = doc.lines.get(idx) {
+        let idx = f.top + i;
+        if let Some(line) = f.doc.lines.get(idx) {
             let shown = truncate_cells(line, cols.saturating_sub(7) as usize);
             execute!(
                 out,
@@ -103,29 +106,29 @@ fn draw(
         out,
         Print(format!(
             "\x1b[7m {:<w$} \x1b[0m\r\n",
-            status,
+            f.status,
             w = cols.saturating_sub(2) as usize
         ))
     )?;
-    if palette_open {
+    if f.palette_open {
         execute!(
             out,
             MoveTo(0, 1),
             Clear(ClearType::CurrentLine),
-            Print(format!("› {palette_query}\r\n"))
+            Print(format!("› {}\r\n", f.palette_query))
         )?;
-        for (i, h) in palette_hits.iter().take(8).enumerate() {
-            let mark = if i == palette_sel { "▸" } else { " " };
+        for (i, h) in f.palette_hits.iter().take(8).enumerate() {
+            let mark = if i == f.palette_sel { "▸" } else { " " };
             let shown = truncate_cells(h, cols.saturating_sub(4) as usize);
-            if i == palette_sel {
+            if i == f.palette_sel {
                 execute!(out, Print(format!("\x1b[7m{mark} {shown}\x1b[0m\r\n")))?;
             } else {
                 execute!(out, Print(format!("{mark} {shown}\r\n")))?;
             }
         }
     }
-    let crow = 1 + cursor.0.saturating_sub(top);
-    let ccol = 5 + cursor.1;
+    let crow = 1 + f.cursor.0.saturating_sub(f.top);
+    let ccol = 5 + f.cursor.1;
     execute!(out, MoveTo(ccol as u16, crow as u16))?;
     out.flush()?;
     Ok(())
@@ -202,20 +205,20 @@ pub fn edit_file(root: PathBuf, file: PathBuf) -> anyhow::Result<()> {
         if cursor.1 > max_col {
             cursor.1 = max_col;
         }
-        draw(
-            &doc,
-            &file_label,
-            &branch,
-            &lang,
+        draw(&Frame {
+            doc: &doc,
+            file_label: &file_label,
+            branch: &branch,
+            lang: &lang,
             cursor,
             top,
             dirty,
-            &status,
+            status: &status,
             palette_open,
-            &palette_query,
-            &palette_hits,
+            palette_query: &palette_query,
+            palette_hits: &palette_hits,
             palette_sel,
-        )?;
+        })?;
         if !event::poll(Duration::from_millis(200))? {
             continue;
         }

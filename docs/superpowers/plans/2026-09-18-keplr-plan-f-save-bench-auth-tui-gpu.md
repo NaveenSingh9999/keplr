@@ -1862,3 +1862,10 @@ Expected: default job green + `gpu-check` green. On failure: `gh run view <id> -
 1. Spec coverage: §8 save flow yes (F1 write→CAS→index→git→optional task); §10 benches yes (F2 synth + p50/p95 + CAS rate + skip rate); §5 hub auth yes (F3 bearer gate; Tailscale/WireGuard remains an operator transport choice); §4 editor/input yes at terminal level (F4 keystroke→rope→repaint→save; IME/touch need the OS shell); §6 live logs yes at report granularity (streaming per-keystroke task output is out of scope); §2 native shell yes behind `gpu` (window+surface+layout paint+resilience fallback; GPU text rasterization is the documented next layer); WASM explicitly deferred with reason.
 2. Placeholder scan: no TBD/TODO/placeholder/unimplemented; `desktop` without GPU prints the real software UI; `save` without git reports honestly; `bench` measures instead of estimating.
 3. Type consistency: `SaveReport/save_buffer`, `synth_tree/percentile_ns`, `new_token/resolve_token/serve_with_token`, `tui::edit_file`, `gpu::run_desktop` spelled identically at every definition and call site; `serve(root, port)` signature unchanged.
+
+## Implementation notes (CI-driven fixes)
+
+- `wgpu 22` has no `winit` feature: render uses `features = ["wgsl"]` only.
+- `wgpu 22` needs `compilation_options: PipelineCompilationOptions::default()` in `VertexState`/`FragmentState`; `App::rebuild` is hoisted before the mutable borrow in `RedrawRequested`.
+- TUI `draw` takes `&Frame` (12-arg function trips `too_many_arguments`); `cas_ms` needs no `as u128` cast.
+- Serve auth uses plain `if/else` and `Some(("token", v))` (newer clippy `obfuscated_if_else`/`redundant_guards`).
