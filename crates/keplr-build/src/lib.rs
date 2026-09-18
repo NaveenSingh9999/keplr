@@ -44,6 +44,7 @@ struct RawTask {
     daemon: bool,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn load_tasks(path: &Path) -> anyhow::Result<BTreeMap<String, TaskDef>> {
     let text = std::fs::read_to_string(path)?;
     let shape: FileShape = serde_json::from_str(&text)?;
@@ -68,6 +69,7 @@ pub fn load_tasks(path: &Path) -> anyhow::Result<BTreeMap<String, TaskDef>> {
         .collect())
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn run_task(task: &TaskDef, workdir: &Path) -> anyhow::Result<String> {
     let cwd = task.cwd.as_ref().map(Path::new).unwrap_or(workdir);
     let output = std::process::Command::new("sh")
@@ -172,6 +174,7 @@ pub struct JournalEntry {
     pub output_tail: String,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn tail_2k(s: &str) -> String {
     if s.len() <= 2048 {
         return s.to_string();
@@ -197,6 +200,7 @@ pub struct RunReport {
     pub cancelled: bool,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn resolve_under(workdir: &Path, pat: &str) -> PathBuf {
     let p = Path::new(pat);
     if p.is_absolute() {
@@ -206,6 +210,7 @@ fn resolve_under(workdir: &Path, pat: &str) -> PathBuf {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn hash_file(hasher: &mut blake3::Hasher, path: &Path) {
     match std::fs::read(path) {
         Ok(bytes) => {
@@ -219,6 +224,7 @@ fn hash_file(hasher: &mut blake3::Hasher, path: &Path) {
     hasher.update(&[0]);
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn hash_listed(hasher: &mut blake3::Hasher, workdir: &Path, patterns: &[String]) {
     let mut pats: Vec<&String> = patterns.iter().collect();
     pats.sort();
@@ -258,6 +264,7 @@ fn hash_listed(hasher: &mut blake3::Hasher, workdir: &Path, patterns: &[String])
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn task_fingerprint(task: &TaskDef, workdir: &Path) -> String {
     let mut h = blake3::Hasher::new();
     h.update(task.name.as_bytes());
@@ -278,6 +285,7 @@ pub fn task_fingerprint(task: &TaskDef, workdir: &Path) -> String {
     h.finalize().to_hex().to_string()
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn fingerprint_inner(
     tasks: &BTreeMap<String, TaskDef>,
     name: &str,
@@ -310,6 +318,7 @@ fn fingerprint_inner(
     s
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn graph_fingerprints(
     tasks: &BTreeMap<String, TaskDef>,
     workdir: &Path,
@@ -322,10 +331,12 @@ pub fn graph_fingerprints(
     memo
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn journal_path(workdir: &Path) -> PathBuf {
     workdir.join(".keplr/build-journal.json")
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn load_journal(workdir: &Path) -> BTreeMap<String, JournalEntry> {
     std::fs::read_to_string(journal_path(workdir))
         .ok()
@@ -333,6 +344,12 @@ pub fn load_journal(workdir: &Path) -> BTreeMap<String, JournalEntry> {
         .unwrap_or_default()
 }
 
+#[cfg(target_arch = "wasm32")]
+pub fn load_journal(_workdir: &Path) -> BTreeMap<String, JournalEntry> {
+    BTreeMap::new()
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 pub fn save_journal(workdir: &Path, journal: &BTreeMap<String, JournalEntry>) -> anyhow::Result<()> {
     let path = journal_path(workdir);
     if let Some(parent) = path.parent() {
@@ -343,6 +360,15 @@ pub fn save_journal(workdir: &Path, journal: &BTreeMap<String, JournalEntry>) ->
     Ok(())
 }
 
+#[cfg(target_arch = "wasm32")]
+pub fn save_journal(
+    _workdir: &Path,
+    _journal: &BTreeMap<String, JournalEntry>,
+) -> anyhow::Result<()> {
+    Ok(())
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 fn store_outputs(
     cas: &keplr_sync::Cas,
     workdir: &Path,
@@ -362,6 +388,7 @@ fn store_outputs(
     stored
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn restore_outputs(
     cas: &keplr_sync::Cas,
     workdir: &Path,
@@ -386,6 +413,7 @@ fn restore_outputs(
     restored
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn run_ordered(
     tasks: &BTreeMap<String, TaskDef>,
     workdir: &Path,
@@ -441,6 +469,7 @@ fn run_ordered(
     Ok(reports)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn run_graph(
     tasks: &BTreeMap<String, TaskDef>,
     workdir: &Path,
@@ -458,6 +487,7 @@ pub fn run_graph(
     run_ordered(tasks, workdir, &order, force)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn run_graph_parallel(
     tasks: &BTreeMap<String, TaskDef>,
     workdir: &Path,
@@ -575,6 +605,7 @@ pub fn run_graph_parallel(
     Ok(reports)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn cancelled_entries(
     order: &[String],
     from: usize,
@@ -594,10 +625,12 @@ fn cancelled_entries(
         .collect()
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn level_index(order: &[String], name: &str) -> usize {
     order.iter().position(|n| n == name).unwrap_or(order.len())
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn run_graph_settled(
     tasks: &BTreeMap<String, TaskDef>,
     workdir: &Path,
