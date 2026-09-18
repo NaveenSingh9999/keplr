@@ -59,3 +59,299 @@ impl LamlProbe {
         Ok(s)
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum TokenKind {
+    Keyword,
+    Str,
+    Comment,
+    Number,
+    Other,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Span {
+    pub start: usize,
+    pub len: usize,
+    pub kind: TokenKind,
+}
+
+fn keywords(lang: LangKind) -> &'static [&'static str] {
+    match lang {
+        LangKind::Rust => &[
+            "fn", "let", "mut", "pub", "struct", "enum", "impl", "trait", "use",
+            "mod", "crate", "self", "Self", "return", "if", "else", "match",
+            "for", "while", "loop", "in", "where", "const", "static", "ref",
+            "move", "async", "await", "dyn", "unsafe", "extern", "as", "break",
+            "continue", "true", "false", "Some", "None", "Ok", "Err", "type",
+        ],
+        LangKind::TypeScript | LangKind::Tsx | LangKind::JavaScript => &[
+            "function", "const", "let", "var", "return", "if", "else", "for",
+            "while", "import", "export", "from", "class", "extends", "new",
+            "typeof", "interface", "type", "enum", "async", "await", "try",
+            "catch", "throw", "switch", "case", "break", "continue", "this",
+            "true", "false", "null", "undefined",
+        ],
+        LangKind::Cpp => &[
+            "int", "float", "double", "char", "bool", "void", "class",
+            "struct", "public", "private", "protected", "virtual", "override",
+            "final", "template", "typename", "namespace", "using", "return",
+            "if", "else", "for", "while", "new", "delete", "const", "static",
+            "auto", "true", "false", "nullptr", "include",
+        ],
+        LangKind::Go => &[
+            "func", "var", "const", "type", "struct", "interface", "map",
+            "chan", "go", "select", "return", "if", "else", "for", "range",
+            "switch", "case", "break", "continue", "package", "import",
+            "true", "false", "nil",
+        ],
+        LangKind::Laml => &[
+            "serve", "on", "send", "broadcast", "joinRoom", "members",
+            "async", "waitFor", "closc", "sort", "pop", "join", "upper",
+            "lower", "keys", "has", "assert", "jsonParse", "jsonStringify",
+            "setTimeout", "return", "if", "else", "for", "true", "false",
+            "null",
+        ],
+        LangKind::Other => &[],
+    }
+}
+
+fn push_other(spans: &mut Vec<Span>, other_start: &mut Option<usize>, end: usize) {
+    if let Some(s) = other_start.take() {
+        if end > s {
+            spans.push(Span {
+                start: s,
+                len: end - s,
+                kind: TokenKind::Other,
+            });
+        }
+    }
+}
+
+pub fn highlight(lang: LangKind, line: &str) -> Vec<Span> {
+    let bytes = line.as_bytes();
+    let mut spans: Vec<Span> = Vec::new();
+    let mut other_start: Option<usize> = None;
+    let mut i = 0;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if lang == LangKind::Laml && b == b'~' {
+            push_other(&mut spans, &mut other_start, i);
+            spans.push(Span {
+                start: i,
+                len: bytes.len() - i,
+                kind: TokenKind::Comment,
+            });
+            break;
+        }
+        if lang != LangKind::Laml
+            && b == b'/'
+            && i + 1 < bytes.len()
+            && bytes[i + 1] == b'/'
+        {
+            push_other(&mut spans, &mut other_start, i);
+            spans.push(Span {
+                start: i,
+                len: bytes.len() - i,
+                kind: TokenKind::Comment,
+            });
+            break;
+        }
+        if b == b'"' {
+            push_other(&mut spans, &mut other_start, i);
+            let mut j = i + 1;
+            while j < bytes.len() {
+                if bytes[j] == b'\\' {
+                    j += 2;
+                    continue;
+                }
+                if bytes[j] == b'"' {
+                    j += 1;
+                    break;
+                }
+                j += 1;
+            }
+            spans.push(Span {
+                start: i,
+                len: j - i,
+                kind: TokenKind::Str,
+            });
+            i = j;
+            continue;
+        }
+        if b.is_ascii_digit() {
+            push_other(&mut spans, &mut other_start, i);
+            let mut j = i;
+            while j < bytes.len()
+                && (bytes[j].is_ascii_alphanumeric() || bytes[j] == b'.')
+            {
+                j += 1;
+            }
+            spans.push(Span {
+                start: i,
+                len: j - i,
+                kind: TokenKind::Number,
+            });
+            i = j;
+            continue;
+        }
+        if b.is_ascii_alphabetic() || b == b'_' {
+            push_other(&mut spans, &mut other_start, i);
+            let mut j = i;
+            while j < bytes.len()
+                && (bytes[j].is_ascii_alphanumeric() || bytes[j] == b'_')
+            {
+                j += 1;
+            }
+            let word = &line[i..j];
+            let kind = if keywords(lang).contains(&word) {
+                TokenKind::Keyword
+            } else {
+                TokenKind::Other
+            };
+            spans.push(Span {
+                start: i,
+                len: j - i,
+                kind,
+            });
+            i = j;
+            continue;
+        }
+        if other_start.is_none() {
+            other_start = Some(i);
+        }
+        i += 1;
+    }
+    push_other(&mut spans, &mut other_start, bytes.len());
+    spans
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Diagnostic {
+    pub path: String,
+    pub line: u64,
+    pub col: u64,
+    pub message: String,
+    pub severity: String,
+}
+
+fn hint_diagnostic(source: &Path, message: &str) -> Diagnostic {
+    Diagnostic {
+        path: source.display().to_string(),
+        line: 1,
+        col: 1,
+        message: message.to_string(),
+        severity: String::from("hint"),
+    }
+}
+
+fn parse_diag_line(raw: &str, fallback_path: &str) -> Option<Diagnostic> {
+    let parts: Vec<&str> = raw.splitn(4, ':').collect();
+    if parts.len() < 3 {
+        return None;
+    }
+    let line: u64 = parts[1].trim().parse().ok()?;
+    if line == 0 {
+        return None;
+    }
+    let (col, message) = if parts.len() == 4 {
+        match parts[2].trim().parse::<u64>() {
+            Ok(c) if c > 0 => (c, parts[3].trim().to_string()),
+            _ => (1, format!("{}: {}", parts[2].trim(), parts[3].trim())),
+        }
+    } else {
+        (1, parts[2].trim().to_string())
+    };
+    if message.is_empty() {
+        return None;
+    }
+    let path = if parts[0].trim().is_empty() {
+        fallback_path.to_string()
+    } else {
+        parts[0].trim().to_string()
+    };
+    Some(Diagnostic {
+        path,
+        line,
+        col,
+        message,
+        severity: String::from("error"),
+    })
+}
+
+pub fn laml_diagnostics(source: &Path) -> Vec<Diagnostic> {
+    let label = source.display().to_string();
+    let Some(bin) = LamlProbe::binary() else {
+        return vec![hint_diagnostic(
+            source,
+            "laml binary not found on PATH; install it for check/run diagnostics",
+        )];
+    };
+    let out = std::process::Command::new(&bin)
+        .arg("check")
+        .arg(source)
+        .output();
+    let Ok(out) = out else {
+        return vec![hint_diagnostic(source, "laml binary could not be spawned")];
+    };
+    if out.status.success() {
+        return Vec::new();
+    }
+    let text = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let mut diags: Vec<Diagnostic> = text
+        .lines()
+        .filter_map(|raw| parse_diag_line(raw, &label))
+        .collect();
+    if diags.is_empty() {
+        diags.push(Diagnostic {
+            path: label,
+            line: 1,
+            col: 1,
+            message: text.chars().take(500).collect(),
+            severity: String::from("error"),
+        });
+    }
+    diags
+}
+
+const LAML_KEYWORDS: &[&str] = &[
+    "serve",
+    "on",
+    "send",
+    "broadcast",
+    "joinRoom",
+    "members",
+    "async",
+    "waitFor",
+    "closc",
+    "sort",
+    "pop",
+    "join",
+    "upper",
+    "lower",
+    "keys",
+    "has",
+    "assert",
+    "jsonParse",
+    "jsonStringify",
+    "setTimeout",
+    "return",
+    "if",
+    "else",
+    "for",
+    "true",
+    "false",
+    "null",
+];
+
+pub fn laml_completions(prefix: &str) -> Vec<String> {
+    LAML_KEYWORDS
+        .iter()
+        .filter(|k| k.starts_with(prefix))
+        .map(|k| k.to_string())
+        .collect()
+}
