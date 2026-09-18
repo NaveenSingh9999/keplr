@@ -3,6 +3,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use axum::response::IntoResponse;
 use serde::Serialize;
 use std::{
     collections::HashMap,
@@ -12,6 +13,95 @@ use std::{
 #[derive(Clone)]
 struct AppState {
     root: PathBuf,
+    token: String,
+}
+
+fn timing_safe_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for i in 0..a.len() {
+        diff |= a[i] ^ b[i];
+    }
+    diff == 0
+}
+
+pub fn new_token() -> String {
+    let bytes = std::fs::read("/dev/urandom").unwrap_or_else(|_| {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        let mut out = Vec::new();
+        let mut counter: u64 = 0;
+        while out.len() < 32 {
+            let mut h = DefaultHasher::new();
+            std::process::id().hash(&mut h);
+            std::time::SystemTime::now().hash(&mut h);
+            counter.hash(&mut h);
+            counter += 1;
+            out.extend_from_slice(&h.finish().to_le_bytes());
+        }
+        out
+    });
+    bytes
+        .iter()
+        .take(32)
+        .map(|b| format!("{b:02x}"))
+        .collect::<Vec<_>>()
+        .join("")
+}
+
+pub fn resolve_token(root: &Path, flag: &str) -> String {
+    if !flag.is_empty() {
+        return flag.to_string();
+    }
+    if let Ok(t) = std::env::var("KEPLR_TOKEN") {
+        if !t.trim().is_empty() {
+            return t.trim().to_string();
+        }
+    }
+    root.join(".keplr/token")
+        .exists()
+        .then(|| {
+            std::fs::read_to_string(root.join(".keplr/token"))
+                .map(|t| t.trim().to_string())
+                .unwrap_or_default()
+        })
+        .unwrap_or_default()
+}
+
+async fn require_token(
+    State(state): State<AppState>,
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    if state.token.is_empty() {
+        return next.run(req).await;
+    }
+    let header_ok = req
+        .headers()
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .map(|t| timing_safe_eq(t.as_bytes(), state.token.as_bytes()))
+        .unwrap_or(false);
+    let query_ok = req.uri().query().map(|q| {
+        q.split('&').any(|kv| match kv.split_once('=') {
+            Some((k, v)) if k == "token" => {
+                timing_safe_eq(v.as_bytes(), state.token.as_bytes())
+            }
+            _ => false,
+        })
+    });
+    if header_ok || query_ok.unwrap_or(false) {
+        next.run(req).await
+    } else {
+        (
+            axum::http::StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({"error": "unauthorized"})),
+        )
+            .into_response()
+    }
 }
 
 #[derive(Serialize)]
@@ -353,6 +443,11 @@ async fn save(
 }
 
 pub async fn serve(root: PathBuf, port: u16) -> anyhow::Result<()> {
+    serve_with_token(root, port, String::new()).await
+}
+
+pub async fn serve_with_token(root: PathBuf, port: u16, token: String) -> anyhow::Result<()> {
+    let state = AppState { root, token };
     let app = Router::new()
         .route("/health", get(health))
         .route("/search", get(search))
@@ -372,7 +467,11 @@ pub async fn serve(root: PathBuf, port: u16) -> anyhow::Result<()> {
             post(sync_snapshot_save).get(sync_snapshot_load),
         )
         .route("/save", post(save))
-        .with_state(AppState { root });
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            require_token,
+        ))
+        .with_state(state);
     let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{port}")).await?;
     axum::serve(listener, app).await?;
     Ok(())
