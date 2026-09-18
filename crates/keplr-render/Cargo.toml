@@ -9,3 +9,9 @@ serde.workspace = true
 serde_json.workspace = true
 keplr-core = { path = "../keplr-core" }
 keplr-lang = { path = "../keplr-lang" }
+winit = { workspace = true, optional = true }
+wgpu = { workspace = true, optional = true, features = ["wgsl", "winit"] }
+pollster = { workspace = true, optional = true }
+
+[features]
+gpu = ["dep:winit", "dep:wgpu", "dep:pollster"]
