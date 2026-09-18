@@ -11,6 +11,9 @@ Plan C builds: `docs/superpowers/plans/2026-09-18-keplr-build-dag.md`
 Plan D index/lang/sync: `docs/superpowers/plans/2026-09-18-keplr-plan-d-index-lang-sync.md`
 Plan E Zed depth: `docs/superpowers/plans/2026-09-18-keplr-plan-e-zed-depth.md`
 Plan F save/bench/auth/tui/gpu: `docs/superpowers/plans/2026-09-18-keplr-plan-f-save-bench-auth-tui-gpu.md`
+Plan G all-in: `docs/superpowers/plans/2026-09-18-keplr-plan-g-all-in.md`
+
+Fonts: SF Mono when macOS/Xcode provides it (Apple license, never vendored), else vendored JetBrains Mono OFL (`assets/fonts/`), else system monos. Override with `KEPLR_FONT`. `keplr fonts` shows the resolved stack.
 
 ## Use (foundation CLI, production)
 
@@ -96,6 +99,23 @@ cargo run -p keplr-cli -- --root . edit Cargo.toml
 cargo run -p keplr-cli --features desktop -- --root . desktop --open Cargo.toml  # native window; falls back to ANSI without GPU
 ```
 
-WASM browser parity is deferred: `notify`/`ignore` are not wasm-safe, so the workspace needs dep surgery first. The browser contract is already live — `Scene` serde JSON over `keplr serve` (see `/scene`).
+WASM browser parity is deferred: `notify`/`ignore` are not wasm-safe, so the workspace needs dep surgery first. The browser contract is already live — `Scene` serde JSON over `keplr serve` (see `/scene`). `keplr-lang` alone is wasm-verified in CI (`wasm-check`).
+
+## Use (Plan G all-in, production)
+
+```bash
+cargo run -p keplr-cli -- --root . fonts
+cargo run -p keplr-cli -- --root . snippets rs
+cargo run -p keplr-cli -- --root . git status
+cargo run -p keplr-cli -- --root . git log --limit 5
+cargo run -p keplr-cli -- --root . lsp-install rust-analyzer --dir ~/.keplr/bin
+cargo run -p keplr-cli -- --root . edit src/main.rs
+cargo run -p keplr-cli -- --root . serve --bind 127.0.0.1 --port 7137
+cargo run -p keplr-cli -- --root . token --rotate
+curl '127.0.0.1:7137/git/status'
+curl '127.0.0.1:7137/snippets?lang=rs'
+curl '127.0.0.1:7137/daemons'
+curl '127.0.0.1:7137/tasks/log?name=lint'
+```
 
 CI runs `cargo test --workspace --all-targets`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo build --workspace` on every push.
