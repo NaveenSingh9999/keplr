@@ -7,6 +7,7 @@ LAML first-class.
 Spec: `docs/superpowers/specs/2026-09-17-keplr-design.md`
 Plan foundation: `docs/superpowers/plans/2026-09-18-keplr-production-foundation.md`
 Plan B canvas: `docs/superpowers/plans/2026-09-18-keplr-plan-b-canvas-foundation.md`
+Plan C builds: `docs/superpowers/plans/2026-09-18-keplr-build-dag.md`
 
 ## Use (foundation CLI, production)
 
@@ -28,6 +29,17 @@ cargo run -p keplr-cli -- --root . serve --port 7137 &
 curl '127.0.0.1:7137/scene?open=Cargo.toml&width=100'
 curl '127.0.0.1:7137/files?query=keplr&limit=5'
 curl '127.0.0.1:7137/tasks'
+```
+
+## Use (Plan C smart builds, production)
+
+```bash
+cargo run -p keplr-cli -- --root . run lint
+cargo run -p keplr-cli -- --root . run --all --jobs 4
+cargo run -p keplr-cli -- --root . run lint --force
+cargo run -p keplr-cli -- --root . run --all --watch
+curl '127.0.0.1:7137/tasks/graph'
+curl -X POST 127.0.0.1:7137/tasks/run -H 'Content-Type: application/json' -d '{"all":true,"jobs":4}'
 ```
 
 CI runs `cargo test --workspace --all-targets`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo build --workspace` on every push.

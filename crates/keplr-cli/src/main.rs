@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use std::path::PathBuf;
+use std::{collections::BTreeMap, path::PathBuf};
 
 #[derive(Parser)]
 #[command(name = "keplr", version, about = "Keplr personal IDE")]
@@ -28,7 +28,15 @@ enum Cmd {
         line: usize,
     },
     Run {
-        task: String,
+        task: Option<String>,
+        #[arg(long)]
+        all: bool,
+        #[arg(long, default_value_t = 1)]
+        jobs: usize,
+        #[arg(long)]
+        force: bool,
+        #[arg(long)]
+        watch: bool,
     },
     Doctor,
     Serve {
@@ -87,10 +95,64 @@ async fn main() -> anyhow::Result<()> {
                 buf.len_lines()
             );
         }
-        Cmd::Run { task } => {
-            let tasks = keplr_build::load_tasks(&cli.root.join("keplr.json"))?;
-            let def = tasks.get(&task).ok_or_else(|| anyhow::anyhow!("unknown task {task}"))?;
-            print!("{}", keplr_build::run_task(def, &cli.root)?);
+        Cmd::Run {
+            task,
+            all,
+            jobs,
+            force,
+            watch,
+        } => {
+            let path = cli.root.join("keplr.json");
+            let run_once = |force: bool| -> anyhow::Result<Vec<keplr_build::RunReport>> {
+                let tasks = keplr_build::load_tasks(&path)?;
+                let targets: Vec<String> = match (&task, all) {
+                    (_, true) => Vec::new(),
+                    (Some(t), false) => vec![t.clone()],
+                    (None, false) => Vec::new(),
+                };
+                if jobs > 1 {
+                    keplr_build::run_graph_parallel(&tasks, &cli.root, &targets, jobs, force)
+                } else {
+                    keplr_build::run_graph(&tasks, &cli.root, &targets, force)
+                }
+            };
+            let print_reports = |reports: &[keplr_build::RunReport]| {
+                for r in reports {
+                    let state = if r.skipped { "skipped" } else { "ok" };
+                    println!("=== {} ({state}) ===", r.task);
+                    print!("{}", r.output);
+                    if !r.output.ends_with('\n') {
+                        println!();
+                    }
+                }
+            };
+            if watch {
+                println!("keplr: watching {} (Ctrl-C to stop)", cli.root.display());
+                let snapshot = || -> anyhow::Result<BTreeMap<String, String>> {
+                    let tasks = keplr_build::load_tasks(&path)?;
+                    Ok(keplr_build::graph_fingerprints(&tasks, &cli.root))
+                };
+                let mut last = snapshot()?;
+                match run_once(force) {
+                    Ok(reports) => print_reports(&reports),
+                    Err(e) => eprintln!("keplr: run failed: {e:#}"),
+                }
+                loop {
+                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                    let now = snapshot()?;
+                    if now == last {
+                        continue;
+                    }
+                    last = now;
+                    match run_once(false) {
+                        Ok(reports) => print_reports(&reports),
+                        Err(e) => eprintln!("keplr: run failed: {e:#}"),
+                    }
+                }
+            } else {
+                let reports = run_once(force)?;
+                print_reports(&reports);
+            }
         }
         Cmd::Doctor => {
             println!("root={}", cli.root.display());

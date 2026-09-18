@@ -1,6 +1,6 @@
 use axum::{
     extract::{Query, State},
-    routing::get,
+    routing::{get, post},
     Json, Router,
 };
 use serde::Serialize;
@@ -98,6 +98,67 @@ async fn scene(
     ))
 }
 
+async fn tasks_graph(State(state): State<AppState>) -> Json<serde_json::Value> {
+    let path = state.root.join("keplr.json");
+    let map = match keplr_build::load_tasks(&path) {
+        Ok(m) => m,
+        Err(e) => return Json(serde_json::json!({"error": format!("{e:#}")})),
+    };
+    match keplr_build::topo_order(&map) {
+        Ok(order) => {
+            let fps = keplr_build::graph_fingerprints(&map, &state.root);
+            Json(serde_json::json!({"order": order, "fingerprints": fps}))
+        }
+        Err(e) => Json(serde_json::json!({"error": format!("{e:#}")})),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct RunReq {
+    #[serde(default)]
+    target: Option<String>,
+    #[serde(default)]
+    all: bool,
+    #[serde(default = "one_job")]
+    jobs: usize,
+    #[serde(default)]
+    force: bool,
+}
+
+fn one_job() -> usize {
+    1
+}
+
+async fn tasks_run(
+    State(state): State<AppState>,
+    Json(req): Json<RunReq>,
+) -> Json<serde_json::Value> {
+    let path = state.root.join("keplr.json");
+    let map = match keplr_build::load_tasks(&path) {
+        Ok(m) => m,
+        Err(e) => return Json(serde_json::json!({"ok": false, "error": format!("{e:#}")})),
+    };
+    let targets: Vec<String> = if req.all || req.target.is_none() {
+        Vec::new()
+    } else {
+        vec![req.target.clone().unwrap_or_default()]
+    };
+    let root = state.root.clone();
+    let done = tokio::task::spawn_blocking(move || {
+        if req.jobs > 1 {
+            keplr_build::run_graph_parallel(&map, &root, &targets, req.jobs, req.force)
+        } else {
+            keplr_build::run_graph(&map, &root, &targets, req.force)
+        }
+    })
+    .await;
+    match done {
+        Ok(Ok(reports)) => Json(serde_json::json!({"ok": true, "reports": reports})),
+        Ok(Err(e)) => Json(serde_json::json!({"ok": false, "error": format!("{e:#}")})),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": format!("join error: {e}")})),
+    }
+}
+
 pub async fn serve(root: PathBuf, port: u16) -> anyhow::Result<()> {
     let app = Router::new()
         .route("/health", get(health))
@@ -105,6 +166,8 @@ pub async fn serve(root: PathBuf, port: u16) -> anyhow::Result<()> {
         .route("/open", get(open))
         .route("/files", get(files))
         .route("/tasks", get(tasks))
+        .route("/tasks/graph", get(tasks_graph))
+        .route("/tasks/run", post(tasks_run))
         .route("/scene", get(scene))
         .with_state(AppState { root });
     let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{port}")).await?;
