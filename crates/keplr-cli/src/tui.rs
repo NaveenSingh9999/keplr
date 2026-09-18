@@ -539,7 +539,7 @@ pub fn edit_file(root: PathBuf, file: PathBuf, no_animations: bool) -> anyhow::R
                 git_lines = match keplr_core::git::status(&root) {
                     Ok(entries) => {
                         if entries.is_empty() {
-                            vec![String::from("(clean)")];
+                            vec![String::from("(clean)")]
                         } else {
                             entries
                                 .into_iter()
