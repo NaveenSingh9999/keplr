@@ -14,7 +14,19 @@ fn theme_scene_paint_and_diff_are_real() {
     std::fs::write(root.join("src/main.rs"), "fn main() {}\nline2\n").unwrap();
     std::fs::write(root.join("README.md"), "hello\n").unwrap();
 
-    let scene = build_scene(root, Some(Path::new("src/main.rs")), "main", None, 100);
+    let spec = keplr_render::SceneSpec {
+        root,
+        open_file: Some(Path::new("src/main.rs")),
+        query: "main",
+        palette_query: None,
+        palette_mode: "files",
+        search_query: None,
+        left_tab: "project",
+        right_tab: "symbols",
+        bottom_tab: "terminal",
+        width: 100,
+    };
+    let scene = build_scene(&spec);
     assert!(scene.center.path.contains("main.rs"));
     assert_eq!(scene.center.lang, "rust");
     assert!(!scene.left.lines.is_empty());

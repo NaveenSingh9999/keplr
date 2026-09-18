@@ -77,6 +77,45 @@ pub struct EditorPane {
     pub lines: Vec<String>,
     pub cursor: (usize, usize),
     pub viewport_top: usize,
+    pub breadcrumbs: Vec<String>,
+    pub squiggles: Vec<Squiggle>,
+    pub cursors: Vec<(usize, usize)>,
+    pub soft_wrap: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DockPane {
+    pub title: String,
+    pub tabs: Vec<String>,
+    pub active_tab: String,
+    pub lines: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskEntry {
+    pub name: String,
+    pub state: String,
+    pub output_tail: String,
+    pub error_file: Option<String>,
+    pub error_line: Option<u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BottomPane {
+    pub title: String,
+    pub tabs: Vec<String>,
+    pub active_tab: String,
+    pub lines: Vec<String>,
+    pub tasks: Vec<TaskEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Squiggle {
+    pub line: u64,
+    pub col: u64,
+    pub len: u64,
+    pub message: String,
+    pub severity: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -90,13 +129,14 @@ pub struct StatusBar {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Scene {
     pub titlebar: TitleBar,
-    pub left: Panel,
+    pub left: DockPane,
     pub center: EditorPane,
-    pub right: Panel,
-    pub bottom: Panel,
+    pub right: DockPane,
+    pub bottom: BottomPane,
     pub status: StatusBar,
     pub palette_open: bool,
     pub palette_query: String,
+    pub palette_mode: String,
     pub palette_hits: Vec<String>,
 }
 
@@ -149,13 +189,52 @@ fn truncate(s: &str, max: usize) -> String {
     }
 }
 
-pub fn build_scene(
-    root: &Path,
-    open_file: Option<&Path>,
-    query: &str,
-    palette_query: Option<&str>,
-    _width: u16,
-) -> Scene {
+pub const PALETTE_COMMANDS: &[&str] = &[
+    "file: open finder",
+    "view: toggle left dock",
+    "view: toggle right dock",
+    "view: toggle bottom dock",
+    "view: next tab",
+    "task: run all",
+    "task: run lint",
+    "task: force run all",
+    "index: rebuild",
+    "build: show graph",
+    "doctor: show status",
+];
+
+pub fn filter_commands(query: &str, limit: usize) -> Vec<String> {
+    let q = query.to_lowercase();
+    PALETTE_COMMANDS
+        .iter()
+        .filter(|c| q.is_empty() || c.to_lowercase().contains(&q))
+        .take(limit.max(1))
+        .map(|c| c.to_string())
+        .collect()
+}
+
+fn breadcrumbs_for(path: &str) -> Vec<String> {
+    path.split('/')
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
+pub struct SceneSpec<'a> {
+    pub root: &'a Path,
+    pub open_file: Option<&'a Path>,
+    pub query: &'a str,
+    pub palette_query: Option<&'a str>,
+    pub palette_mode: &'a str,
+    pub search_query: Option<&'a str>,
+    pub left_tab: &'a str,
+    pub right_tab: &'a str,
+    pub bottom_tab: &'a str,
+    pub width: u16,
+}
+
+pub fn build_scene(spec: &SceneSpec) -> Scene {
+    let root = spec.root;
     let ws = keplr_core::Workspace::new(root.to_path_buf());
     let entries = ws.walk_files(20_000);
     let files = entries.len();
@@ -176,7 +255,7 @@ pub fn build_scene(
         left_lines.push(String::from("(empty)"));
     }
 
-    let resolved_open: Option<PathBuf> = open_file.map(|p| {
+    let resolved_open: Option<PathBuf> = spec.open_file.map(|p| {
         if p.is_absolute() {
             p.to_path_buf()
         } else {
@@ -218,20 +297,38 @@ pub fn build_scene(
         ),
     };
 
-    let (palette_open, palette_query_str, palette_hits) = match palette_query {
+    let squiggles: Vec<Squiggle> = match (&resolved_open, center_lang.as_str()) {
+        (Some(full), "laml") => keplr_lang::laml_diagnostics(full)
+            .into_iter()
+            .filter(|d| d.severity == "error")
+            .map(|d| Squiggle {
+                line: d.line,
+                col: d.col,
+                len: 1,
+                message: d.message,
+                severity: d.severity,
+            })
+            .collect(),
+        _ => Vec::new(),
+    };
+
+    let (palette_open, palette_query_str, palette_hits) = match spec.palette_query {
         Some(q) => {
-            let paths: Vec<PathBuf> = entries.iter().map(|e| e.path.clone()).collect();
-            let hits = keplr_core::search::fuzzy_paths(&paths, q, 10);
-            let labels = hits
-                .into_iter()
-                .map(|p| {
-                    p.strip_prefix(root)
-                        .unwrap_or(&p)
-                        .to_string_lossy()
-                        .to_string()
-                })
-                .collect();
-            (true, q.to_string(), labels)
+            let hits = if spec.palette_mode == "commands" {
+                filter_commands(q, 10)
+            } else {
+                let paths: Vec<PathBuf> = entries.iter().map(|e| e.path.clone()).collect();
+                keplr_core::search::fuzzy_paths(&paths, q, 10)
+                    .into_iter()
+                    .map(|p| {
+                        p.strip_prefix(root)
+                            .unwrap_or(&p)
+                            .to_string_lossy()
+                            .to_string()
+                    })
+                    .collect()
+            };
+            (true, q.to_string(), hits)
         }
         None => (false, String::new(), Vec::new()),
     };
@@ -246,30 +343,49 @@ pub fn build_scene(
     Scene {
         titlebar: TitleBar {
             root: root.display().to_string(),
-            query: query.to_string(),
+            query: spec.query.to_string(),
         },
-        left: Panel {
-            title: String::from("project"),
+        left: DockPane {
+            title: String::from("left"),
+            tabs: vec![
+                String::from("project"),
+                String::from("outline"),
+                String::from("search"),
+            ],
+            active_tab: spec.left_tab.to_string(),
             lines: left_lines,
         },
         center: EditorPane {
+            breadcrumbs: breadcrumbs_for(&center_path),
             path: center_path,
             lang: center_lang,
             lines: center_lines,
             cursor,
+            cursors: vec![cursor],
+            soft_wrap: false,
             viewport_top: 1,
+            squiggles,
         },
-        right: Panel {
-            title: String::from("outline"),
+        right: DockPane {
+            title: String::from("right"),
+            tabs: vec![String::from("symbols")],
+            active_tab: spec.right_tab.to_string(),
             lines: if outline.is_empty() {
                 vec![String::from("(no symbols)")]
             } else {
                 outline
             },
         },
-        bottom: Panel {
-            title: String::from("terminal"),
+        bottom: BottomPane {
+            title: String::from("bottom"),
+            tabs: vec![
+                String::from("terminal"),
+                String::from("diagnostics"),
+                String::from("tasks"),
+            ],
+            active_tab: spec.bottom_tab.to_string(),
             lines: vec![String::from("keplr ready — run `keplr run <task>`")],
+            tasks: Vec::new(),
         },
         status: StatusBar {
             branch: branch_for(root),
@@ -279,6 +395,7 @@ pub fn build_scene(
         },
         palette_open,
         palette_query: palette_query_str,
+        palette_mode: spec.palette_mode.to_string(),
         palette_hits,
     }
 }
@@ -308,6 +425,7 @@ pub fn diff_scenes(a: &Scene, b: &Scene) -> Vec<SceneOp> {
         b.titlebar.query.clone(),
     );
     push_op(&mut ops, "left.title", a.left.title.clone(), b.left.title.clone());
+    push_op(&mut ops, "left.active_tab", a.left.active_tab.clone(), b.left.active_tab.clone());
     push_op(
         &mut ops,
         "left.lines",
@@ -340,21 +458,53 @@ pub fn diff_scenes(a: &Scene, b: &Scene) -> Vec<SceneOp> {
     );
     push_op(
         &mut ops,
+        "center.cursors",
+        format!("{:?}", a.center.cursors),
+        format!("{:?}", b.center.cursors),
+    );
+    push_op(
+        &mut ops,
+        "center.soft_wrap",
+        a.center.soft_wrap.to_string(),
+        b.center.soft_wrap.to_string(),
+    );
+    push_op(
+        &mut ops,
+        "center.breadcrumbs",
+        a.center.breadcrumbs.join("/"),
+        b.center.breadcrumbs.join("/"),
+    );
+    push_op(
+        &mut ops,
+        "center.squiggles",
+        format!("{:?}", a.center.squiggles),
+        format!("{:?}", b.center.squiggles),
+    );
+    push_op(
+        &mut ops,
         "center.viewport_top",
         a.center.viewport_top.to_string(),
         b.center.viewport_top.to_string(),
     );
+    push_op(&mut ops, "right.active_tab", a.right.active_tab.clone(), b.right.active_tab.clone());
     push_op(
         &mut ops,
         "right.lines",
         a.right.lines.join("\n"),
         b.right.lines.join("\n"),
     );
+    push_op(&mut ops, "bottom.active_tab", a.bottom.active_tab.clone(), b.bottom.active_tab.clone());
     push_op(
         &mut ops,
         "bottom.lines",
         a.bottom.lines.join("\n"),
         b.bottom.lines.join("\n"),
+    );
+    push_op(
+        &mut ops,
+        "bottom.tasks",
+        format!("{:?}", a.bottom.tasks),
+        format!("{:?}", b.bottom.tasks),
     );
     push_op(
         &mut ops,
@@ -394,6 +544,12 @@ pub fn diff_scenes(a: &Scene, b: &Scene) -> Vec<SceneOp> {
     );
     push_op(
         &mut ops,
+        "palette.mode",
+        a.palette_mode.clone(),
+        b.palette_mode.clone(),
+    );
+    push_op(
+        &mut ops,
         "palette.hits",
         a.palette_hits.join("\n"),
         b.palette_hits.join("\n"),
@@ -421,9 +577,13 @@ impl PaintBackend for AnsiBackend {
             "\x1b[1m▶ {} \x1b[0m\x1b[2m({} files · {} · {} errs)\x1b[0m\n",
             scene.center.path, scene.status.files, scene.status.branch, scene.status.errors
         ));
+        out.push_str(&format!(
+            "\x1b[2m{} \x1b[0m\n",
+            scene.center.breadcrumbs.join(" › ")
+        ));
         for (i, line) in scene.center.lines.iter().take(25).enumerate() {
             let n = scene.center.viewport_top + i;
-            let marker = if n == scene.center.cursor.0 {
+            let marker = if scene.center.cursors.iter().any(|c| c.0 == n) {
                 "›"
             } else {
                 " "
@@ -432,11 +592,26 @@ impl PaintBackend for AnsiBackend {
                 "\x1b[2m{n:>3} {marker}\x1b[0m {}\n",
                 truncate(line, w.saturating_sub(8))
             ));
+            for sq in scene
+                .center
+                .squiggles
+                .iter()
+                .filter(|s| s.line as usize == n)
+                .take(2)
+            {
+                out.push_str(&format!(
+                    "\x1b[31m    ~ {}:{}\x1b[0m {}\n",
+                    sq.line,
+                    sq.col,
+                    truncate(&sq.message, w.saturating_sub(12))
+                ));
+            }
         }
         out.push_str(&format!("\x1b[2m{bar}\x1b[0m\n"));
         out.push_str(&format!(
-            "\x1b[1mleft:{}\x1b[0m {}\n",
-            scene.left.title,
+            "\x1b[1mleft:{}/{}\x1b[0m {}\n",
+            scene.left.active_tab,
+            scene.left.tabs.join("|"),
             scene.left
                 .lines
                 .iter()
@@ -446,17 +621,42 @@ impl PaintBackend for AnsiBackend {
                 .join(" · ")
         ));
         out.push_str(&format!(
+            "\x1b[1mright:{}\x1b[0m {}\n",
+            scene.right.active_tab,
+            scene.right
+                .lines
+                .iter()
+                .take(5)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(" · ")
+        ));
+        out.push_str(&format!(
             "\x1b[1mbottom:{}\x1b[0m {}\n",
-            scene.bottom.title,
+            scene.bottom.active_tab,
             scene.bottom.lines.first().cloned().unwrap_or_default()
         ));
+        if !scene.bottom.tasks.is_empty() {
+            let done = scene
+                .bottom
+                .tasks
+                .iter()
+                .filter(|t| t.state == "ok" || t.state == "skipped")
+                .count();
+            out.push_str(&format!(
+                "\x1b[2mtasks {}/{} ok\x1b[0m\n",
+                done,
+                scene.bottom.tasks.len()
+            ));
+        }
         out.push_str(&format!(
             "\x1b[2mbranch:{} lsp:{} lang:{}\x1b[0m\n",
             scene.status.branch, scene.status.lsp, scene.center.lang
         ));
         if scene.palette_open {
             out.push_str(&format!(
-                "\x1b[1;35m◇ palette:{}\x1b[0m {}\n",
+                "\x1b[1;35m◇ {}:{}\x1b[0m {}\n",
+                scene.palette_mode,
                 scene.palette_query,
                 scene.palette_hits.join(" · ")
             ));
