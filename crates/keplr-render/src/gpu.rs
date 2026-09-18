@@ -433,3 +433,141 @@ pub fn run_desktop(
     }
     Ok(())
 }
+
+use ab_glyph::{Font, FontRef, PxScale, ScaleFont};
+use std::collections::HashMap;
+
+#[derive(Debug, Clone, Copy)]
+pub struct GlyphSpot {
+    pub x: u32,
+    pub y: u32,
+    pub w: u32,
+    pub h: u32,
+    pub advance: f32,
+    pub bx: f32,
+    pub by: f32,
+}
+
+pub struct GlyphAtlas {
+    pub width: u32,
+    pub height: u32,
+    pub pixels: Vec<u8>,
+    pub glyphs: HashMap<(char, u32), GlyphSpot>,
+}
+
+pub fn build_atlas(font_bytes: &[u8], px: f32) -> anyhow::Result<GlyphAtlas> {
+    let font =
+        FontRef::try_from_slice(font_bytes).map_err(|e| anyhow::anyhow!("bad font: {e:?}"))?;
+    let scaled = font.as_scaled(PxScale::from(px));
+    let ascent = scaled.ascent();
+    let mut atlas = GlyphAtlas {
+        width: 512,
+        height: 512,
+        pixels: vec![0u8; 512 * 512],
+        glyphs: HashMap::new(),
+    };
+    let mut pen_x = 0u32;
+    let mut pen_y = 0u32;
+    let mut row_h = 0u32;
+    let id = px as u32;
+    for b in 32u8..127u8 {
+        let c = b as char;
+        let glyph = scaled.scaled_glyph(c);
+        let outlined = match scaled.outline_glyph(glyph) {
+            Some(o) => o,
+            None => {
+                let adv = scaled.h_advance(glyph.id);
+                atlas.glyphs.insert(
+                    (c, id),
+                    GlyphSpot {
+                        x: 0,
+                        y: 0,
+                        w: 0,
+                        h: 0,
+                        advance: adv,
+                        bx: 0.0,
+                        by: 0.0,
+                    },
+                );
+                continue;
+            }
+        };
+        let bounds = outlined.px_bounds();
+        let w = bounds.width() as u32;
+        let h = bounds.height() as u32;
+        if w == 0 || h == 0 {
+            continue;
+        }
+        if pen_x + w > atlas.width {
+            pen_x = 0;
+            pen_y += row_h;
+            row_h = 0;
+        }
+        if pen_y + h > atlas.height {
+            anyhow::bail!("atlas overflow at {px}px");
+        }
+        outlined.draw(|x, y, v| {
+            let gx = pen_x + x;
+            let gy = pen_y + y;
+            atlas.pixels[(gy * atlas.width + gx) as usize] =
+                (v.clamp(0.0, 1.0) * 255.0) as u8;
+        });
+        let adv = scaled.h_advance(outlined.glyph().id);
+        atlas.glyphs.insert(
+            (c, id),
+            GlyphSpot {
+                x: pen_x,
+                y: pen_y,
+                w,
+                h,
+                advance: adv,
+                bx: bounds.min.x,
+                by: ascent - bounds.min.y,
+            },
+        );
+        pen_x += w + 1;
+        row_h = row_h.max(h + 1);
+    }
+    Ok(atlas)
+}
+
+pub fn upload_atlas(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    atlas: &GlyphAtlas,
+) -> wgpu::Texture {
+    let texture = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("keplr-glyphs"),
+        size: wgpu::Extent3d {
+            width: atlas.width,
+            height: atlas.height,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::R8Unorm,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+        view_formats: &[],
+    });
+    queue.write_texture(
+        wgpu::ImageCopyTexture {
+            texture: &texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
+        &atlas.pixels,
+        wgpu::ImageDataLayout {
+            offset: 0,
+            bytes_per_row: Some(atlas.width),
+            rows_per_image: Some(atlas.height),
+        },
+        wgpu::Extent3d {
+            width: atlas.width,
+            height: atlas.height,
+            depth_or_array_layers: 1,
+        },
+    );
+    texture
+}
