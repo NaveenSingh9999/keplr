@@ -1884,10 +1884,11 @@ pub fn build_atlas(font_bytes: &[u8], px: f32) -> anyhow::Result<GlyphAtlas> {
     for b in 32u8..127u8 {
         let c = b as char;
         let glyph = scaled.scaled_glyph(c);
+        let gid = glyph.id;
         let outlined = match scaled.outline_glyph(glyph) {
             Some(o) => o,
             None => {
-                let adv = scaled.h_advance(glyph.id);
+                let adv = scaled.h_advance(gid);
                 atlas.glyphs.insert(
                     (c, id),
                     GlyphSpot {
