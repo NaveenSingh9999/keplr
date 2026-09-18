@@ -12,6 +12,7 @@ Plan D index/lang/sync: `docs/superpowers/plans/2026-09-18-keplr-plan-d-index-la
 Plan E Zed depth: `docs/superpowers/plans/2026-09-18-keplr-plan-e-zed-depth.md`
 Plan F save/bench/auth/tui/gpu: `docs/superpowers/plans/2026-09-18-keplr-plan-f-save-bench-auth-tui-gpu.md`
 Plan G all-in: `docs/superpowers/plans/2026-09-18-keplr-plan-g-all-in.md`
+Plan H roaming/wasm/gpu-text: `docs/superpowers/plans/2026-09-18-keplr-plan-h-roaming-wasm-gputext.md`
 
 Fonts: SF Mono when macOS/Xcode provides it (Apple license, never vendored), else vendored JetBrains Mono OFL (`assets/fonts/`), else system monos. Override with `KEPLR_FONT`. `keplr fonts` shows the resolved stack.
 
@@ -116,6 +117,14 @@ curl '127.0.0.1:7137/git/status'
 curl '127.0.0.1:7137/snippets?lang=rs'
 curl '127.0.0.1:7137/daemons'
 curl '127.0.0.1:7137/tasks/log?name=lint'
+```
+
+## Use (Plan H roaming/wasm/gpu-text, production)
+
+```bash
+cargo run -p keplr-cli -- --root . serve --port 7137 &
+cargo run -p keplr-cli -- --root /tmp/roam sync --url ws://127.0.0.1:7137/sync/channel --name notes --file notes.txt --once
+cargo run -p keplr-cli --features desktop -- --root . desktop --open Cargo.toml  # editor text now GPU-painted
 ```
 
 CI runs `cargo test --workspace --all-targets`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo build --workspace` on every push.
