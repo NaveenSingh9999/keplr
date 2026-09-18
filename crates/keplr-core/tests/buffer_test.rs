@@ -3,7 +3,7 @@ use std::{fs, path::PathBuf};
 
 #[test]
 fn buffer_load_line_save_roundtrip() {
-    let path = PathBuf::from("/tmp/keplr-buffer-test.txt");
+    let path = std::env::temp_dir().join("keplr-buffer-test.txt");
     fs::write(&path, "one\ntwo\nthree\n").unwrap();
     let buf = Buffer::load(path.clone()).unwrap();
     assert_eq!(buf.len_lines(), 3);

@@ -3,7 +3,7 @@ use std::{fs, path::PathBuf};
 
 #[test]
 fn walk_skips_git_target_and_caps_limit() {
-    let root = PathBuf::from("/tmp/keplr-walk-test");
+    let root = std::env::temp_dir().join("keplr-walk-test");
     let _ = fs::remove_dir_all(&root);
     fs::create_dir_all(root.join("src")).unwrap();
     fs::create_dir_all(root.join(".git")).unwrap();

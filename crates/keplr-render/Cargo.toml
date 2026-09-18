@@ -1,0 +1,11 @@
+[package]
+name = "keplr-render"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+keplr-core = { path = "../keplr-core" }
+keplr-lang = { path = "../keplr-lang" }

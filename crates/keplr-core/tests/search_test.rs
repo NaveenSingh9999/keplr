@@ -11,7 +11,7 @@ fn fuzzy_and_grep_find_expected() {
     let got = fuzzy_paths(&paths, "edr", 5);
     assert_eq!(got, vec![PathBuf::from("src/editor.rs")]);
 
-    let root = PathBuf::from("/tmp/keplr-grep-test");
+    let root = std::env::temp_dir().join("keplr-grep-test");
     let _ = fs::remove_dir_all(&root);
     fs::create_dir_all(&root).unwrap();
     fs::write(root.join("a.txt"), "hello keplr\nsecond line\n").unwrap();
