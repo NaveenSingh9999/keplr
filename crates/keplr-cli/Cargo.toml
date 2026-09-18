@@ -16,4 +16,6 @@ keplr-build = { path = "../keplr-build" }
 keplr-lang = { path = "../keplr-lang" }
 keplr-sync = { path = "../keplr-sync" }
 keplr-serve = { path = "../keplr-serve" }
+keplr-render = { path = "../keplr-render" }
+keplr-ui = { path = "../keplr-ui" }
 tokio.workspace = true

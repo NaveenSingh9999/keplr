@@ -35,6 +35,26 @@ enum Cmd {
         #[arg(long, default_value_t = 7137)]
         port: u16,
     },
+    Ui {
+        #[arg(long)]
+        open: Option<PathBuf>,
+        #[arg(long, default_value = "")]
+        query: String,
+        #[arg(long)]
+        palette: Option<String>,
+        #[arg(long, default_value_t = 100)]
+        width: u16,
+    },
+    Scene {
+        #[arg(long)]
+        open: Option<PathBuf>,
+        #[arg(long, default_value = "")]
+        query: String,
+        #[arg(long)]
+        palette: Option<String>,
+        #[arg(long, default_value_t = 100)]
+        width: u16,
+    },
 }
 
 #[tokio::main]
@@ -79,6 +99,44 @@ async fn main() -> anyhow::Result<()> {
         }
         Cmd::Serve { port } => {
             keplr_serve::serve(cli.root, port).await?;
+        }
+        Cmd::Ui {
+            open,
+            query,
+            palette,
+            width,
+        } => {
+            let mut ui = keplr_ui::UiState::new(cli.root.clone());
+            if let Some(path) = open.clone() {
+                ui.open_file(path);
+            }
+            if let Some(q) = palette.clone() {
+                ui.palette_open = true;
+                ui.palette_query = q;
+            } else if !query.is_empty() {
+                ui.palette_query = query.clone();
+            }
+            let scene = ui.to_scene(width);
+            let backend = keplr_render::AnsiBackend;
+            print!(
+                "{}",
+                keplr_render::PaintBackend::paint(&backend, &scene, width as usize)
+            );
+        }
+        Cmd::Scene {
+            open,
+            query,
+            palette,
+            width,
+        } => {
+            let scene = keplr_render::build_scene(
+                &cli.root,
+                open.as_deref(),
+                &query,
+                palette.as_deref(),
+                width,
+            );
+            println!("{}", serde_json::to_string_pretty(&scene)?);
         }
     }
     Ok(())
