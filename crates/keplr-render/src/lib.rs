@@ -180,6 +180,7 @@ fn lang_label(path: &Path) -> String {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn branch_for(root: &Path) -> String {
     let out = std::process::Command::new("git")
         .arg("-C")
@@ -253,6 +254,7 @@ pub struct SceneSpec<'a> {
     pub width: u16,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn build_scene(spec: &SceneSpec) -> Scene {
     let root = spec.root;
     let ws = keplr_core::Workspace::new(root.to_path_buf());
@@ -724,12 +726,14 @@ impl PaintBackend for AnsiBackend {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn dirs_home() -> PathBuf {
     std::env::var_os("HOME")
         .map(PathBuf::from)
         .unwrap_or_default()
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn font_stack() -> Vec<PathBuf> {
     let mut stack = Vec::new();
     if let Ok(f) = std::env::var("KEPLR_FONT") {
@@ -768,6 +772,7 @@ pub fn font_stack() -> Vec<PathBuf> {
     stack
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn discover_font() -> Option<PathBuf> {
     font_stack().into_iter().find(|p| p.is_file())
 }

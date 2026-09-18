@@ -135,6 +135,8 @@ impl UiState {
         keplr_render::filter_commands(&self.palette_query, limit)
     }
 
+    /// Files mode needs a workspace walk, which has no filesystem on
+    /// wasm and yields empty; commands mode is pure and works everywhere.
     pub fn palette_results(&self, limit: usize) -> Vec<String> {
         if self.palette_mode == "commands" {
             return self.palette_commands(limit);
@@ -177,6 +179,7 @@ impl UiState {
         self.diagnostics.push(diag);
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn run_tasks(
         &mut self,
         tasks: &BTreeMap<String, keplr_build::TaskDef>,
@@ -237,6 +240,7 @@ impl UiState {
         Ok(())
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn to_scene(&self, width: u16) -> keplr_render::Scene {
         let open: Option<PathBuf> = self.active_editor().map(|t| t.path.clone());
         let search = if self.search_query.is_empty() {
@@ -422,6 +426,7 @@ pub fn key_action(key: &str) -> Action {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn branch_name(root: &Path) -> String {
     let out = std::process::Command::new("git")
         .arg("-C")
