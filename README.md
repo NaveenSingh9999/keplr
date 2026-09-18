@@ -62,4 +62,13 @@ curl '127.0.0.1:7137/diagnostics?path=Cargo.toml'
 curl '127.0.0.1:7137/highlight?path=Cargo.toml&line=1'
 ```
 
+## Use (Plan D sync, production)
+
+```bash
+curl '127.0.0.1:7137/lfs/pointer?path=assets/font.woff2'
+curl -X POST 127.0.0.1:7137/sync/merge -H 'Content-Type: application/json' -d '{"name":"notes","seed":"hello","updates":[]}'
+curl -X POST 127.0.0.1:7137/sync/snapshot -H 'Content-Type: application/json' -d '{"name":"notes","update":[1,2,3]}'
+curl '127.0.0.1:7137/sync/snapshot?name=notes'
+```
+
 CI runs `cargo test --workspace --all-targets`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo build --workspace` on every push.

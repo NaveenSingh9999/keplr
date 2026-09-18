@@ -211,6 +211,80 @@ async fn highlight(
     }))
 }
 
+async fn lfs_pointer(
+    State(state): State<AppState>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Json<serde_json::Value> {
+    let rel = params.get("path").cloned().unwrap_or_default();
+    let text = std::fs::read_to_string(state.root.join(&rel)).unwrap_or_default();
+    match keplr_sync::parse_lfs_pointer(&text) {
+        Some(p) => Json(serde_json::json!({
+            "file": rel,
+            "lfs": true,
+            "oid": p.oid,
+            "size": p.size,
+        })),
+        None => Json(serde_json::json!({"file": rel, "lfs": false})),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct SyncMergeReq {
+    #[serde(default = "default_sync_name")]
+    name: String,
+    #[serde(default)]
+    seed: String,
+    #[serde(default)]
+    updates: Vec<Vec<u8>>,
+}
+
+fn default_sync_name() -> String {
+    String::from("buffer")
+}
+
+async fn sync_merge(Json(req): Json<SyncMergeReq>) -> Json<serde_json::Value> {
+    let doc = keplr_sync::SyncDoc::from_text(&req.name, &req.seed);
+    for u in &req.updates {
+        if let Err(e) = doc.apply_update(u) {
+            return Json(serde_json::json!({"ok": false, "error": format!("{e:#}")}));
+        }
+    }
+    Json(serde_json::json!({"ok": true, "text": doc.content()}))
+}
+
+#[derive(serde::Deserialize)]
+struct SnapshotSaveReq {
+    name: String,
+    #[serde(default)]
+    update: Vec<u8>,
+}
+
+async fn sync_snapshot_save(
+    State(state): State<AppState>,
+    Json(req): Json<SnapshotSaveReq>,
+) -> Json<serde_json::Value> {
+    let dir = state.root.join(".keplr/snapshots");
+    match keplr_sync::save_snapshot(&dir, &req.name, &req.update) {
+        Ok(p) => Json(serde_json::json!({
+            "ok": true,
+            "path": p.display().to_string(),
+        })),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": format!("{e:#}")})),
+    }
+}
+
+async fn sync_snapshot_load(
+    State(state): State<AppState>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Json<serde_json::Value> {
+    let name = params.get("name").cloned().unwrap_or_default();
+    let dir = state.root.join(".keplr/snapshots");
+    match keplr_sync::load_snapshot(&dir, &name) {
+        Ok(bytes) => Json(serde_json::json!({"ok": true, "name": name, "update": bytes})),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": format!("{e:#}")})),
+    }
+}
+
 pub async fn serve(root: PathBuf, port: u16) -> anyhow::Result<()> {
     let app = Router::new()
         .route("/health", get(health))
@@ -224,6 +298,12 @@ pub async fn serve(root: PathBuf, port: u16) -> anyhow::Result<()> {
         .route("/index/status", get(index_status))
         .route("/diagnostics", get(diagnostics))
         .route("/highlight", get(highlight))
+        .route("/lfs/pointer", get(lfs_pointer))
+        .route("/sync/merge", post(sync_merge))
+        .route(
+            "/sync/snapshot",
+            post(sync_snapshot_save).get(sync_snapshot_load),
+        )
         .with_state(AppState { root });
     let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{port}")).await?;
     axum::serve(listener, app).await?;
