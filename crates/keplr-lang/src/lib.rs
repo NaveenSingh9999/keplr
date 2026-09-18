@@ -64,6 +64,7 @@ impl LangKind {
 pub struct LamlProbe;
 
 impl LamlProbe {
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn binary() -> Option<PathBuf> {
         for candidate in [
             PathBuf::from("/data/data/com.termux/files/home/LAML/laml"),
@@ -82,6 +83,12 @@ impl LamlProbe {
         })
     }
 
+    #[cfg(target_arch = "wasm32")]
+    pub fn binary() -> Option<PathBuf> {
+        None
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn check(source: &Path) -> anyhow::Result<String> {
         let bin = Self::binary().ok_or_else(|| anyhow::anyhow!("laml binary not found"))?;
         let output = std::process::Command::new(bin).arg("check").arg(source).output()?;
@@ -91,6 +98,11 @@ impl LamlProbe {
             anyhow::bail!("laml check failed: {s}");
         }
         Ok(s)
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn check(_source: &Path) -> anyhow::Result<String> {
+        anyhow::bail!("laml binary unavailable on wasm")
     }
 }
 
@@ -487,6 +499,7 @@ pub struct LspServer {
     pub present: bool,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn command_present(cmd: &str) -> bool {
     if cmd.contains('/') {
         return Path::new(cmd).exists();
@@ -496,6 +509,11 @@ pub fn command_present(cmd: &str) -> bool {
             std::env::split_paths(&paths).any(|dir| dir.join(cmd).exists())
         })
         .unwrap_or(false)
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn command_present(_cmd: &str) -> bool {
+    false
 }
 
 pub fn lsp_servers(lang: LangKind) -> Vec<LspServer> {
@@ -569,6 +587,7 @@ pub fn lsp_servers(lang: LangKind) -> Vec<LspServer> {
         .collect()
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn spawn_lsp(server: &LspServer) -> anyhow::Result<std::process::Child> {
     if !server.present {
         anyhow::bail!(
@@ -584,6 +603,11 @@ pub fn spawn_lsp(server: &LspServer) -> anyhow::Result<std::process::Child> {
         .stderr(std::process::Stdio::piped())
         .spawn()
         .map_err(|e| anyhow::anyhow!("failed to start `{}`: {}", server.cmd, e))
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn spawn_lsp(_server: &LspServer) -> anyhow::Result<()> {
+    anyhow::bail!("language servers unavailable on wasm")
 }
 
 pub fn symbols_for(lang: LangKind, lines: &[String]) -> Vec<String> {
@@ -660,4 +684,88 @@ pub fn symbols_for(lang: LangKind, lines: &[String]) -> Vec<String> {
         }
     }
     out
+}
+
+pub fn install_hint(name: &str) -> String {
+    match name {
+        "rust-analyzer" => String::from("keplr lsp-install rust-analyzer"),
+        "gopls" => String::from("go install golang.org/x/tools/gopls@latest"),
+        "typescript-language-server" => {
+            String::from("npm install -g typescript typescript-language-server")
+        }
+        "clangd" => String::from("pkg install clang  # or apt/brew install llvm"),
+        "pyright" => String::from("npm install -g pyright"),
+        "lua-language-server" | "lua-ls" => {
+            String::from("pkg install lua-language-server  # or brew/apt")
+        }
+        "taplo" => String::from("cargo install taplo-cli --locked"),
+        "marksman" => String::from("pkg install marksman  # or brew/apt"),
+        "bash-language-server" | "bash-ls" => {
+            String::from("npm install -g bash-language-server")
+        }
+        _ => format!("no managed recipe for `{name}`; install it and ensure it is on PATH"),
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn rust_analyzer_asset() -> Option<&'static str> {
+    match (std::env::consts::OS, std::env::consts::ARCH) {
+        ("linux", "aarch64") => {
+            Some("rust-analyzer-aarch64-unknown-linux-gnu.gz")
+        }
+        ("linux", "x86_64") => Some("rust-analyzer-x86_64-unknown-linux-gnu.gz"),
+        ("macos", "aarch64") => Some("rust-analyzer-aarch64-apple-darwin.gz"),
+        ("macos", "x86_64") => Some("rust-analyzer-x86_64-apple-darwin.gz"),
+        _ => None,
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn install_rust_analyzer(dest_dir: &Path) -> anyhow::Result<PathBuf> {
+    let asset = rust_analyzer_asset()
+        .ok_or_else(|| anyhow::anyhow!("no rust-analyzer build for this platform"))?;
+    let url = format!(
+        "https://github.com/rust-lang/rust-analyzer/releases/latest/download/{asset}"
+    );
+    std::fs::create_dir_all(dest_dir)?;
+    let gz = dest_dir.join(asset);
+    let out = std::process::Command::new("curl")
+        .arg("-fsSL")
+        .arg("-o")
+        .arg(&gz)
+        .arg(&url)
+        .output()
+        .map_err(|e| anyhow::anyhow!("curl missing or failed to spawn: {e}"))?;
+    if !out.status.success() {
+        let _ = std::fs::remove_file(&gz);
+        anyhow::bail!(
+            "download failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+    let bin = dest_dir.join("rust-analyzer");
+    let unzip = std::process::Command::new("gunzip")
+        .arg("-f")
+        .arg(&gz)
+        .output()
+        .map_err(|e| anyhow::anyhow!("gunzip missing or failed to spawn: {e}"))?;
+    if !unzip.status.success() {
+        anyhow::bail!(
+            "gunzip failed: {}",
+            String::from_utf8_lossy(&unzip.stderr)
+        );
+    }
+    let downloaded = dest_dir.join(asset.trim_end_matches(".gz"));
+    std::fs::rename(&downloaded, &bin)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755))?;
+    }
+    Ok(bin)
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn install_rust_analyzer(_dest_dir: &Path) -> anyhow::Result<PathBuf> {
+    anyhow::bail!("installer unavailable on wasm")
 }

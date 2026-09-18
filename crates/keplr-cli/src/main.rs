@@ -76,6 +76,11 @@ enum Cmd {
     Diagnostics {
         file: PathBuf,
     },
+    LspInstall {
+        name: String,
+        #[arg(long)]
+        dir: Option<PathBuf>,
+    },
     Serve {
         #[arg(long, default_value_t = 7137)]
         port: u16,
@@ -439,6 +444,16 @@ async fn main() -> anyhow::Result<()> {
                     "servers": keplr_lang::lsp_servers(lang),
                 }))?
             );
+        }
+        Cmd::LspInstall { name, dir } => {
+            if name == "rust-analyzer" {
+                let dest = dir.unwrap_or_else(|| cli.root.join(".keplr/bin"));
+                let bin = keplr_lang::install_rust_analyzer(&dest)?;
+                println!("installed to {}", bin.display());
+            } else {
+                let present = keplr_lang::command_present(&name);
+                println!("present={present} hint: {}", keplr_lang::install_hint(&name));
+            }
         }
         Cmd::Serve { port, token } => {
             let resolved = keplr_serve::resolve_token(&cli.root, &token);
