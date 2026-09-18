@@ -413,3 +413,49 @@ pub fn spawn_lsp(server: &LspServer) -> anyhow::Result<std::process::Child> {
         .spawn()
         .map_err(|e| anyhow::anyhow!("failed to start `{}`: {}", server.cmd, e))
 }
+
+pub fn symbols_for(lang: LangKind, lines: &[String]) -> Vec<String> {
+    let kinds: &[&str] = match lang {
+        LangKind::Rust => &["fn", "struct", "enum", "impl", "trait", "mod"],
+        LangKind::TypeScript | LangKind::Tsx | LangKind::JavaScript => {
+            &["function", "class", "interface"]
+        }
+        LangKind::Cpp => &["class", "struct"],
+        LangKind::Go => &["func", "type"],
+        LangKind::Laml => &["serve", "on"],
+        LangKind::Other => &[],
+    };
+    if kinds.is_empty() {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    for line in lines.iter().take(200) {
+        let t = line.trim_start();
+        if t.starts_with("//") || t.starts_with('~') || t.starts_with('#') {
+            continue;
+        }
+        let words: Vec<&str> = t
+            .split(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
+            .filter(|w| !w.is_empty())
+            .collect();
+        let mut iter = words.iter();
+        let mut found: Option<(&str, &str)> = None;
+        while let Some(w) = iter.next() {
+            if kinds.contains(w) {
+                if let Some(n) = iter.next() {
+                    if n.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_') {
+                        found = Some((w, n));
+                    }
+                }
+                break;
+            }
+        }
+        if let Some((k, n)) = found {
+            out.push(format!("{k} {n}"));
+            if out.len() >= 50 {
+                break;
+            }
+        }
+    }
+    out
+}

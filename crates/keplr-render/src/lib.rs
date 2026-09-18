@@ -239,22 +239,6 @@ pub fn build_scene(spec: &SceneSpec) -> Scene {
     let entries = ws.walk_files(20_000);
     let files = entries.len();
 
-    let mut rel_paths: Vec<String> = entries
-        .iter()
-        .map(|e| {
-            e.path
-                .strip_prefix(root)
-                .unwrap_or(&e.path)
-                .to_string_lossy()
-                .to_string()
-        })
-        .collect();
-    rel_paths.sort();
-    let mut left_lines: Vec<String> = rel_paths.into_iter().take(30).collect();
-    if left_lines.is_empty() {
-        left_lines.push(String::from("(empty)"));
-    }
-
     let resolved_open: Option<PathBuf> = spec.open_file.map(|p| {
         if p.is_absolute() {
             p.to_path_buf()
@@ -297,6 +281,62 @@ pub fn build_scene(spec: &SceneSpec) -> Scene {
         ),
     };
 
+    let outline: Vec<String> = center_lines
+        .iter()
+        .take(10)
+        .enumerate()
+        .map(|(i, l)| format!("{} {}", i + 1, truncate(l.trim(), 48)))
+        .collect();
+
+    let mut rel_paths: Vec<String> = entries
+        .iter()
+        .map(|e| {
+            e.path
+                .strip_prefix(root)
+                .unwrap_or(&e.path)
+                .to_string_lossy()
+                .to_string()
+        })
+        .collect();
+    rel_paths.sort();
+    let mut project_lines: Vec<String> = rel_paths.into_iter().take(30).collect();
+    if project_lines.is_empty() {
+        project_lines.push(String::from("(empty)"));
+    }
+    let left_lines: Vec<String> = match spec.left_tab {
+        "search" => match spec.search_query {
+            Some(q) if !q.is_empty() => {
+                let hits = ws.grep(q, 30);
+                if hits.is_empty() {
+                    vec![String::from("(no matches)")]
+                } else {
+                    hits.into_iter()
+                        .map(|h| {
+                            format!(
+                                "{}:{}: {}",
+                                h.path
+                                    .strip_prefix(root)
+                                    .unwrap_or(&h.path)
+                                    .to_string_lossy(),
+                                h.line,
+                                truncate(&h.preview, 48)
+                            )
+                        })
+                        .collect()
+                }
+            }
+            _ => vec![String::from("(no search query)")],
+        },
+        "outline" => {
+            if outline.is_empty() {
+                vec![String::from("(no file)")]
+            } else {
+                outline.clone()
+            }
+        }
+        _ => project_lines,
+    };
+
     let squiggles: Vec<Squiggle> = match (&resolved_open, center_lang.as_str()) {
         (Some(full), "laml") => keplr_lang::laml_diagnostics(full)
             .into_iter()
@@ -333,13 +373,6 @@ pub fn build_scene(spec: &SceneSpec) -> Scene {
         None => (false, String::new(), Vec::new()),
     };
 
-    let outline: Vec<String> = center_lines
-        .iter()
-        .take(10)
-        .enumerate()
-        .map(|(i, l)| format!("{} {}", i + 1, truncate(l.trim(), 48)))
-        .collect();
-
     Scene {
         titlebar: TitleBar {
             root: root.display().to_string(),
@@ -370,10 +403,14 @@ pub fn build_scene(spec: &SceneSpec) -> Scene {
             title: String::from("right"),
             tabs: vec![String::from("symbols")],
             active_tab: spec.right_tab.to_string(),
-            lines: if outline.is_empty() {
-                vec![String::from("(no symbols)")]
-            } else {
-                outline
+            lines: {
+                let lang = keplr_lang::LangKind::from_path(Path::new(&center_path));
+                let syms = keplr_lang::symbols_for(lang, &center_lines);
+                if syms.is_empty() {
+                    vec![String::from("(no symbols)")]
+                } else {
+                    syms
+                }
             },
         },
         bottom: BottomPane {
