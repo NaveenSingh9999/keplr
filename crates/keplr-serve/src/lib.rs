@@ -571,10 +571,6 @@ async fn ui_root() -> axum::response::Html<&'static str> {
     axum::response::Html(include_str!("ui.html"))
 }
 
-async fn ui_root() -> axum::response::Html<&'static str> {
-    axum::response::Html(include_str!("ui.html"))
-}
-
 #[derive(Clone, Copy, Debug)]
 struct TermSize {
     cols: usize,
@@ -602,32 +598,46 @@ impl alacritty_terminal::event::EventListener for TermListener {
     fn send_event(&self, _event: alacritty_terminal::event::Event) {}
 }
 
-fn term_css(c: &alacritty_terminal::term::color::Color) -> Option<String> {
-    use alacritty_terminal::term::color::{AnsiColor, Color};
+fn term_css(c: &alacritty_terminal::vte::ansi::Color) -> Option<String> {
+    use alacritty_terminal::vte::ansi::{Color, NamedColor};
     match c {
         Color::Named(n) => Some(
             match n {
-                AnsiColor::Black => "#000000",
-                AnsiColor::Red => "#f85149",
-                AnsiColor::Green => "#3fb950",
-                AnsiColor::Yellow => "#d29922",
-                AnsiColor::Blue => "#58a6ff",
-                AnsiColor::Magenta => "#bc8cff",
-                AnsiColor::Cyan => "#39c5cf",
-                AnsiColor::White => "#e6edf3",
-                AnsiColor::BrightBlack => "#6e7681",
-                AnsiColor::BrightRed => "#ff7b72",
-                AnsiColor::BrightGreen => "#7ee787",
-                AnsiColor::BrightYellow => "#ffa657",
-                AnsiColor::BrightBlue => "#79c0ff",
-                AnsiColor::BrightMagenta => "#d2a8ff",
-                AnsiColor::BrightCyan => "#56d4dd",
-                AnsiColor::BrightWhite => "#ffffff",
-                AnsiColor::Foreground => "#e6edf3",
-                AnsiColor::Background => return None,
-                AnsiColor::Cursor => "#58a6ff",
-                _ => "#e6edf3",
+                NamedColor::Black => "#000000",
+                NamedColor::Red => "#f85149",
+                NamedColor::Green => "#3fb950",
+                NamedColor::Yellow => "#d29922",
+                NamedColor::Blue => "#58a6ff",
+                NamedColor::Magenta => "#bc8cff",
+                NamedColor::Cyan => "#39c5cf",
+                NamedColor::White => "#e6edf3",
+                NamedColor::BrightBlack => "#6e7681",
+                NamedColor::BrightRed => "#ff7b72",
+                NamedColor::BrightGreen => "#7ee787",
+                NamedColor::BrightYellow => "#ffa657",
+                NamedColor::BrightBlue => "#79c0ff",
+                NamedColor::BrightMagenta => "#d2a8ff",
+                NamedColor::BrightCyan => "#56d4dd",
+                NamedColor::BrightWhite => "#ffffff",
+                NamedColor::Foreground | NamedColor::BrightForeground => "#e6edf3",
+                NamedColor::Background => return None,
+                NamedColor::Cursor => "#58a6ff",
+                NamedColor::DimBlack => "#000000",
+                NamedColor::DimRed => "#f85149",
+                NamedColor::DimGreen => "#3fb950",
+                NamedColor::DimYellow => "#d29922",
+                NamedColor::DimBlue => "#58a6ff",
+                NamedColor::DimMagenta => "#bc8cff",
+                NamedColor::DimCyan => "#39c5cf",
+                NamedColor::DimWhite => "#e6edf3",
+                NamedColor::DimForeground => "#8b949e",
             }
+            .to_string(),
+        ),
+        Color::Indexed(i) => Some(indexed_css(*i)),
+        Color::Spec(rgb) => Some(format!("#{:02x}{:02x}{:02x}", rgb.r, rgb.g, rgb.b)),
+    }
+}
             .to_string(),
         ),
         Color::Indexed(i) => Some(indexed_css(*i)),
@@ -725,9 +735,11 @@ async fn term_loop(
     rows: usize,
     mut socket: axum::extract::ws::WebSocket,
 ) {
-    use alacritty_terminal::event::EventListener as _;
     use alacritty_terminal::term::{Config, Term};
-    use alacritty_terminal::vte::Parser;
+    use alacritty_terminal::vte::ansi::Processor;
+    let size = TermSize { cols, rows };
+    let mut term = Term::new(Config::default(), &size, TermListener);
+    let mut processor = Processor::new();
     use axum::extract::ws::Message;
     use std::io::{Read, Write};
     let pty_system = portable_pty::native_pty_system();
@@ -756,9 +768,6 @@ async fn term_loop(
         Ok(r) => r,
         Err(_) => return,
     };
-    let size = TermSize { cols, rows };
-    let mut term = Term::new(Config::default(), &size, TermListener);
-    let mut parser = Parser::new();
     let (fwd_tx, mut fwd_rx) = tokio::sync::mpsc::unbounded_channel::<Vec<u8>>();
     std::thread::spawn(move || {
         let mut reader = reader;
@@ -790,7 +799,7 @@ async fn term_loop(
             out = fwd_rx.recv() => {
                 match out {
                     Some(bytes) => {
-                        parser.advance(&mut term, &bytes);
+                        processor.advance(&mut term, &bytes);
                         if push(&mut socket, &term, cols, rows).await.is_err() {
                             break;
                         }
