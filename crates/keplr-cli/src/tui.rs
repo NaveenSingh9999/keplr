@@ -185,6 +185,7 @@ struct Frame<'a> {
     git_open: bool,
     git_lines: &'a [String],
     diags: &'a [keplr_lang::Diagnostic],
+    extras: &'a [(usize, usize)],
 }
 
 fn draw(f: &Frame) -> anyhow::Result<()> {
@@ -275,6 +276,25 @@ fn draw(f: &Frame) -> anyhow::Result<()> {
     } else {
         execute!(out, Hide)?;
     }
+    for (line, col) in f.extras.iter() {
+        if *line < f.top_render || *line >= f.top_render + height {
+            continue;
+        }
+        let row = 2 + line.saturating_sub(f.top_render);
+        let ch = f
+            .doc
+            .lines
+            .get(*line)
+            .and_then(|l| l.chars().nth(*col))
+            .unwrap_or(' ');
+        execute!(out, MoveTo((5 + col) as u16, row as u16))?;
+        execute!(out, Print(format!("\x1b[7m{ch}\x1b[0m")))?;
+    }
+    if !f.extras.is_empty() && f.cursor_visible && !f.git_open {
+        let crow = 2 + f.cursor.0.saturating_sub(f.top_render);
+        let ccol = 5 + f.cursor.1;
+        execute!(out, Show, MoveTo(ccol as u16, crow as u16))?;
+    }
     out.flush()?;
     Ok(())
 }
@@ -296,7 +316,79 @@ fn word_before(doc: &Doc, cursor: (usize, usize)) -> (usize, String) {
     (start, chars[start..cursor.1.min(chars.len())].iter().collect())
 }
 
-pub fn edit_file(root: PathBuf, file: PathBuf, no_animations: bool) -> anyhow::Result<()> {
+fn is_word_char(c: char) -> bool {
+    c.is_alphanumeric() || c == '_'
+}
+
+fn word_fwd(line: &[char], col: usize) -> usize {
+    let n = line.len();
+    let mut i = col.min(n);
+    if i < n && is_word_char(line[i]) {
+        while i < n && is_word_char(line[i]) {
+            i += 1;
+        }
+    }
+    while i < n && !is_word_char(line[i]) {
+        i += 1;
+    }
+    i.min(n)
+}
+
+fn word_back(line: &[char], col: usize) -> usize {
+    let mut i = col.min(line.len());
+    if i > 0 {
+        i -= 1;
+        while i > 0 && !is_word_char(line[i]) {
+            i -= 1;
+        }
+        while i > 0 && is_word_char(line[i - 1]) {
+            i -= 1;
+        }
+    }
+    i
+}
+
+fn word_end(line: &[char], col: usize) -> usize {
+    let n = line.len();
+    let mut i = (col + 1).min(n);
+    while i < n && !is_word_char(line[i]) {
+        i += 1;
+    }
+    while i + 1 < n && is_word_char(line[i + 1]) {
+        i += 1;
+    }
+    i.min(n)
+}
+
+fn save_active_tab(
+    ws: &keplr_core::Workspace,
+    tabs: &mut [TabState],
+    active: usize,
+) -> String {
+    let content = tabs[active].doc.content();
+    let full = tabs[active].path.clone();
+    match keplr_core::save_buffer(ws, &full, &content) {
+        Ok(r) => {
+            tabs[active].dirty = false;
+            refresh_diags(&mut tabs[active]);
+            format!(
+                "saved {} hash={} cas={} git={}",
+                r.bytes,
+                &r.hash[..12.min(r.hash.len())],
+                r.cas_stored,
+                r.git_committed
+            )
+        }
+        Err(e) => format!("save failed: {e:#}"),
+    }
+}
+
+pub fn edit_file(
+    root: PathBuf,
+    file: PathBuf,
+    no_animations: bool,
+    vim: bool,
+) -> anyhow::Result<()> {
     let reduced = reduced_motion(no_animations);
     let ws = keplr_core::Workspace::new(root.clone());
     let branch = keplr_ui::branch_name(&root);
@@ -314,6 +406,13 @@ pub fn edit_file(root: PathBuf, file: PathBuf, no_animations: bool) -> anyhow::R
     let mut last_frame = Instant::now();
     let mut last_key = Instant::now();
     let mut blink_on;
+    let vim_on = vim;
+    let mut vim_normal = vim;
+    let mut pending: Option<char> = None;
+    let mut clipboard = String::new();
+    let mut clip_line = false;
+    let mut cmdline: Option<String> = None;
+    let mut extras: Vec<(usize, usize)> = Vec::new();
     let _guard = ScreenGuard::enter()?;
 
     let refresh_palette = |query: &str, index: &[PathBuf], root: &Path| -> Vec<String> {
@@ -404,6 +503,7 @@ pub fn edit_file(root: PathBuf, file: PathBuf, no_animations: bool) -> anyhow::R
             git_open,
             git_lines: &git_lines,
             diags: &tab.diags,
+            extras: &extras,
         })?;
         let timeout = if animating && !reduced {
             Duration::from_millis(16)
@@ -420,25 +520,8 @@ pub fn edit_file(root: PathBuf, file: PathBuf, no_animations: bool) -> anyhow::R
         if key.modifiers.contains(KeyModifiers::CONTROL) {
             match key.code {
                 KeyCode::Char('s') => {
-                    let content = tabs[active].doc.content();
-                    let full = tabs[active].path.clone();
-                    match keplr_core::save_buffer(&ws, &full, &content) {
-                        Ok(r) => {
-                            tabs[active].dirty = false;
-                            quit_armed = false;
-                            refresh_diags(&mut tabs[active]);
-                            status = format!(
-                                "saved {} hash={} cas={} git={}",
-                                r.bytes,
-                                &r.hash[..12.min(r.hash.len())],
-                                r.cas_stored,
-                                r.git_committed
-                            );
-                        }
-                        Err(e) => {
-                            status = format!("save failed: {e:#}");
-                        }
-                    }
+                    status = save_active_tab(&ws, &mut tabs, active);
+                    quit_armed = false;
                     continue;
                 }
                 KeyCode::Char('p') => {
@@ -458,10 +541,12 @@ pub fn edit_file(root: PathBuf, file: PathBuf, no_animations: bool) -> anyhow::R
                 }
                 KeyCode::Char(']') => {
                     active = (active + 1) % tabs.len();
+                    extras.clear();
                     continue;
                 }
                 KeyCode::Char('[') => {
                     active = (active + tabs.len() - 1) % tabs.len();
+                    extras.clear();
                     continue;
                 }
                 KeyCode::Char('q') | KeyCode::Char('c') => {
@@ -472,10 +557,345 @@ pub fn edit_file(root: PathBuf, file: PathBuf, no_animations: bool) -> anyhow::R
                     }
                     return Ok(());
                 }
+                KeyCode::Char('d') => {
+                    let tab = &tabs[active];
+                    let line = tab.doc.lines.get(tab.cursor.0).cloned().unwrap_or_default();
+                    let chars: Vec<char> = line.chars().collect();
+                    let mut s = tab.cursor.1.min(chars.len());
+                    while s > 0 && is_word_char(chars[s - 1]) {
+                        s -= 1;
+                    }
+                    let mut e = tab.cursor.1.min(chars.len());
+                    while e < chars.len() && is_word_char(chars[e]) {
+                        e += 1;
+                    }
+                    if s < e {
+                        let word: String = chars[s..e].iter().collect();
+                        let at = |ln: usize, from: usize| -> Option<(usize, usize)> {
+                            let l = tab.doc.lines.get(ln)?;
+                            let cs: Vec<char> = l.chars().collect();
+                            if from > cs.len() {
+                                return None;
+                            }
+                            let hay: String = cs[from..].iter().collect();
+                            hay.find(word.as_str()).map(|pos| {
+                                (ln, from + hay[..pos].chars().count())
+                            })
+                        };
+                        let mut found = None;
+                        for ln in tab.cursor.0..tab.doc.lines.len() {
+                            let from = if ln == tab.cursor.0 { e } else { 0 };
+                            if let Some(p) = at(ln, from) {
+                                found = Some(p);
+                                break;
+                            }
+                        }
+                        if found.is_none() {
+                            for ln in 0..=tab.cursor.0.min(tab.doc.lines.len().saturating_sub(1)) {
+                                let end = if ln == tab.cursor.0 { s } else { usize::MAX };
+                                let l = match tab.doc.lines.get(ln) {
+                                    Some(l) => l,
+                                    None => continue,
+                                };
+                                let cs: Vec<char> = l.chars().collect();
+                                let hay: String =
+                                    cs[..end.min(cs.len())].iter().collect();
+                                if let Some(pos) = hay.find(word.as_str()) {
+                                    found = Some((ln, hay[..pos].chars().count()));
+                                    break;
+                                }
+                            }
+                        }
+                        if let Some(p) = found {
+                            if p != tab.cursor && !extras.contains(&p) {
+                                extras.push(p);
+                                status = format!("{} cursors", extras.len() + 1);
+                            }
+                        }
+                    }
+                    continue;
+                }
                 _ => {}
             }
         }
         quit_armed = false;
+        if let Some(cmd) = cmdline.clone() {
+            let _ = cmd;
+            match key.code {
+                KeyCode::Esc => {
+                    cmdline = None;
+                }
+                KeyCode::Enter => {
+                    let c = cmdline.take().unwrap_or_default();
+                    match c.trim() {
+                        "w" => {
+                            status = save_active_tab(&ws, &mut tabs, active);
+                        }
+                        "q" => {
+                            if tabs.iter().any(|t| t.dirty) {
+                                status = String::from("unsaved changes (use q!)");
+                            } else {
+                                return Ok(());
+                            }
+                        }
+                        "wq" | "x" => {
+                            status = save_active_tab(&ws, &mut tabs, active);
+                            if !tabs.iter().any(|t| t.dirty) {
+                                return Ok(());
+                            }
+                        }
+                        "q!" => return Ok(()),
+                        other => {
+                            status = format!("unknown command: {other}");
+                        }
+                    }
+                }
+                KeyCode::Backspace => {
+                    if let Some(c) = cmdline.as_mut() {
+                        c.pop();
+                    }
+                }
+                KeyCode::Char(ch)
+                    if !key.modifiers.contains(KeyModifiers::CONTROL)
+                        && !key.modifiers.contains(KeyModifiers::ALT) =>
+                {
+                    if let Some(c) = cmdline.as_mut() {
+                        c.push(ch);
+                    }
+                }
+                _ => {}
+            }
+            continue;
+        }
+        if vim_on && vim_normal && !palette_open && !git_open {
+            let plain = !key.modifiers.contains(KeyModifiers::CONTROL)
+                && !key.modifiers.contains(KeyModifiers::ALT);
+            let code = if plain { Some(key.code) } else { None };
+            let first = {
+                let tab = &tabs[active];
+                let line = tab.doc.lines.get(tab.cursor.0).cloned().unwrap_or_default();
+                let chars: Vec<char> = line.chars().collect();
+                let n = chars.len();
+                let cur = (tab.cursor.0, tab.cursor.1.min(n));
+                let indent = line
+                    .chars()
+                    .take_while(|c| *c == ' ' || *c == '\t')
+                    .count();
+                (cur, n, indent)
+            };
+            let ((ln, col), n, indent) = first;
+            let mut consumed = true;
+            match (pending.take(), code) {
+                (_, Some(KeyCode::Esc)) => {
+                    extras.clear();
+                }
+                (Some('d'), Some(KeyCode::Char('d'))) => {
+                    let tab = &mut tabs[active];
+                    let line = tab.doc.lines.remove(ln.min(tab.doc.lines.len() - 1));
+                    if tab.doc.lines.is_empty() {
+                        tab.doc.lines.push(String::new());
+                    }
+                    clipboard = line + "\n";
+                    clip_line = true;
+                    tab.cursor.0 = ln.min(tab.doc.lines.len() - 1);
+                    tab.cursor.1 = 0;
+                    tab.dirty = true;
+                }
+                (Some('y'), Some(KeyCode::Char('y'))) => {
+                    let tab = &tabs[active];
+                    clipboard = tab.doc.lines.get(ln).cloned().unwrap_or_default() + "\n";
+                    clip_line = true;
+                }
+                (Some('g'), Some(KeyCode::Char('g'))) => {
+                    tabs[active].cursor = (0, 0);
+                }
+                (Some('d'), Some(KeyCode::Char('w'))) => {
+                    let tab = &mut tabs[active];
+                    let to = word_fwd(
+                        &tab.doc.lines[tab.cursor.0].chars().collect::<Vec<_>>(),
+                        tab.cursor.1,
+                    );
+                    let byte = tab.doc.byte_col(tab.cursor.0, tab.cursor.1);
+                    let end = tab.doc.byte_col(tab.cursor.0, to);
+                    tab.doc.lines[tab.cursor.0].drain(byte..end);
+                    clipboard = String::new();
+                    clip_line = false;
+                    tab.dirty = true;
+                }
+                (Some('d'), Some(KeyCode::Char('$'))) => {
+                    let tab = &mut tabs[active];
+                    let byte = tab.doc.byte_col(tab.cursor.0, tab.cursor.1);
+                    tab.doc.lines[tab.cursor.0].truncate(byte);
+                    tab.dirty = true;
+                }
+                (Some('y'), Some(KeyCode::Char('w'))) => {
+                    let tab = &tabs[active];
+                    let chars: Vec<char> = tab.doc.lines[tab.cursor.0].chars().collect();
+                    let to = word_fwd(&chars, tab.cursor.1);
+                    clipboard = chars[tab.cursor.1.min(n)..to.min(n)].iter().collect();
+                    clip_line = false;
+                }
+                (Some('r'), Some(KeyCode::Char(rc))) => {
+                    let tab = &mut tabs[active];
+                    if tab.cursor.1 < n {
+                        let byte = tab.doc.byte_col(tab.cursor.0, tab.cursor.1);
+                        let next = tab.doc.byte_col(tab.cursor.0, tab.cursor.1 + 1);
+                        tab.doc.lines[tab.cursor.0].replace_range(byte..next, &rc.to_string());
+                        tab.dirty = true;
+                    }
+                }
+                (None, Some(KeyCode::Char('h'))) => {
+                    let tab = &mut tabs[active];
+                    if tab.cursor.1 > 0 {
+                        tab.cursor.1 -= 1;
+                    }
+                }
+                (None, Some(KeyCode::Char('j'))) => {
+                    let tab = &mut tabs[active];
+                    tab.cursor.0 = (tab.cursor.0 + 1).min(tab.doc.lines.len() - 1);
+                }
+                (None, Some(KeyCode::Char('k'))) => {
+                    let tab = &mut tabs[active];
+                    tab.cursor.0 = tab.cursor.0.saturating_sub(1);
+                }
+                (None, Some(KeyCode::Char('l'))) => {
+                    let tab = &mut tabs[active];
+                    tab.cursor.1 = (tab.cursor.1 + 1).min(n);
+                }
+                (None, Some(KeyCode::Char('w'))) => {
+                    let tab = &mut tabs[active];
+                    let chars: Vec<char> = tab.doc.lines[tab.cursor.0].chars().collect();
+                    tab.cursor.1 = word_fwd(&chars, tab.cursor.1);
+                }
+                (None, Some(KeyCode::Char('b'))) => {
+                    let tab = &mut tabs[active];
+                    let chars: Vec<char> = tab.doc.lines[tab.cursor.0].chars().collect();
+                    tab.cursor.1 = word_back(&chars, tab.cursor.1);
+                }
+                (None, Some(KeyCode::Char('e'))) => {
+                    let tab = &mut tabs[active];
+                    let chars: Vec<char> = tab.doc.lines[tab.cursor.0].chars().collect();
+                    tab.cursor.1 = word_end(&chars, tab.cursor.1);
+                }
+                (None, Some(KeyCode::Char('0'))) => {
+                    tabs[active].cursor.1 = 0;
+                }
+                (None, Some(KeyCode::Char('$'))) => {
+                    tabs[active].cursor.1 = n;
+                }
+                (None, Some(KeyCode::Char('^'))) => {
+                    tabs[active].cursor.1 = indent;
+                }
+                (None, Some(KeyCode::Char('G'))) => {
+                    let tab = &mut tabs[active];
+                    tab.cursor.0 = tab.doc.lines.len() - 1;
+                    tab.cursor.1 = 0;
+                }
+                (None, Some(KeyCode::Char('i'))) => {
+                    vim_normal = false;
+                }
+                (None, Some(KeyCode::Char('a'))) => {
+                    let tab = &mut tabs[active];
+                    tab.cursor.1 = (tab.cursor.1 + 1).min(n);
+                    vim_normal = false;
+                }
+                (None, Some(KeyCode::Char('I'))) => {
+                    tabs[active].cursor.1 = indent;
+                    vim_normal = false;
+                }
+                (None, Some(KeyCode::Char('A'))) => {
+                    tabs[active].cursor.1 = n;
+                    vim_normal = false;
+                }
+                (None, Some(KeyCode::Char('o'))) => {
+                    let tab = &mut tabs[active];
+                    tab.doc.lines.insert(tab.cursor.0 + 1, String::new());
+                    tab.cursor.0 += 1;
+                    tab.cursor.1 = 0;
+                    tab.dirty = true;
+                    vim_normal = false;
+                }
+                (None, Some(KeyCode::Char('O'))) => {
+                    let tab = &mut tabs[active];
+                    tab.doc.lines.insert(tab.cursor.0, String::new());
+                    tab.cursor.1 = 0;
+                    tab.dirty = true;
+                    vim_normal = false;
+                }
+                (None, Some(KeyCode::Char('x'))) => {
+                    let tab = &mut tabs[active];
+                    if tab.cursor.1 < n {
+                        let byte = tab.doc.byte_col(tab.cursor.0, tab.cursor.1);
+                        let next = tab.doc.byte_col(tab.cursor.0, tab.cursor.1 + 1);
+                        tab.doc.lines[tab.cursor.0].drain(byte..next);
+                        tab.dirty = true;
+                    }
+                }
+                (None, Some(KeyCode::Char('D'))) => {
+                    let tab = &mut tabs[active];
+                    let byte = tab.doc.byte_col(tab.cursor.0, tab.cursor.1);
+                    clipboard = tab.doc.lines[tab.cursor.0][byte..].to_string();
+                    clip_line = false;
+                    tab.doc.lines[tab.cursor.0].truncate(byte);
+                    tab.dirty = true;
+                }
+                (None, Some(KeyCode::Char('p'))) => {
+                    let tab = &mut tabs[active];
+                    if clip_line {
+                        tab.doc.lines.insert(
+                            tab.cursor.0 + 1,
+                            clipboard.trim_end_matches('\n').to_string(),
+                        );
+                        tab.cursor.0 += 1;
+                        tab.cursor.1 = 0;
+                    } else {
+                        let byte = tab.doc.byte_col(tab.cursor.0, tab.cursor.1);
+                        tab.doc.lines[tab.cursor.0].insert_str(byte, &clipboard);
+                        tab.cursor.1 += clipboard.chars().count();
+                    }
+                    tab.dirty = true;
+                }
+                (None, Some(KeyCode::Char('P'))) => {
+                    let tab = &mut tabs[active];
+                    if clip_line {
+                        tab.doc.lines.insert(
+                            tab.cursor.0,
+                            clipboard.trim_end_matches('\n').to_string(),
+                        );
+                        tab.cursor.1 = 0;
+                    } else {
+                        let byte = tab.doc.byte_col(tab.cursor.0, tab.cursor.1);
+                        tab.doc.lines[tab.cursor.0].insert_str(byte, &clipboard);
+                    }
+                    tab.dirty = true;
+                }
+                (None, Some(KeyCode::Char('d')))
+                | (None, Some(KeyCode::Char('y')))
+                | (None, Some(KeyCode::Char('g')))
+                | (None, Some(KeyCode::Char('r'))) => {
+                    pending = match key.code {
+                        KeyCode::Char(c) => Some(c),
+                        _ => None,
+                    };
+                }
+                (None, Some(KeyCode::Char(':'))) => {
+                    cmdline = Some(String::new());
+                }
+                (None, Some(KeyCode::Char('u'))) => {
+                    status = String::from("no undo stack — use git checkout to revert");
+                }
+                (None, Some(KeyCode::Char('/'))) => {
+                    status = String::from("search lives in the finder (ctrl+p)");
+                }
+                _ => {
+                    consumed = false;
+                }
+            }
+            let _ = (ln, col);
+            if consumed {
+                continue;
+            }
+        }
         if git_open && !palette_open {
             match key.code {
                 KeyCode::Esc | KeyCode::Char('g') => {
@@ -499,6 +919,7 @@ pub fn edit_file(root: PathBuf, file: PathBuf, no_animations: bool) -> anyhow::R
                             tabs.push(open_tab(&root, &next));
                             active = tabs.len() - 1;
                         }
+                        extras.clear();
                         status = format!("opened {hit}");
                     }
                     palette_open = false;
@@ -600,14 +1021,51 @@ pub fn edit_file(root: PathBuf, file: PathBuf, no_animations: bool) -> anyhow::R
                 tab.cursor.0 += 1;
                 tab.cursor.1 = 0;
                 tab.dirty = true;
+                extras.clear();
             }
             KeyCode::Backspace => {
                 let tab = &mut tabs[active];
                 if tab.cursor.1 > 0 {
-                    let byte = tab.doc.byte_col(tab.cursor.0, tab.cursor.1);
-                    let prev = tab.doc.byte_col(tab.cursor.0, tab.cursor.1 - 1);
-                    tab.doc.lines[tab.cursor.0].drain(prev..byte);
-                    tab.cursor.1 -= 1;
+                    let mut all = vec![tab.cursor];
+                    all.extend(extras.iter().cloned());
+                    all.sort();
+                    all.dedup();
+                    // only cursors with col > 0 delete; others ride along
+                    let mut applied: Vec<(usize, usize)> = Vec::new();
+                    for cur in &all {
+                        if cur.0 >= tab.doc.lines.len() {
+                            continue;
+                        }
+                        let max = tab.doc.line_chars(cur.0);
+                        let c = cur.1.min(max);
+                        if c > 0 {
+                            applied.push((cur.0, c));
+                        }
+                    }
+                    let mut desc = applied.clone();
+                    desc.sort_by(|a, b| b.cmp(a));
+                    for (line, col) in &desc {
+                        let byte = tab.doc.byte_col(*line, *col);
+                        let prev = tab.doc.byte_col(*line, col - 1);
+                        tab.doc.lines[*line].drain(prev..byte);
+                    }
+                    let shift = |pos: (usize, usize)| -> (usize, usize) {
+                        let n = applied
+                            .iter()
+                            .filter(|&&(l, cc)| l == pos.0 && cc <= pos.1)
+                            .count();
+                        (pos.0, pos.1.saturating_sub(n))
+                    };
+                    let primary = tab.cursor;
+                    tab.cursor = shift(primary);
+                    let mut fresh = Vec::new();
+                    for e in extras.iter() {
+                        let p = shift(*e);
+                        if p != tab.cursor && !fresh.contains(&p) {
+                            fresh.push(p);
+                        }
+                    }
+                    extras = fresh;
                     tab.dirty = true;
                 } else if tab.cursor.0 > 0 {
                     let tail = tab.doc.lines.remove(tab.cursor.0);
@@ -615,23 +1073,62 @@ pub fn edit_file(root: PathBuf, file: PathBuf, no_animations: bool) -> anyhow::R
                     tab.cursor.1 = tab.doc.line_chars(tab.cursor.0);
                     tab.doc.lines[tab.cursor.0].push_str(&tail);
                     tab.dirty = true;
+                    extras.clear();
                 }
             }
             KeyCode::Delete => {
                 let tab = &mut tabs[active];
                 let max = tab.doc.line_chars(tab.cursor.0);
                 if tab.cursor.1 < max {
-                    let byte = tab.doc.byte_col(tab.cursor.0, tab.cursor.1);
-                    let next = tab.doc.byte_col(tab.cursor.0, tab.cursor.1 + 1);
-                    tab.doc.lines[tab.cursor.0].drain(byte..next);
+                    let mut all = vec![tab.cursor];
+                    all.extend(extras.iter().cloned());
+                    all.sort();
+                    all.dedup();
+                    let mut applied: Vec<(usize, usize)> = Vec::new();
+                    for cur in &all {
+                        if cur.0 >= tab.doc.lines.len() {
+                            continue;
+                        }
+                        let max = tab.doc.line_chars(cur.0);
+                        let c = cur.1.min(max);
+                        if c < max {
+                            applied.push((cur.0, c));
+                        }
+                    }
+                    let mut desc = applied.clone();
+                    desc.sort_by(|a, b| b.cmp(a));
+                    for (line, col) in &desc {
+                        let byte = tab.doc.byte_col(*line, *col);
+                        let next = tab.doc.byte_col(*line, col + 1);
+                        tab.doc.lines[*line].drain(byte..next);
+                    }
+                    let shift = |pos: (usize, usize)| -> (usize, usize) {
+                        let n = applied
+                            .iter()
+                            .filter(|&&(l, cc)| l == pos.0 && cc < pos.1)
+                            .count();
+                        (pos.0, pos.1.saturating_sub(n))
+                    };
+                    let primary = tab.cursor;
+                    tab.cursor = shift(primary);
+                    let mut fresh = Vec::new();
+                    for e in extras.iter() {
+                        let p = shift(*e);
+                        if p != tab.cursor && !fresh.contains(&p) {
+                            fresh.push(p);
+                        }
+                    }
+                    extras = fresh;
                     tab.dirty = true;
                 } else if tab.cursor.0 + 1 < tab.doc.lines.len() {
                     let tail = tab.doc.lines.remove(tab.cursor.0 + 1);
                     tab.doc.lines[tab.cursor.0].push_str(&tail);
                     tab.dirty = true;
+                    extras.clear();
                 }
             }
             KeyCode::Tab => {
+                extras.clear();
                 let tab = &mut tabs[active];
                 let (start, word) = word_before(&tab.doc, tab.cursor);
                 if !word.is_empty() {
@@ -671,23 +1168,73 @@ pub fn edit_file(root: PathBuf, file: PathBuf, no_animations: bool) -> anyhow::R
                     && !key.modifiers.contains(KeyModifiers::ALT) =>
             {
                 let tab = &mut tabs[active];
-                let byte = tab.doc.byte_col(tab.cursor.0, tab.cursor.1);
-                tab.doc.lines[tab.cursor.0].insert(byte, c);
-                tab.cursor.1 += 1;
+                let mut all = vec![tab.cursor];
+                all.extend(extras.iter().cloned());
+                all.sort();
+                all.dedup();
+                for cur in all.iter_mut() {
+                    if cur.0 < tab.doc.lines.len() {
+                        let max = tab.doc.line_chars(cur.0);
+                        cur.1 = cur.1.min(max);
+                    }
+                }
+                let mut desc = all.clone();
+                desc.sort_by(|a, b| b.cmp(a));
+                for (line, col) in &desc {
+                    if *line >= tab.doc.lines.len() {
+                        continue;
+                    }
+                    let byte = tab.doc.byte_col(*line, *col);
+                    tab.doc.lines[*line].insert(byte, c);
+                }
+                let shift = |pos: (usize, usize), targets: &[(usize, usize)]| -> (usize, usize) {
+                    let n = targets
+                        .iter()
+                        .filter(|&&(l, cc)| l == pos.0 && cc <= pos.1)
+                        .count();
+                    (pos.0, pos.1 + n)
+                };
+                let primary = tab.cursor;
+                tab.cursor = shift(primary, &all);
+                let mut fresh = Vec::new();
+                for e in extras.iter() {
+                    let p = shift(*e, &all);
+                    if p != tab.cursor && !fresh.contains(&p) {
+                        fresh.push(p);
+                    }
+                }
+                extras = fresh;
                 tab.dirty = true;
             }
             KeyCode::Esc => {
                 git_open = false;
+                extras.clear();
+                if vim_on {
+                    vim_normal = true;
+                }
             }
             _ => {}
         }
         {
             let tab = &tabs[active];
+            let mode = if vim_on && vim_normal {
+                "[N] "
+            } else if vim_on {
+                "[I] "
+            } else {
+                ""
+            };
+            let multi = if extras.is_empty() {
+                String::new()
+            } else {
+                format!(" ({} cursors)", extras.len() + 1)
+            };
             status = format!(
-                "{}:{} {}",
+                "{mode}{}:{} {}{}",
                 tab.cursor.0 + 1,
                 tab.cursor.1 + 1,
-                if tab.dirty { "modified" } else { "" }
+                if tab.dirty { "modified" } else { "" },
+                multi
             );
         }
     }

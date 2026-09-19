@@ -71,6 +71,8 @@ enum Cmd {
         file: PathBuf,
         #[arg(long)]
         no_animations: bool,
+        #[arg(long)]
+        vim: bool,
     },
     Save {
         file: PathBuf,
@@ -371,8 +373,12 @@ async fn main() -> anyhow::Result<()> {
                 buf.len_lines()
             );
         }
-        Cmd::Edit { file, no_animations } => {
-            tui::edit_file(cli.root, file, no_animations)?;
+        Cmd::Edit {
+            file,
+            no_animations,
+            vim,
+        } => {
+            tui::edit_file(cli.root, file, no_animations, vim)?;
         }
         Cmd::Save {
             file,
