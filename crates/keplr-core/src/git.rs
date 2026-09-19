@@ -202,6 +202,26 @@ pub fn current_branch(workdir: &Path) -> anyhow::Result<String> {
     Ok(git(workdir, &["branch", "--show-current"])?.trim().to_string())
 }
 
+/// (ahead, behind) vs the upstream. Errors when no upstream is set.
+pub fn ahead_behind(workdir: &Path) -> anyhow::Result<(u64, u64)> {
+    let out = git(workdir, &["rev-list", "--left-right", "--count", "HEAD...@{upstream}"])?;
+    let mut it = out.split_whitespace();
+    let ahead = it.next().unwrap_or("0").parse().unwrap_or(0);
+    let behind = it.next().unwrap_or("0").parse().unwrap_or(0);
+    Ok((ahead, behind))
+}
+
+pub fn file_diff(workdir: &Path, rel: &str, staged: bool) -> anyhow::Result<String> {
+    if rel.contains("..") {
+        anyhow::bail!("invalid path");
+    }
+    if staged {
+        git(workdir, &["diff", "--cached", "--", rel])
+    } else {
+        git(workdir, &["diff", "--", rel])
+    }
+}
+
 pub fn stage(workdir: &Path, path: &str) -> anyhow::Result<String> {
     git(workdir, &["add", "--", path])
 }

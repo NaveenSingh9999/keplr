@@ -773,6 +773,71 @@
   #termholder { scrollbar-gutter: stable; }
   #termholder canvas { display: block; }
   .ser-empty code { user-select: all; }
+
+  /* ============ PHASE 5 source control ============ */
+  #scm { display: flex; flex-direction: column; gap: 8px; padding: 10px 10px 16px; }
+  #scm .msgrow { display: flex; justify-content: flex-end; align-items: center; margin-top: -4px; }
+  #scm .msgrow .count { font-size: 11px; color: var(--text3); font-variant-numeric: tabular-nums; }
+  #scm .msgrow .count.over { color: var(--warn); }
+  #scm .kbtn { width: 100%; }
+  #scm .pushrow { display: flex; gap: 6px; }
+  #scm .pushrow .kbtn:first-child { flex: 1; }
+  #scm .pushrow .kbtn { width: auto; }
+  #scm .branchrow { display: flex; gap: 6px; }
+  #scm .branchrow .kbtn:first-child { flex: 1; justify-content: flex-start; font-weight: 500; }
+  #scm .spin {
+    width: 13px; height: 13px; border-radius: 50%; flex: none;
+    border: 2px solid rgba(255,255,255,.35); border-top-color: #fff;
+    animation: kspin .7s linear infinite;
+  }
+  @keyframes kspin { to { transform: rotate(360deg); } }
+  .sechead {
+    appearance: none; display: flex; align-items: center; gap: 6px; width: 100%;
+    background: transparent; border: 0; color: var(--text2); cursor: pointer;
+    font: 600 11px var(--font-ui); text-transform: uppercase; letter-spacing: .07em;
+    padding: 8px 4px 4px;
+  }
+  .sechead .n {
+    font-variant-numeric: tabular-nums; background: var(--raised);
+    border: 1px solid var(--sep); border-radius: 999px; padding: 0 7px; font-size: 10px;
+  }
+  .sechead .tri { display: inline-flex; transition: transform var(--d1) var(--ease); color: var(--text3); }
+  .sechead .tri .ic { width: 12px; height: 12px; }
+  .staged-sec.open .sechead .tri, .changes-sec.open .sechead .tri { transform: rotate(90deg); }
+  .seckids.closed { display: none; }
+  .seckids { animation: ksec-in var(--d1) var(--ease); }
+  @keyframes ksec-in { from { opacity: 0; transform: translateY(-3px); } }
+  .filerow {
+    display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px;
+    cursor: pointer; transition: background 80ms linear;
+  }
+  .filerow:hover { background: var(--raised); }
+  .filerow .badge { font: 600 11px var(--font-mono); width: 14px; flex: none; text-align: center; }
+  .filerow .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+  .filerow .act { display: none; gap: 2px; flex: none; }
+  .filerow:hover .act, .filerow:focus-within .act { display: inline-flex; }
+  .filerow .act .kicon { width: 24px; height: 24px; }
+  .diffbar {
+    display: flex; align-items: center; gap: 8px; padding: 8px 14px;
+    border-bottom: 1px solid var(--sep); flex: none; position: sticky; top: 0;
+    background: var(--bg); z-index: 2;
+  }
+  .diffbar .difftitle { font: 600 13px var(--font-ui); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .diffbar .kbtn { width: auto; }
+  pre.diff { margin: 0; padding: 12px 0 40px; font: 12.5px/1.6 var(--font-mono); }
+  pre.diff div { padding: 0 14px; white-space: pre-wrap; word-break: break-all; }
+  pre.diff .add { background: color-mix(in srgb, var(--ok) 10%, transparent); color: var(--ok); }
+  pre.diff .del { background: color-mix(in srgb, var(--error) 10%, transparent); color: var(--error); }
+  pre.diff .hunk { color: var(--accent); }
+  table.diffsplit { border-collapse: collapse; width: 100%; font: 12.5px/1.6 var(--font-mono); margin-bottom: 40px; }
+  table.diffsplit td { padding: 0 10px; vertical-align: top; }
+  table.diffsplit td.ln { width: 40px; text-align: right; color: var(--text3); user-select: none; flex: none; }
+  table.diffsplit td.code { white-space: pre-wrap; word-break: break-all; width: 50%; }
+  table.diffsplit tr td.add { background: color-mix(in srgb, var(--ok) 9%, transparent); }
+  table.diffsplit tr td.del { background: color-mix(in srgb, var(--error) 9%, transparent); }
+  table.diffsplit td.add { color: var(--ok); }
+  table.diffsplit td.del { color: var(--error); }
+  table.diffsplit td.hunk { color: var(--accent); text-align: left; }
 </style>
 <script type="importmap">
 {"imports": {
@@ -810,6 +875,7 @@
     <symbol id="i-side" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/></g></symbol>
     <symbol id="i-panel" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></g></symbol>
     <symbol id="i-activity" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></g></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></g></symbol>
     <symbol id="i-list" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></g></symbol>
     <!-- File icons: Seti UI pack, the family VS Code ships (MIT) -->
     <symbol id="f-rust" viewBox="0 0 32 32"><path d="M10.5 27h-.2c-.1-.1-.3-.2-.4-.4-.2-.2-.2-.5.1-.8.2-.3.6-.5.9-.7-.8-.7-1.2-1.5-1.4-2.5-.2-.7-.2-1.5-.2-2.3 0-1.2.2-2.3.2-3.5-.3.2-.6.4-1 .5h-.2c-.2-.2-.3-.4-.3-.6 0-.2.2-.4.3-.5.3-.2.6-.3 1-.3.2 0 .2-.1.2-.2-.1-1-.2-2-.2-3-.1-1-.1-2.1.1-3.1.1-.5.1-.5-.3-.6-.5-.3-.8-.9-.7-1.4.2-1.1 1.4-1.6 2.4-1.1.1.1.2.1.3 0 .5-.4 1-.7 1.6-.9 1.7-.6 3.5-.7 5.2-.4.9.1 1.8.4 2.5 1 .2.2.4.2.6.1.8-.4 1.7-.1 2.1.7.4.8.1 1.5-.8 1.9-.1.1-.1.1-.1.2.3 1 .4 2 .4 3.1 0 1.2 0 2.3.1 3.5 0 .2 0 .2.2.3.4 0 .7.2 1 .5.2.2.2.3 0 .6v.1c0 .2-.2.3-.4.3s-.4-.1-.5-.2c-.1 0-.2-.1-.3-.1v.1c0 .6.1 1.2.1 1.9 0 1.1 0 2.1-.2 3.2-.2 1-.6 2-1.3 2.8-.1.1-.1.2 0 .3.3.2.6.5.8.9.1.3 0 .5-.3.7-.2.2-.4.1-.6 0l-.4-.4c-.2-.2-.3-.4-.5-.5-.1-.1-.2-.1-.3 0-1.1.6-2.3.8-3.5.8-1.4.1-2.9-.1-4.2-.7h-.1c-.2.2-.6.3-.8.5-.3-.2-.6 0-.9.2z"/></symbol>
@@ -1609,7 +1675,7 @@ function renderTabs() {
     d.draggable = true;
     const nm = document.createElement("span");
     nm.className = "nm";
-    nm.textContent = rel(t.path).split("/").pop();
+    nm.textContent = t.view === "diff" ? "≠ " + rel(t.diffPath || "").split("/").pop() : rel(t.path).split("/").pop();
     const dot = document.createElement("span");
     dot.className = "dot";
     const x = document.createElement("span");
@@ -1774,6 +1840,9 @@ function activateTab(i) {
     showEditorPane(false);
     renderPreview(t);
   } else if (t.view === "large") {
+    showEditorPane(false);
+    renderPreview(t);
+  } else if (t.view === "diff") {
     showEditorPane(false);
     renderPreview(t);
   } else if (kind === "md" && t.view === "preview") {
@@ -2072,8 +2141,144 @@ function mdRenderNested(text, depth) {
   for (let d = 0; d < depth; d++) out = "<blockquote>" + out + "</blockquote>";
   return out;
 }
+/* ============ inline diff view ============ */
+async function openDiff(entry, staged) {
+  const g = G();
+  const key = "diff:" + (staged ? "s:" : "w:") + entry.path;
+  const found = g.tabs.findIndex(t => t.path === key);
+  if (found >= 0) {
+    activateTab(found);
+    return;
+  }
+  let text = "";
+  try {
+    const j = await get("/git/difftext?path=" + encodeURIComponent(entry.path) + (staged ? "&staged=1" : ""));
+    if (j.error) throw new Error(j.error);
+    text = j.text || "";
+  } catch (e) { msg(String(e), true); return; }
+  if (!text.trim()) {
+    msg("no diff output — opening file instead");
+    openFile(entry.path, 0, true).catch(e => msg(String(e), true));
+    return;
+  }
+  g.tabs.push({
+    path: key, lang: "text", text, saved: text, sel: 0, dirty: false,
+    view: "diff", diffPath: entry.path, diffStaged: staged, diffMode: "unified",
+  });
+  g.active = -1;
+  activateTab(g.tabs.length - 1);
+}
+function renderDiff(wrap, tab) {
+  wrap.innerHTML = "";
+  const bar = document.createElement("div");
+  bar.className = "diffbar";
+  const title = document.createElement("span");
+  title.className = "difftitle";
+  title.textContent = (tab.diffStaged ? "staged · " : "") + rel(tab.diffPath || "");
+  const seg = document.createElement("div");
+  seg.className = "kseg";
+  seg.setAttribute("role", "group");
+  seg.setAttribute("aria-label", "Diff mode");
+  const bu = document.createElement("button");
+  bu.textContent = "Unified";
+  bu.classList.toggle("sel", tab.diffMode !== "split");
+  const bs = document.createElement("button");
+  bs.textContent = "Split";
+  bs.classList.toggle("sel", tab.diffMode === "split");
+  bu.onclick = () => { tab.diffMode = "unified"; renderPreview(tab); };
+  bs.onclick = () => { tab.diffMode = "split"; renderPreview(tab); };
+  seg.appendChild(bu);
+  seg.appendChild(bs);
+  const open = document.createElement("button");
+  open.className = "kbtn";
+  open.textContent = "Open file";
+  open.onclick = () => openFile(tab.diffPath, 0, true).catch(e => msg(String(e), true));
+  bar.appendChild(title);
+  bar.appendChild(seg);
+  bar.appendChild(open);
+  wrap.appendChild(bar);
+  if (tab.diffMode === "split") wrap.appendChild(splitDiffEl(tab.text));
+  else wrap.appendChild(unifiedDiffEl(tab.text));
+}
+function unifiedDiffEl(text) {
+  const pre = document.createElement("pre");
+  pre.className = "diff";
+  for (const line of text.split("\n")) {
+    const d = document.createElement("div");
+    if (line.startsWith("+") && !line.startsWith("+++")) d.className = "add";
+    else if (line.startsWith("-") && !line.startsWith("---")) d.className = "del";
+    else if (line.startsWith("@@")) d.className = "hunk";
+    d.textContent = line || " ";
+    pre.appendChild(d);
+  }
+  return pre;
+}
+function splitDiffEl(text) {
+  const table = document.createElement("table");
+  table.className = "diffsplit";
+  let oldN = 0, newN = 0;
+  const num = (el, n, cls) => {
+    const td = document.createElement("td");
+    td.className = "ln " + cls;
+    td.textContent = n > 0 ? String(n) : "";
+    el.appendChild(td);
+  };
+  const code = (el, t, cls) => {
+    const td = document.createElement("td");
+    td.className = "code " + cls;
+    td.textContent = t;
+    el.appendChild(td);
+  };
+  for (const raw of text.split("\n")) {
+    if (raw.startsWith("+++") || raw.startsWith("---") || raw.startsWith("diff ") || raw.startsWith("index ")) continue;
+    const m = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(raw);
+    if (m) {
+      oldN = parseInt(m[1], 10) - 1;
+      newN = parseInt(m[3], 10) - 1;
+      const tr = document.createElement("tr");
+      const td = document.createElement("td");
+      td.colSpan = 4;
+      td.className = "hunk";
+      td.textContent = raw;
+      tr.appendChild(td);
+      table.appendChild(tr);
+      continue;
+    }
+    if (raw.startsWith("\\")) continue;
+    const tr = document.createElement("tr");
+    if (raw.startsWith("-")) {
+      oldN += 1;
+      num(tr, oldN, "del");
+      code(tr, raw.slice(1), "del");
+      num(tr, 0, "del");
+      code(tr, "", "del");
+    } else if (raw.startsWith("+")) {
+      newN += 1;
+      num(tr, 0, "add");
+      code(tr, "", "add");
+      num(tr, newN, "add");
+      code(tr, raw.slice(1), "add");
+    } else {
+      oldN += 1;
+      newN += 1;
+      const body = raw.startsWith(" ") ? raw.slice(1) : raw;
+      num(tr, oldN, "");
+      code(tr, body, "");
+      num(tr, newN, "");
+      code(tr, body, "");
+    }
+    table.appendChild(tr);
+  }
+  return table;
+}
+
 function renderPreview(tab) {
   const wrap = document.getElementById("previewwrap");
+  if (tab.view === "diff") {
+    renderDiff(wrap, tab);
+    wrap.scrollTop = 0;
+    return;
+  }
   const kind = previewKind(tab.path);
   if (kind === "md") {
     wrap.innerHTML = '<div class="md">' + mdRender(tab.text) + "</div>";
@@ -3557,11 +3762,14 @@ async function refreshGitCounts() {
 function scmFileRow(body, entry, staged, onAction) {
   const d = document.createElement("div");
   d.className = "filerow";
+  d.tabIndex = 0;
+  d.setAttribute("role", "button");
   const badge = document.createElement("span");
   badge.className = "badge";
   const mark = staged ? entry.staged : entry.unstaged;
-  badge.textContent = mark === " " ? "M" : mark;
-  badge.style.color = mark === "?" ? "var(--ok)" : mark === "D" ? "var(--error)" : "var(--warn)";
+  const letter = mark === "?" ? "U" : mark === " " ? "M" : mark;
+  badge.textContent = letter;
+  badge.style.color = mark === "?" || mark === "A" ? "var(--ok)" : mark === "D" ? "var(--error)" : "var(--warn)";
   const nm = document.createElement("span");
   nm.className = "nm";
   nm.textContent = entry.path;
@@ -3570,15 +3778,21 @@ function scmFileRow(body, entry, staged, onAction) {
   act.className = "act";
   onAction.forEach(a => {
     const b = document.createElement("button");
-    b.textContent = a[0];
+    b.className = "kicon";
+    b.innerHTML = icon(a[0]);
     b.title = a[1];
+    b.setAttribute("aria-label", a[1] + " " + entry.path);
     b.onclick = ev => { ev.stopPropagation(); a[2](); };
     act.appendChild(b);
   });
   d.appendChild(badge);
   d.appendChild(nm);
   d.appendChild(act);
-  d.onclick = () => openFile(entry.path, 0).catch(e => msg(String(e), true));
+  d.title = "Show diff";
+  d.onclick = () => openDiff(entry, staged);
+  d.onkeydown = e => {
+    if (e.key === "Enter") openDiff(entry, staged);
+  };
   body.appendChild(d);
 }
 async function loadScm() {
@@ -3587,149 +3801,224 @@ async function loadScm() {
   const wrap = document.createElement("div");
   wrap.id = "scm";
   const msg2 = document.createElement("textarea");
+  msg2.className = "kinput";
   msg2.placeholder = "Message (Ctrl+Enter to commit)";
+  msg2.rows = 2;
+  msg2.setAttribute("aria-label", "Commit message");
+  const msgRow = document.createElement("div");
+  msgRow.className = "msgrow";
+  const counter = document.createElement("span");
+  counter.className = "count";
+  counter.textContent = "0/50";
+  msgRow.appendChild(counter);
   const commitBtn = document.createElement("button");
-  commitBtn.className = "commitbtn";
+  commitBtn.className = "kbtn kbtn-acc";
   commitBtn.textContent = "Commit";
   commitBtn.disabled = true;
-  msg2.addEventListener("input", () => { commitBtn.disabled = !msg2.value.trim(); });
+  let stagedCount = 0;
+  const paintCommit = () => {
+    const first = msg2.value.split("\n")[0];
+    counter.textContent = first.length + "/50";
+    counter.classList.toggle("over", first.length > 50);
+    const ok = msg2.value.trim() && stagedCount > 0;
+    commitBtn.disabled = !ok;
+    commitBtn.classList.toggle("kbtn-acc", !!ok);
+  };
+  const autogrow = () => {
+    msg2.style.height = "auto";
+    msg2.style.height = Math.min(140, msg2.scrollHeight) + "px";
+  };
+  msg2.addEventListener("input", () => { autogrow(); paintCommit(); });
   msg2.addEventListener("keydown", e => {
-    if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && msg2.value.trim()) {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !commitBtn.disabled) {
       e.preventDefault();
       doCommit();
     }
   });
   async function doCommit() {
     const m = msg2.value.trim();
-    if (!m) return;
+    if (!m || stagedCount <= 0) return;
     try {
       const j = await post("/git/commit", { message: m });
       if (!j.ok) throw new Error(j.error || "commit failed");
       msg2.value = "";
-      commitBtn.disabled = true;
+      autogrow();
       log("console", "committed: " + m.split("\n")[0]);
+      toast("Committed", "ok");
       await reloadScm();
-    } catch (e) { msg(String(e), true); }
+    } catch (e) {
+      msg(String(e), true);
+      toast(String(e), "err");
+    }
   }
   commitBtn.onclick = doCommit;
   wrap.appendChild(msg2);
+  wrap.appendChild(msgRow);
   wrap.appendChild(commitBtn);
+  const pushRow = document.createElement("div");
+  pushRow.className = "pushrow";
   const pushBtn = document.createElement("button");
-  pushBtn.className = "commitbtn";
-  pushBtn.textContent = "Push";
-  pushBtn.title = "git push origin (one click)";
-  pushBtn.onclick = async () => {
+  pushBtn.className = "kbtn kbtn-acc";
+  pushBtn.innerHTML = icon("push") + "<span>Push</span>";
+  const pushChev = document.createElement("button");
+  pushChev.className = "kbtn kbtn-acc";
+  pushChev.innerHTML = icon("chev-d");
+  pushChev.title = "Push options";
+  pushChev.setAttribute("aria-label", "Push options");
+  let pushing = false;
+  let retryArmed = false;
+  async function doPush(setUpstream) {
+    if (pushing) return;
+    pushing = true;
+    retryArmed = false;
     pushBtn.disabled = true;
-    pushBtn.textContent = "Pushing…";
+    pushChev.disabled = true;
+    pushBtn.innerHTML = '<span class="spin"></span><span>Pushing…</span>';
     try {
-      const j = await post("/git/push", {});
+      const j = await post("/git/push", setUpstream ? { set_upstream: true } : {});
       if (!j.ok) throw new Error(j.error || "push failed");
       log("console", "pushed" + (j.output ? ": " + String(j.output).trim().split("\n").pop() : ""));
-      msg("pushed");
+      toast("Pushed", "ok");
+      pushBtn.innerHTML = icon("check") + "<span>Pushed</span>";
+      setTimeout(() => paintPush(S.pushInfo), 1600);
       await reloadScm();
-    } catch (e) { msg(String(e), true); }
+    } catch (e) {
+      msg(String(e), true);
+      toast("Push failed — " + String(e.message || e), "err");
+      retryArmed = true;
+      pushBtn.innerHTML = icon("refresh") + "<span>Retry</span>";
+    }
+    pushing = false;
     pushBtn.disabled = false;
-    pushBtn.textContent = "Push";
+    pushChev.disabled = false;
+  }
+  function paintPush(info) {
+    if (pushing) return;
+    if (retryArmed) return;
+    const a = (info && info.ahead) || 0, b = (info && info.behind) || 0;
+    if (a > 0 || b > 0) pushBtn.innerHTML = icon("push") + "<span>Push ↑" + a + " ↓" + b + "</span>";
+    else pushBtn.innerHTML = icon("push") + "<span>Push</span>";
+  }
+  pushBtn.onclick = () => doPush(false);
+  pushChev.onclick = e => {
+    const r = pushChev.getBoundingClientRect();
+    showMenu(r.left, r.bottom + 4, [
+      { label: "Push", icon: "push", run: () => doPush(false) },
+      { label: "Push with upstream", icon: "push", run: () => doPush(true) },
+    ]);
   };
-  wrap.appendChild(pushBtn);
+  pushRow.appendChild(pushBtn);
+  pushRow.appendChild(pushChev);
+  wrap.appendChild(pushRow);
   const branchRow = document.createElement("div");
-  branchRow.style.cssText = "display:flex;gap:6px;align-items:center;";
-  const sel = document.createElement("select");
-  const newBtn = document.createElement("button");
-  newBtn.className = "mini";
-  newBtn.textContent = "+ branch";
-  newBtn.onclick = async () => {
-    const name = await askInput({ title: "New branch", placeholder: "feature/name", okLabel: "Create" });
-    if (!name) return;
-    try {
-      const j = await post("/git/switch", { branch: name, create: true });
-      if (!j.ok) throw new Error(j.error || "failed");
-      await reloadScm();
-    } catch (e) { msg(String(e), true); }
+  branchRow.className = "branchrow";
+  const branchBtn = document.createElement("button");
+  branchBtn.className = "kbtn";
+  branchBtn.innerHTML = icon("branch") + "<span>…</span>";
+  branchBtn.onclick = e => branchPicker(e);
+  const moreBtn = document.createElement("button");
+  moreBtn.className = "kicon";
+  moreBtn.innerHTML = icon("dots");
+  moreBtn.title = "Stash options";
+  moreBtn.setAttribute("aria-label", "Stash options");
+  moreBtn.onclick = e => {
+    const r = moreBtn.getBoundingClientRect();
+    showMenu(r.left, r.bottom + 4, [
+      { label: "Stash changes…", icon: "plus", run: async () => {
+        const m = await askInput({ title: "Stash message (optional)", placeholder: "wip", okLabel: "Stash" });
+        if (m === null) return;
+        try {
+          const j = await post("/git/stash", { message: m || "" });
+          if (!j.ok) throw new Error(j.error || "failed");
+          toast("Stashed", "ok");
+          await reloadScm();
+        } catch (err) { msg(String(err), true); }
+      }},
+      { label: "Pop stash", icon: "check", run: async () => {
+        try {
+          const j = await post("/git/stash", { pop: true });
+          if (!j.ok) throw new Error(j.error || "failed");
+          toast("Stash popped", "ok");
+          await reloadScm();
+        } catch (err) { msg(String(err), true); }
+      }},
+    ]);
   };
-  branchRow.appendChild(sel);
-  branchRow.appendChild(newBtn);
+  branchRow.appendChild(branchBtn);
+  branchRow.appendChild(moreBtn);
   wrap.appendChild(branchRow);
-  const stashRow = document.createElement("div");
-  stashRow.style.cssText = "display:flex;gap:6px;";
-  const stashBtn = document.createElement("button");
-  stashBtn.className = "mini";
-  stashBtn.textContent = "stash changes";
-  stashBtn.onclick = async () => {
-    const m = await askInput({ title: "Stash message (optional)", placeholder: "wip", okLabel: "Stash" });
-    if (m === null) return;
-    try {
-      const j = await post("/git/stash", { message: m || "" });
-      if (!j.ok) throw new Error(j.error || "failed");
-      await reloadScm();
-    } catch (e) { msg(String(e), true); }
-  };
-  const popBtn = document.createElement("button");
-  popBtn.className = "mini";
-  popBtn.textContent = "pop stash";
-  popBtn.onclick = async () => {
-    try {
-      const j = await post("/git/stash", { pop: true });
-      if (!j.ok) throw new Error(j.error || "failed");
-      await reloadScm();
-    } catch (e) { msg(String(e), true); }
-  };
-  stashRow.appendChild(stashBtn);
-  stashRow.appendChild(popBtn);
-  wrap.appendChild(stashRow);
   body.appendChild(wrap);
   async function reloadScm() {
     try {
-      const [st, br] = await Promise.all([get("/git/status"), get("/git/branches")]);
+      const [st, br, ah] = await Promise.all([
+        get("/git/status"),
+        get("/git/branches"),
+        get("/git/ahead").catch(() => null),
+      ]);
       const entries = st.entries || [];
-      sel.innerHTML = "";
-      (br.entries || []).forEach(b => {
-        const o = document.createElement("option");
-        o.value = b.name;
-        o.textContent = (b.current ? "● " : "") + b.name;
-        if (b.current) o.selected = true;
-        sel.appendChild(o);
-      });
-      sel.onchange = async () => {
-        try {
-          const j = await post("/git/switch", { branch: sel.value });
-          if (!j.ok) throw new Error(j.error || "failed");
-          await reloadScm();
-        } catch (e) { msg(String(e), true); }
-      };
+      const branches = br.entries || [];
+      const cur = branches.find(b => b.current);
+      branchBtn.innerHTML = icon("branch") + "<span></span>";
+      branchBtn.lastChild.textContent = (cur && cur.name) || "branch…";
+      S.pushInfo = ah && !ah.error ? { ahead: ah.ahead || 0, behind: ah.behind || 0 } : null;
+      paintPush(S.pushInfo);
       wrap.querySelectorAll(".staged-sec,.changes-sec").forEach(el => el.remove());
       const staged = entries.filter(e => e.staged && e.staged !== " " && e.staged !== "?");
       const changes = entries.filter(e => e.unstaged && e.unstaged !== " ");
+      stagedCount = staged.length;
+      paintCommit();
       const mkSec = (title, list, stagedFlag) => {
         const sec = document.createElement("div");
         sec.className = stagedFlag ? "staged-sec" : "changes-sec";
-        const h = document.createElement("h4");
+        const h = document.createElement("button");
+        h.className = "sechead";
+        h.setAttribute("aria-expanded", S.scmOpen && S.scmOpen[title] === false ? "false" : "true");
+        const chev = document.createElement("span");
+        chev.className = "tri";
+        chev.innerHTML = icon("chev-r");
         const span = document.createElement("span");
         span.textContent = title + " ";
         const n = document.createElement("span");
         n.className = "n";
         n.textContent = list.length;
+        h.appendChild(chev);
         h.appendChild(span);
         h.appendChild(n);
         sec.appendChild(h);
+        const kids = document.createElement("div");
+        kids.className = "seckids";
+        if (S.scmOpen && S.scmOpen[title] === false) {
+          kids.classList.add("closed");
+          sec.classList.remove("open");
+          h.setAttribute("aria-expanded", "false");
+        } else {
+          sec.classList.add("open");
+        }
+        h.onclick = () => {
+          const shut = kids.classList.toggle("closed");
+          sec.classList.toggle("open", !shut);
+          h.setAttribute("aria-expanded", shut ? "false" : "true");
+          S.scmOpen = S.scmOpen || {};
+          S.scmOpen[title] = !shut;
+        };
         if (!list.length) {
           const em = document.createElement("div");
           em.className = "logline";
           em.textContent = stagedFlag ? "(nothing staged)" : "(working tree clean)";
-          sec.appendChild(em);
+          kids.appendChild(em);
         }
         list.forEach(e => {
-          scmFileRow(sec, e, stagedFlag, stagedFlag
-            ? [["−", "unstage", async () => {
+          scmFileRow(kids, e, stagedFlag, stagedFlag
+            ? [["minus", "unstage", async () => {
                 const j = await post("/git/unstage", { path: e.path });
                 if (!j.ok) throw new Error(j.error || "failed");
                 await reloadScm();
               }]]
-            : [["+", "stage", async () => {
+            : [["plus", "stage", async () => {
                 const j = await post("/git/stage", { path: e.path });
                 if (!j.ok) throw new Error(j.error || "failed");
                 await reloadScm();
-              }], ["⟲", "discard changes", async () => {
+              }], ["x", "discard changes", async () => {
                 const ok = await askConfirm({ title: "Discard changes?", body: e.path, okLabel: "Discard" });
                 if (!ok) return;
                 const j = await post("/git/discard", { path: e.path });
@@ -3738,6 +4027,7 @@ async function loadScm() {
                 loadFiles();
               }]]);
         });
+        sec.appendChild(kids);
         wrap.appendChild(sec);
       };
       mkSec("staged", staged, true);
@@ -3746,6 +4036,7 @@ async function loadScm() {
       health();
     } catch (e) { msg(String(e), true); }
   }
+  paintCommit();
   await reloadScm();
 }
 

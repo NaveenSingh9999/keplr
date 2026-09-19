@@ -886,6 +886,33 @@ async fn git_push(
     }
 }
 
+async fn git_ahead(State(state): State<AppState>) -> Json<serde_json::Value> {
+    match keplr_core::git::ahead_behind(&state.root) {
+        Ok((ahead, behind)) => Json(serde_json::json!({ "ahead": ahead, "behind": behind })),
+        Err(e) => Json(serde_json::json!({ "error": format!("{e:#}") })),
+    }
+}
+
+async fn git_difftext(
+    State(state): State<AppState>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Json<serde_json::Value> {
+    let rel = params.get("path").cloned().unwrap_or_default();
+    let staged = params.get("staged").map(|v| v == "1").unwrap_or(false);
+    let full = match safe_rel(&state.root, &rel) {
+        Ok(p) => p,
+        Err(e) => return Json(serde_json::json!({ "error": format!("{e:#}") })),
+    };
+    let relpath = full
+        .strip_prefix(&state.root)
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or(rel);
+    match keplr_core::git::file_diff(&state.root, &relpath, staged) {
+        Ok(text) => Json(serde_json::json!({ "text": text })),
+        Err(e) => Json(serde_json::json!({ "error": format!("{e:#}") })),
+    }
+}
+
 async fn lfs_pointer(
     State(state): State<AppState>,
     Query(params): Query<HashMap<String, String>>,
@@ -1613,6 +1640,8 @@ pub async fn serve_full(
         .route("/git/switch", post(git_switch))
         .route("/git/stash", post(git_stash))
         .route("/git/push", post(git_push))
+        .route("/git/ahead", get(git_ahead))
+        .route("/git/difftext", get(git_difftext))
         .route("/fs/create", post(fs_create))
         .route("/fs/rename", post(fs_rename))
         .route("/fs/delete", post(fs_delete))
