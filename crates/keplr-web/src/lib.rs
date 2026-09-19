@@ -52,17 +52,17 @@ fn paint(
     let w = canvas.width() as f64;
     let h = canvas.height() as f64;
     let theme = keplr_render::Theme::zed_dark();
-    ctx.set_fill_style(&JsValue::from_str("#0e1116"));
+    ctx.set_fill_style_str("#0e1116");
     ctx.fill_rect(0.0, 0.0, w, h);
     ctx.set_font("13px 'JetBrains Mono','SF Mono',monospace");
-    ctx.set_fill_style(&JsValue::from_str(&theme.surface));
+    ctx.set_fill_style_str(&theme.surface);
     ctx.fill_rect(0.0, 0.0, w, 30.0);
-    ctx.set_fill_style(&JsValue::from_str(&theme.text));
+    ctx.set_fill_style_str(&theme.text);
     ctx.fill_text(&scene.titlebar.root, 12.0, 20.0)?;
     let lw = w * 0.22;
-    ctx.set_fill_style(&JsValue::from_str(&theme.surface));
+    ctx.set_fill_style_str(&theme.surface);
     ctx.fill_rect(0.0, 30.0, lw, h - 56.0);
-    ctx.set_fill_style(&JsValue::from_str(&theme.text_dim));
+    ctx.set_fill_style_str(&theme.text_dim);
     let mut y = 48.0;
     for line in scene.left.lines.iter().take(30) {
         ctx.fill_text(&line.chars().take(32).collect::<String>(), 12.0, y)?;
@@ -72,9 +72,9 @@ fn paint(
     let mut y = 48.0;
     for (i, line) in scene.center.lines.iter().take(40).enumerate() {
         let n = scene.center.viewport_top + i;
-        ctx.set_fill_style(&JsValue::from_str(&theme.text_dim));
+        ctx.set_fill_style_str(&theme.text_dim);
         ctx.fill_text(&format!("{n:>3}"), x0, y)?;
-        ctx.set_fill_style(&JsValue::from_str(&theme.text));
+        ctx.set_fill_style_str(&theme.text);
         ctx.fill_text(&line.chars().take(100).collect::<String>(), x0 + 44.0, y)?;
         y += 17.0;
     }
@@ -85,20 +85,20 @@ fn paint(
             .0
             .saturating_sub(scene.center.viewport_top)) as f64)
             * 17.0;
-    ctx.set_fill_style(&JsValue::from_str(&theme.accent));
+    ctx.set_fill_style_str(&theme.accent);
     ctx.fill_rect(x0 + 44.0, cy - 12.0, 8.0, 15.0);
-    ctx.set_fill_style(&JsValue::from_str(&theme.surface));
+    ctx.set_fill_style_str(&theme.surface);
     ctx.fill_rect(0.0, h - 26.0, w, 26.0);
-    ctx.set_fill_style(&JsValue::from_str(&theme.text_dim));
+    ctx.set_fill_style_str(&theme.text_dim);
     ctx.fill_text(
         &format!("{} · {} files", scene.status.branch, scene.status.files),
         12.0,
         h - 9.0,
     )?;
     if scene.palette_open {
-        ctx.set_fill_style(&JsValue::from_str("#161b22ee"));
+        ctx.set_fill_style_str("#161b22ee");
         ctx.fill_rect(w * 0.25, 60.0, w * 0.5, 220.0);
-        ctx.set_fill_style(&JsValue::from_str(&theme.text));
+        ctx.set_fill_style_str(&theme.text);
         ctx.fill_text(&scene.palette_query, w * 0.25 + 12.0, 84.0)?;
         let mut y = 106.0;
         for hit in scene.palette_hits.iter().take(8) {
