@@ -1199,7 +1199,7 @@ function renderTree(box, node, depth, base) {
 }
 function loadFiles() {
   const q = "";
-  get("/files?query=" + encodeURIComponent(q) + "&limit=5000")
+  const done = get("/files?query=" + encodeURIComponent(q) + "&limit=5000")
     .then(list => {
       S.files = (list || []).map(f => f.path);
       const box = document.getElementById("leftbody");
@@ -1217,6 +1217,7 @@ function loadFiles() {
       fileMenu(e.clientX, e.clientY, wsRoot, true);
     }
   };
+  return done;
 }
 
 /* ============ search / problems / symbols / tasks / console ============ */
@@ -1337,8 +1338,6 @@ function renderConsole() {
     const d = document.createElement("div");
     d.className = "logline";
     d.textContent = l;
-    body.appendChild(d);  });
-}
     body.appendChild(d);  });
 }
 
@@ -2079,13 +2078,6 @@ function revealInTree(absPath) {
   setLeftTabSilent("project");
   loadFiles();
 }
-function setLeftTabSilent(t) {
-  S.leftTab = t;
-  document.querySelectorAll("#left .docktabs button").forEach(b => {
-    b.classList.toggle("sel", b.dataset.ltab === t);
-  });
-}
-
 function setLeftTabSilent(t) {
   S.leftTab = t;
   document.querySelectorAll("#left .docktabs button").forEach(b => {
@@ -2858,9 +2850,22 @@ function focusGroup(i) {
   document.getElementById("t-settings").onclick = () => toggleSettings();
   document.getElementById("settings-close").onclick = () => toggleSettings(false);
   health();
-  loadFiles();
+  await loadFiles();
   renderProblems();
   log("console", "keplr web ui ready");
+  // Deep links for sharing/screenshots: ?open=path&line=12&bottom=terminal&left=source
+  try {
+    const q = new URLSearchParams(location.search);
+    const left = q.get("left");
+    if (left === "project" || left === "source") setLeftTab(left);
+    const bottom = q.get("bottom");
+    if (bottom) setBottomTab(bottom);
+    const open = q.get("open");
+    if (open) {
+      const line = parseInt(q.get("line") || "0", 10) || 0;
+      await openFile(open, line).catch(e => msg(String(e), true));
+    }
+  } catch (e) {}
 })();
 </script>
 </body>

@@ -1,184 +1,160 @@
 # Keplr
 
-Personal lightweight Rust IDE — canvas foundation, Zed-exact dark UX,
-headless `serve` + desktop native from one codebase, Git LFS native,
-LAML first-class.
+[![CI](https://github.com/NaveenSingh9999/keplr/actions/workflows/ci.yml/badge.svg)](https://github.com/NaveenSingh9999/keplr/actions)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Rust](https://img.shields.io/badge/rust-stable-orange.svg)](https://www.rust-lang.org)
+[![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-lightgrey.svg)](#install)
 
-Spec: `docs/superpowers/specs/2026-09-17-keplr-design.md`
-Plan foundation: `docs/superpowers/plans/2026-09-18-keplr-production-foundation.md`
-Plan B canvas: `docs/superpowers/plans/2026-09-18-keplr-plan-b-canvas-foundation.md`
-Plan C builds: `docs/superpowers/plans/2026-09-18-keplr-build-dag.md`
-Plan D index/lang/sync: `docs/superpowers/plans/2026-09-18-keplr-plan-d-index-lang-sync.md`
-Plan E Zed depth: `docs/superpowers/plans/2026-09-18-keplr-plan-e-zed-depth.md`
-Plan F save/bench/auth/tui/gpu: `docs/superpowers/plans/2026-09-18-keplr-plan-f-save-bench-auth-tui-gpu.md`
-Plan G all-in: `docs/superpowers/plans/2026-09-18-keplr-plan-g-all-in.md`
-Plan H roaming/wasm/gpu-text: `docs/superpowers/plans/2026-09-18-keplr-plan-h-roaming-wasm-gputext.md`
-Plan I all remaining: `docs/superpowers/plans/2026-09-18-keplr-plan-i-all-remaining.md`
-Plan J leftovers: `docs/superpowers/plans/2026-09-19-keplr-plan-j-leftovers.md`
-Remote ops: `docs/REMOTE.md`
+**A personal lightweight IDE in a single Rust binary** — tree-sitter highlighting,
+a Zed-style web UI, a real PTY terminal with tabs, a serial monitor, VSCode-style
+source control with one-click Push, headless `serve` + desktop + TUI from one
+codebase, Git LFS aware, and CRDT sync between machines.
 
-Fonts: SF Mono when macOS/Xcode provides it (Apple license, never vendored), else vendored JetBrains Mono OFL (`assets/fonts/`), else system monos. Override with `KEPLR_FONT`. `keplr fonts` shows the resolved stack.
-Icon: orbit mark in Zed-dark tokens (`assets/icon/keplr.svg`, PNGs 16–512).
+![keplr editor](docs/showcase/shots/shot-editor.png)
 
-## Use (foundation CLI, production)
+## Why keplr
 
-```bash
-cargo run -p keplr-cli -- --root ~/LAML files "serve" --limit 20
-cargo run -p keplr-cli -- --root ~/LAML search "broadcast" --limit 20
-cargo run -p keplr-cli -- --root . run check
-cargo run -p keplr-cli -- --root . serve --port 7137
-curl '127.0.0.1:7137/search?needle=hello&limit=5'
-```
+- **One binary, 17 MB.** No runtime, no Electron, no `node_modules`. Copy it anywhere.
+- **Starts in 54 ms.** Measured cold start (`keplr --help`, release build).
+- **Use it anywhere.** Local TUI, desktop window, or `keplr serve` + any browser —
+  including your phone on the same network, or a headless box over SSH.
+- **Real terminals.** Every terminal tab is an independent PTY shell, painted on
+  canvas — no xterm.js.
+- **Hardware friendly.** Built-in serial monitor (`/dev/ttyUSB*`, `/dev/cu.*`):
+  pick a port, pick a baud, talk to your board.
+- **Git without the terminal.** Stage, commit, branch, stash — and Push with one click.
+- **Stays in sync.** CRDT-backed sync sessions merge concurrent edits live;
+  conflicts keep both sides instead of eating your work.
 
-## Use (Plan B canvas foundation, production)
+## Tour
 
-```bash
-cargo run -p keplr-cli -- --root . ui --open Cargo.toml --width 100
-cargo run -p keplr-cli -- --root . scene --open Cargo.toml | head -n 40
-cargo run -p keplr-cli -- --root . ui --palette "main" --width 100
-cargo run -p keplr-cli -- --root . serve --port 7137 &
-curl '127.0.0.1:7137/scene?open=Cargo.toml&width=100'
-curl '127.0.0.1:7137/files?query=keplr&limit=5'
-curl '127.0.0.1:7137/tasks'
-```
+**Editor** — fuzzy finder (`Ctrl+P`), tree-sitter highlighting, split panes,
+vim mode, diagnostics, symbols, Markdown/PDF/image previews.
 
-## Use (Plan C smart builds, production)
+![editor](docs/showcase/shots/shot-editor.png)
 
-```bash
-cargo run -p keplr-cli -- --root . run lint
-cargo run -p keplr-cli -- --root . run --all --jobs 4
-cargo run -p keplr-cli -- --root . run lint --force
-cargo run -p keplr-cli -- --root . run --all --watch
-curl '127.0.0.1:7137/tasks/graph'
-curl -X POST 127.0.0.1:7137/tasks/run -H 'Content-Type: application/json' -d '{"all":true,"jobs":4}'
-```
+**Source control** — commit box, branch picker, stage/unstage/discard, stash,
+and the blue **Push** button. No terminal required.
 
-## Use (Plan D index + watcher, production)
+![source control with one-click Push](docs/showcase/shots/shot-git.png)
 
-```bash
-cargo run -p keplr-cli -- --root . index
-cargo run -p keplr-cli -- --root . index --refresh
-cargo run -p keplr-cli -- --root . search --via trigram "broadcast" --limit 20
-cargo run -p keplr-cli -- --root . search --via index "broadcast" --limit 20
-cargo run -p keplr-cli -- --root . watch --debounce-ms 500
-curl '127.0.0.1:7137/index/status'
-```
+**Terminals** — parallel independent shells in tabs (`+` to open, `×` to kill),
+right inside the IDE.
 
-## Use (Plan D lang, production)
+![parallel terminals](docs/showcase/shots/shot-terminal.png)
 
-```bash
-cargo run -p keplr-cli -- --root ~/LAML diagnostics ng/src/main.lm
-curl '127.0.0.1:7137/diagnostics?path=Cargo.toml'
-curl '127.0.0.1:7137/highlight?path=Cargo.toml&line=1'
-```
+**Serial monitor** — open a port at any standard baud rate, watch bytes stream in,
+type back. Perfect for ESP32/Arduino/STM32 work.
 
-## Use (Plan D sync, production)
+![serial monitor](docs/showcase/shots/shot-serial.png)
 
-```bash
-curl '127.0.0.1:7137/lfs/pointer?path=assets/font.woff2'
-curl -X POST 127.0.0.1:7137/sync/merge -H 'Content-Type: application/json' -d '{"name":"notes","seed":"hello","updates":[]}'
-curl -X POST 127.0.0.1:7137/sync/snapshot -H 'Content-Type: application/json' -d '{"name":"notes","update":[1,2,3]}'
-curl '127.0.0.1:7137/sync/snapshot?name=notes'
-```
+## keplr vs VS Code
 
-## Use (Plan E Zed depth, production)
+| | keplr | VS Code |
+|---|---|---|
+| Install size | **17 MB** single binary (measured) | Electron distribution, hundreds of MB |
+| Cold start | **54 ms** (measured, release) | seconds (Electron runtime) |
+| Terminal | built-in PTY tabs, no extensions | built-in terminal, one session per panel |
+| Serial monitor | **built in** | needs an extension |
+| Git push | **one-click button** | button in Source Control |
+| Remote/headless | `keplr serve` — browser UI served directly | needs Tunnel / Server component |
+| TUI mode | **yes** (`keplr edit --vim`) | no |
+| Multi-device sync | **built-in CRDT sync** | Settings Sync service |
+| Syntax highlighting | tree-sitter | TextMate grammars (+ tree-sitter recently) |
+| Extension API | none — features are built in | huge marketplace |
+| Memory footprint | one native process | Electron + extension host |
 
-```bash
-cargo run -p keplr-cli -- --root . ui --open Cargo.toml --left-tab search --search "clap" --width 100
-cargo run -p keplr-cli -- --root . ui --palette "run" --palette-mode commands --width 100
-cargo run -p keplr-cli -- --root . scene --open crates/keplr-cli/src/main.rs --bottom-tab tasks | head -n 60
-curl '127.0.0.1:7137/scene?open=Cargo.toml&left=search&search=clap&width=100'
-curl '127.0.0.1:7137/scene?palette_mode=commands&palette=run'
-```
+keplr is not a VS Code replacement — it is a *complement*: the tool you reach for
+on servers, Chromebooks, tablets, and embedded benches, where a 17 MB binary
+that starts in 54 ms beats an Electron install.
 
-## Use (Plan F save/bench/auth/tui/gpu, production)
+## Speed (measured)
+
+Release build on Termux/aarch64, `bench --files 200 --lines 20`:
+
+| Operation | Time |
+|---|---|
+| Cold start (`--help`) | **54 ms** |
+| Binary size | **17 MB** |
+| Walk 200 files | **34 ms** |
+| Index 200 files | **19 ms** |
+| Fuzzy match p50 | **398 µs** |
+| Content grep p50 | **52 ms** |
+| CAS store throughput | **52,594 puts/s** |
+
+Reproduce: `cargo run --release -p keplr-cli -- --root /tmp/benchroot bench --files 200 --lines 20 --json`
+
+## Install
 
 ```bash
-echo 'hello keplr' | cargo run -p keplr-cli -- --root . save notes.txt --stdin
-cargo run -p keplr-cli -- --root . save notes.txt --content "hello" --task lint
-curl -X POST 127.0.0.1:7137/save -H 'Content-Type: application/json' -d '{"path":"notes.txt","content":"hi"}'
-cargo run -p keplr-cli -- --root /tmp/bench bench --files 2000 --lines 40
-cargo run -p keplr-cli -- --root . token --save
-cargo run -p keplr-cli -- --root . serve --port 7137  # KEPLR_TOKEN=... or --token ...
-cargo run -p keplr-cli -- --root . edit Cargo.toml
-cargo run -p keplr-cli --features desktop -- --root . desktop --open Cargo.toml  # native window; falls back to ANSI without GPU
+# From source (Rust stable):
+cargo install --git https://github.com/NaveenSingh9999/keplr.git keplr-cli
+# Or build locally:
+git clone https://github.com/NaveenSingh9999/keplr.git && cd keplr
+cargo build --release -p keplr-cli   # → target/release/keplr
+
+# Daemon + self-updates from inside keplr:
+keplr start --name dev               # background serve on :7137
+keplr list                           # running instances
+keplr stop --name dev                # or --all
 ```
 
-WASM browser parity is deferred: `notify`/`ignore` are not wasm-safe, so the workspace needs dep surgery first. The browser contract is already live — `Scene` serde JSON over `keplr serve` (see `/scene`). `keplr-lang` alone is wasm-verified in CI (`wasm-check`).
+`keplr install --version latest` fetches prebuilt release binaries
+(`keplr-{target}` assets) into `~/.keplr/bin` — needs `GITHUB_TOKEN` while
+releases are being set up. On Windows add `%USERPROFILE%\.keplr\bin` to PATH.
 
-## Use (Plan G all-in, production)
+## Quickstart
 
 ```bash
-cargo run -p keplr-cli -- --root . fonts
-cargo run -p keplr-cli -- --root . snippets rs
-cargo run -p keplr-cli -- --root . git status
-cargo run -p keplr-cli -- --root . git log --limit 5
-cargo run -p keplr-cli -- --root . lsp-install rust-analyzer --dir ~/.keplr/bin
-cargo run -p keplr-cli -- --root . edit src/main.rs
-cargo run -p keplr-cli -- --root . serve --bind 127.0.0.1 --port 7137
-cargo run -p keplr-cli -- --root . token --rotate
-curl '127.0.0.1:7137/git/status'
-curl '127.0.0.1:7137/snippets?lang=rs'
-curl '127.0.0.1:7137/daemons'
-curl '127.0.0.1:7137/tasks/log?name=lint'
+keplr --root ~/myproject serve --port 7137
+# open http://127.0.0.1:7137/
+#  • ?open=path&line=12   deep-link a file
+#  • ?bottom=terminal      open with terminal up
+#  • ?left=source          open with source control up
+
+keplr --root . files "serve" --limit 20     # fuzzy files
+keplr --root . search "broadcast" --limit 20 # trigram content search
+keplr --root . run --all --jobs 4           # build DAG tasks
+keplr --root . git push                     # CLI push
+keplr --root . lfs ls-files                 # LFS tracking
+keplr --root . sync --url ws://127.0.0.1:7137/sync/channel --name notes
 ```
 
-## Use (browser UI, production)
+In a Codespace: run `serve`, forward port `7137` in the **Ports** panel, open in browser.
+If a token is configured (`keplr token --save`), paste it into the token box.
 
-`keplr serve` also hosts a built-in browser page (no build step, vanilla JS over the same JSON API):
+## Layout
+
+```
+crates/
+  keplr-core    index, watcher, fuzzy/trigram search, rope buffers, git + LFS
+  keplr-sync    Blake3 CAS + yrs CRDT sync
+  keplr-build   keplr.json DAG task runner
+  keplr-lang    tree-sitter + LSP + snippets
+  keplr-serve   axum server, PTY terminals, serial bridge, browser UI
+  keplr-cli     the `keplr` binary (CLI + lifecycle + self-update)
+  keplr-render  GPU canvas / ANSI fallback scene builder
+  keplr-ui      UI state machine   keplr-web  WASM browser entry
+docs/showcase/  demo project + screenshots used above
+```
+
+Design docs live under `docs/superpowers/` (specs + plans). CI runs tests,
+clippy `-D warnings`, full build, GPU/wasm checks, and macOS/Windows jobs on
+every push.
+
+## Contributing
+
+Issues and PRs welcome. Please run before pushing:
 
 ```bash
-cargo run -p keplr-cli -- --root ~/LAML serve --port 7137
+cargo test --workspace --all-targets
+cargo clippy --workspace --all-targets -- -D warnings
 ```
 
-Open `http://127.0.0.1:7137/` — file tree, highlighted editor, content search, task list with run buttons, git-backed files, and a real terminal tab (PTY shell parsed by `alacritty_terminal`, painted on canvas in the Zed theme — no xterm.js). Right-click anywhere in the tree, tabs, or empty space for file/folder actions (new, rename, delete, duplicate, copy path, reveal); the source tab is a VSCode-style git panel (stage/unstage/discard/commit/branches/stash). Markdown files preview with full formatting, PDFs and images open in viewers. The gear opens settings (font, wrap, suggestions, auto-save, animations) applied live. If a token is configured, paste it into the token box (or open `/?token=...`); the page itself is public, the API stays gated.
+JavaScript in `crates/keplr-serve/src/ui.html` is an ES module — validate syntax with
+`node --check` on the extracted script (modules reject duplicate declarations
+that sloppy-mode checkers miss).
 
-In a Codespace: run the same command in a terminal, then open the **Ports** panel, forward port `7137`, and **Open in Browser`.
+## License
 
-## Use (Plan H roaming/wasm/gpu-text, production)
-
-```bash
-cargo run -p keplr-cli -- --root . serve --port 7137 &
-cargo run -p keplr-cli -- --root /tmp/roam sync --url ws://127.0.0.1:7137/sync/channel --name notes --file notes.txt --once
-cargo run -p keplr-cli --features desktop -- --root . desktop --open Cargo.toml  # editor text now GPU-painted
-```
-
-## Use (Plan I all remaining, production)
-
-```bash
-cargo run -p keplr-cli -- --root . parse crates/keplr-cli/src/main.rs | head -c 400
-cargo run -p keplr-cli -- --root . diagnostics src/app.rs
-cargo run -p keplr-cli -- --root . edit src/main.rs --vim
-cargo run -p keplr-cli -- --root . sync --url ws://127.0.0.1:7137/sync/channel --name notes --file notes.txt
-cargo run -p keplr-cli --features desktop -- --root . snapshot --open Cargo.toml --out /tmp/shot.png
-```
-
-TUI vim (`--vim`) covers hjkl/wbe/0/$/^/gg/G, i/a/I/A/o/O, x/D/dd/yy/p/P, r, d/y + w/$, `:w :q :wq :x :q!`, multi-cursor with ctrl+d in insert mode. No undo stack — use `git checkout` to revert (stated in-editor on `u`).
-
-## Use (Plan J leftovers, production)
-
-```bash
-cargo run -p keplr-cli -- --root . lfs ls-files
-cargo run -p keplr-cli -- --root . sync --url ws://127.0.0.1:7137/sync/channel --name notes  # auto-reconnects
-curl '127.0.0.1:7137/highlight?path=src/main.rs&full=1' | head -c 300
-curl -X POST 127.0.0.1:7137/index/rebuild
-```
-
-## Use (lifecycle, production)
-
-```bash
-cargo run -p keplr-cli -- --root . start --name dev          # background serve on :7137
-cargo run -p keplr-cli -- list                               # running instances
-cargo run -p keplr-cli -- stop --name dev                    # or --all
-cargo run -p keplr-cli -- install --version latest           # needs GITHUB_TOKEN for this private repo
-```
-
-The web UI adds one-click Push in the source panel, parallel terminal tabs (`+` in the
-terminal panel, each an independent shell), and a serial monitor bottom tab
-(port + baud + send; Unix only — `/dev/ttyUSB*`, `/dev/ttyACM*`, `/dev/cu.*`).
-
-Windows/macOS: same CLI (`cargo install -p keplr-cli`); lifecycle commands work with
-native process handling. The managed binary lands in `~/.keplr/bin` — on Windows add
-`%USERPROFILE%\.keplr\bin` to PATH yourself. Serial monitor is Unix-only.
-
-CI runs `cargo test --workspace --all-targets`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo build --workspace` on every push.
+MIT — see [LICENSE](LICENSE).

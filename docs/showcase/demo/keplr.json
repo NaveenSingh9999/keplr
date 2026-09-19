@@ -1,0 +1,8 @@
+{
+  "tasks": [
+    {
+      "name": "check",
+      "run": "python3 -c \"print('demo tasks: all green')\""
+    }
+  ]
+}
