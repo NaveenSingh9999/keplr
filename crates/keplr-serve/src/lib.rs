@@ -706,6 +706,22 @@ fn term_snapshot(
     })
 }
 
+async fn push_frame(
+    socket: &mut axum::extract::ws::WebSocket,
+    term: &alacritty_terminal::term::Term<TermListener>,
+    cols: usize,
+    rows: usize,
+) -> anyhow::Result<()> {
+    use axum::extract::ws::Message;
+    let frame = term_snapshot(term, cols, rows);
+    let text = serde_json::to_string(&frame).unwrap_or_default();
+    socket
+        .send(Message::Text(text.into()))
+        .await
+        .map_err(|e| anyhow::anyhow!("ws send failed: {e}"))?;
+    Ok(())
+}
+
 async fn term_ws(
     State(state): State<AppState>,
     Query(params): Query<HashMap<String, String>>,
@@ -780,21 +796,13 @@ async fn term_loop(
     let mut writer = writer;
     let mut cols = cols;
     let mut rows = rows;
-    let push = |socket: &mut axum::extract::ws::WebSocket,
-                term: &alacritty_terminal::term::Term<TermListener>,
-                cols: usize,
-                rows: usize| {
-        let frame = term_snapshot(term, cols, rows);
-        let text = serde_json::to_string(&frame).unwrap_or_default();
-        socket.send(Message::Text(text.into()))
-    };
     loop {
         tokio::select! {
             out = fwd_rx.recv() => {
                 match out {
                     Some(bytes) => {
                         processor.advance(&mut term, &bytes);
-                        if push(&mut socket, &term, cols, rows).await.is_err() {
+                        if push_frame(&mut socket, &term, cols, rows).await.is_err() {
                             break;
                         }
                     }
@@ -824,7 +832,7 @@ async fn term_loop(
                                         pixel_height: 0,
                                     });
                                     term.resize(TermSize { cols, rows });
-                                    if push(&mut socket, &term, cols, rows).await.is_err() {
+                                    if push_frame(&mut socket, &term, cols, rows).await.is_err() {
                                         break;
                                     }
                                 }
