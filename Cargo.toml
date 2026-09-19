@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/keplr-core", "crates/keplr-sync", "crates/keplr-build", "crates/keplr-lang", "crates/keplr-serve", "crates/keplr-cli", "crates/keplr-render", "crates/keplr-ui"]
+members = ["crates/keplr-core", "crates/keplr-sync", "crates/keplr-build", "crates/keplr-lang", "crates/keplr-serve", "crates/keplr-cli", "crates/keplr-render", "crates/keplr-ui", "crates/keplr-web"]
 resolver = "2"
 
 [workspace.dependencies]
@@ -28,6 +28,8 @@ tree-sitter-javascript = "0.25"
 tree-sitter-python = "0.25"
 tree-sitter-go = "0.25"
 tree-sitter-typescript = "0.23"
+wasm-bindgen = "0.2"
+web-sys = "0.3"
 tokio-tungstenite = "0.26"
 futures-util = "0.3"
 http = "1"
