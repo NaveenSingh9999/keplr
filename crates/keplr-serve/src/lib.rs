@@ -493,6 +493,16 @@ async fn highlight(
         Err(e) => return Json(serde_json::json!({"error": format!("{e:#}")})),
     };
     let lang = keplr_lang::LangKind::from_path(&full);
+    if params.get("full").map(|v| v == "1").unwrap_or(false) {
+        let text = keplr_core::buffer::Buffer::load(&full)
+            .map(|b| b.rope.to_string())
+            .unwrap_or_default();
+        return Json(serde_json::json!({
+            "file": rel,
+            "lang": format!("{lang:?}"),
+            "spans": keplr_lang::ts_highlight(lang, &text),
+        }));
+    }
     let text = keplr_core::buffer::Buffer::load(full)
         .ok()
         .and_then(|b| b.line(line))

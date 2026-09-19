@@ -72,6 +72,74 @@ struct TabState {
     top_f: f32,
     dirty: bool,
     diags: Vec<keplr_lang::Diagnostic>,
+    ts_hash: u64,
+    ts_spans: Vec<keplr_lang::TsSpan>,
+}
+
+fn content_hash(doc: &Doc) -> u64 {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut s = DefaultHasher::new();
+    for line in &doc.lines {
+        line.hash(&mut s);
+    }
+    doc.lines.len().hash(&mut s);
+    s.finish()
+}
+
+fn ts_lang_supported(lang: keplr_lang::LangKind) -> bool {
+    matches!(
+        lang,
+        keplr_lang::LangKind::Rust
+            | keplr_lang::LangKind::Python
+            | keplr_lang::LangKind::JavaScript
+            | keplr_lang::LangKind::TypeScript
+            | keplr_lang::LangKind::Tsx
+            | keplr_lang::LangKind::Go
+    )
+}
+
+fn colored_spans_ts(line: &str, line_no: u64, spans: &[keplr_lang::TsSpan], max: usize) -> String {
+    let text: String = line.chars().take(max).collect();
+    let mut relevant: Vec<&keplr_lang::TsSpan> = spans
+        .iter()
+        .filter(|s| s.line == line_no)
+        .collect();
+    if relevant.is_empty() {
+        return text;
+    }
+    relevant.sort_by_key(|s| (s.col, std::u64::MAX - s.len));
+    let mut out = String::new();
+    let mut pos = 0usize;
+    for s in relevant {
+        let start = ((s.col - 1) as usize).min(text.len());
+        let end = (start + s.len as usize).min(text.len());
+        if start < pos || start >= end {
+            continue;
+        }
+        out.push_str(byte_slice(&text, pos, start - pos));
+        let piece = byte_slice(&text, start, end - start);
+        match s.kind {
+            keplr_lang::TokenKind::Keyword => {
+                out.push_str(&format!("\x1b[1;36m{piece}\x1b[0m"));
+            }
+            keplr_lang::TokenKind::Str => {
+                out.push_str(&format!("\x1b[32m{piece}\x1b[0m"));
+            }
+            keplr_lang::TokenKind::Comment => {
+                out.push_str(&format!("\x1b[2m{piece}\x1b[0m"));
+            }
+            keplr_lang::TokenKind::Number => {
+                out.push_str(&format!("\x1b[33m{piece}\x1b[0m"));
+            }
+            keplr_lang::TokenKind::Other => {
+                out.push_str(piece);
+            }
+        }
+        pos = end;
+    }
+    out.push_str(byte_slice(&text, pos, text.len().saturating_sub(pos)));
+    out
 }
 
 fn open_tab(root: &Path, rel_or_abs: &Path) -> TabState {
@@ -102,6 +170,8 @@ fn open_tab(root: &Path, rel_or_abs: &Path) -> TabState {
         top_f: 0.0,
         dirty: false,
         diags,
+        ts_hash: 0,
+        ts_spans: Vec::new(),
     }
 }
 
@@ -186,6 +256,8 @@ struct Frame<'a> {
     git_lines: &'a [String],
     diags: &'a [keplr_lang::Diagnostic],
     extras: &'a [(usize, usize)],
+    ts_spans: &'a [keplr_lang::TsSpan],
+    ts_on: bool,
 }
 
 fn draw(f: &Frame) -> anyhow::Result<()> {
@@ -221,8 +293,11 @@ fn draw(f: &Frame) -> anyhow::Result<()> {
         for i in 0..height {
             let idx = f.top_render + i;
             if let Some(line) = f.doc.lines.get(idx) {
-                let shown =
-                    colored_spans(f.lang, line, cols.saturating_sub(7) as usize);
+                let shown = if f.ts_on {
+                    colored_spans_ts(line, (idx + 1) as u64, f.ts_spans, cols.saturating_sub(7) as usize)
+                } else {
+                    colored_spans(f.lang, line, cols.saturating_sub(7) as usize)
+                };
                 execute!(
                     out,
                     Print(format!("\x1b[2m{:>4} \x1b[0m{shown}\r\n", idx + 1))
@@ -479,12 +554,28 @@ pub fn edit_file(
                 tab.cursor.1 = max_col;
             }
         }
+        {
+            let tab = &mut tabs[active];
+            let use_ts = ts_lang_supported(tab.lang) && tab.doc.content().len() < 500_000;
+            if use_ts {
+                let h = content_hash(&tab.doc);
+                if h != tab.ts_hash {
+                    tab.ts_hash = h;
+                    let text = tab.doc.content();
+                    tab.ts_spans = keplr_lang::ts_highlight(tab.lang, &text);
+                }
+            } else if !tab.ts_spans.is_empty() {
+                tab.ts_spans.clear();
+                tab.ts_hash = 0;
+            }
+        }
         let tab = &tabs[active];
         let labels: Vec<(String, bool, bool)> = tabs
             .iter()
             .enumerate()
             .map(|(i, t)| (t.label.clone(), i == active, t.dirty))
             .collect();
+        let ts_on = !tab.ts_spans.is_empty();
         draw(&Frame {
             doc: &tab.doc,
             file_label: &tab.label,
@@ -504,6 +595,8 @@ pub fn edit_file(
             git_lines: &git_lines,
             diags: &tab.diags,
             extras: &extras,
+            ts_spans: &tab.ts_spans,
+            ts_on,
         })?;
         let timeout = if animating && !reduced {
             Duration::from_millis(16)
