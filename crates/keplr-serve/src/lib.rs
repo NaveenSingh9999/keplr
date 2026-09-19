@@ -1131,6 +1131,50 @@ fn spawn_daemon(
     ))
 }
 
+async fn web_file(
+    State(state): State<AppState>,
+    axum::extract::Path(path): axum::extract::Path<String>,
+) -> axum::response::Response {
+    let rel = if path.is_empty() || path == "/" {
+        "index.html".to_string()
+    } else {
+        path.trim_start_matches('/').to_string()
+    };
+    let full = match safe_rel(&state.root.join(".keplr/web"), &rel) {
+        Ok(p) => p,
+        Err(e) => {
+            return (
+                axum::http::StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error": format!("{e:#}")})),
+            )
+                .into_response()
+        }
+    };
+    let bytes = match std::fs::read(&full) {
+        Ok(b) => b,
+        Err(_) => {
+            return (
+                axum::http::StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "no bundle — build it (see assets/web/index.html)"})),
+            )
+                .into_response()
+        }
+    };
+    let mime = match full.extension().and_then(|e| e.to_str()).unwrap_or("") {
+        "html" => "text/html",
+        "js" => "text/javascript",
+        "wasm" => "application/wasm",
+        "css" => "text/css",
+        "json" => "application/json",
+        _ => "application/octet-stream",
+    };
+    (
+        [(axum::http::header::CONTENT_TYPE, mime)],
+        axum::body::Body::from(bytes),
+    )
+        .into_response()
+}
+
 pub async fn serve_full(
     root: PathBuf,
     port: u16,
@@ -1211,6 +1255,7 @@ pub async fn serve_full(
         .route("/tasks/log", get(task_log))
         .route("/sync/channel", get(sync_channel))
         .route("/terms/ws", get(term_ws))
+        .route("/web/*path", get(web_file))
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             require_token,

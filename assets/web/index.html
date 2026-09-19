@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>keplr canvas</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0e1116; }
+  #app { width: 100vw; height: 100vh; display: block; }
+  #err { color: #f85149; font: 13px monospace; padding: 20px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<canvas id="app" width="1280" height="800"></canvas>
+<div id="err"></div>
+<script type="module">
+  const err = (m) => { document.getElementById("err").textContent += m + "\n"; };
+  try {
+    const mod = await import("./keplr_web.js");
+    await mod.default();
+    const scene = await (await fetch("/scene?width=120")).json();
+    const canvas = document.getElementById("app");
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    mod.render_scene("app", JSON.stringify(scene));
+    err("keplr canvas " + mod.version() + " — static snapshot (live loop is the next layer)");
+  } catch (e) {
+    err("canvas failed: " + e + "\nbuild: cargo build -p keplr-web --target wasm32-unknown-unknown --release && wasm-bindgen --target web --out-dir <root>/.keplr/web");
+  }
+</script>
+</body>
+</html>
