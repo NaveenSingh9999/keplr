@@ -174,3 +174,79 @@ pub fn stash_push(workdir: &Path, message: &str) -> anyhow::Result<String> {
 pub fn stash_pop(workdir: &Path) -> anyhow::Result<String> {
     git(workdir, &["stash", "pop"])
 }
+
+pub fn lfs_pull(workdir: &Path, include: Option<&str>) -> anyhow::Result<String> {
+    match include {
+        Some(pat) => git(workdir, &["lfs", "pull", &format!("--include={pat}")]),
+        None => git(workdir, &["lfs", "pull"]),
+    }
+}
+
+pub fn lfs_fetch(workdir: &Path, include: Option<&str>) -> anyhow::Result<String> {
+    match include {
+        Some(pat) => git(workdir, &["lfs", "fetch", &format!("--include={pat}")]),
+        None => git(workdir, &["lfs", "fetch", "--all"]),
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct LfsTracked {
+    pub path: String,
+    pub oid: Option<String>,
+    pub size: Option<u64>,
+}
+
+pub fn lfs_files(workdir: &Path) -> anyhow::Result<Vec<LfsTracked>> {
+    let out = git(workdir, &["lfs", "ls-files", "--long"])?;
+    let mut list = Vec::new();
+    for line in out.lines() {
+        let mut parts = line.split_whitespace();
+        let (oid, size, path) = match (parts.next(), parts.next(), parts.next()) {
+            (Some(a), Some(b), Some(c)) => (a, b, c),
+            _ => continue,
+        };
+        let oid = oid.strip_prefix("oid sha256:").unwrap_or(oid);
+        let oid = if oid.len() == 64 && oid.chars().all(|c| c.is_ascii_hexdigit()) {
+            Some(oid.to_string())
+        } else {
+            None
+        };
+        let size = size.parse::<u64>().ok();
+        list.push(LfsTracked {
+            path: path.to_string(),
+            oid,
+            size,
+        });
+    }
+    Ok(list)
+}
+
+pub fn clone_partial(
+    url: &str,
+    dir: &Path,
+    depth: Option<u32>,
+) -> anyhow::Result<String> {
+    if url.trim().is_empty() {
+        anyhow::bail!("empty url");
+    }
+    let mut args = vec![
+        "clone".to_string(),
+        "--filter=blob:none".to_string(),
+        "--no-checkout".to_string(),
+    ];
+    if let Some(d) = depth {
+        args.push("--depth".to_string());
+        args.push(d.to_string());
+    }
+    args.push(url.to_string());
+    args.push(dir.display().to_string());
+    let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    let out = std::process::Command::new("git")
+        .args(&arg_refs)
+        .output()
+        .map_err(|e| anyhow::anyhow!("git failed to spawn: {e}"))?;
+    if !out.status.success() {
+        anyhow::bail!("git clone failed: {}", String::from_utf8_lossy(&out.stderr));
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).to_string())
+}

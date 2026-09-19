@@ -748,6 +748,39 @@ struct GitStashReq {
     pop: bool,
 }
 
+#[derive(serde::Deserialize)]
+struct LfsIncludeReq {
+    #[serde(default)]
+    include: Option<String>,
+}
+
+async fn lfs_pull(
+    State(state): State<AppState>,
+    Json(req): Json<LfsIncludeReq>,
+) -> Json<serde_json::Value> {
+    match keplr_core::git::lfs_pull(&state.root, req.include.as_deref()) {
+        Ok(out) => Json(serde_json::json!({"ok": true, "output": out})),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": format!("{e:#}")})),
+    }
+}
+
+async fn lfs_fetch(
+    State(state): State<AppState>,
+    Json(req): Json<LfsIncludeReq>,
+) -> Json<serde_json::Value> {
+    match keplr_core::git::lfs_fetch(&state.root, req.include.as_deref()) {
+        Ok(out) => Json(serde_json::json!({"ok": true, "output": out})),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": format!("{e:#}")})),
+    }
+}
+
+async fn lfs_files(State(state): State<AppState>) -> Json<serde_json::Value> {
+    match keplr_core::git::lfs_files(&state.root) {
+        Ok(entries) => Json(serde_json::json!({ "entries": entries })),
+        Err(e) => Json(serde_json::json!({ "error": format!("{e:#}") })),
+    }
+}
+
 async fn git_stage(
     State(state): State<AppState>,
     Json(req): Json<GitPathReq>,
@@ -1370,6 +1403,9 @@ pub async fn serve_full(
         .route("/fs/delete", post(fs_delete))
         .route("/fs/duplicate", post(fs_duplicate))
         .route("/lfs/pointer", get(lfs_pointer))
+        .route("/lfs/pull", post(lfs_pull))
+        .route("/lfs/fetch", post(lfs_fetch))
+        .route("/lfs/files", get(lfs_files))
         .route("/sync/merge", post(sync_merge))
         .route(
             "/sync/snapshot",

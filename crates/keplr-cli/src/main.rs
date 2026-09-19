@@ -31,6 +31,25 @@ enum GitCmd {
 }
 
 #[derive(Subcommand)]
+enum LfsCmd {
+    Pull {
+        #[arg(long)]
+        include: Option<String>,
+    },
+    Fetch {
+        #[arg(long)]
+        include: Option<String>,
+    },
+    LsFiles,
+    Clone {
+        url: String,
+        dir: PathBuf,
+        #[arg(long)]
+        depth: Option<u32>,
+    },
+}
+
+#[derive(Subcommand)]
 enum Cmd {
     Files {
         query: String,
@@ -113,6 +132,10 @@ enum Cmd {
     Git {
         #[command(subcommand)]
         cmd: GitCmd,
+    },
+    Lfs {
+        #[command(subcommand)]
+        cmd: LfsCmd,
     },
     Serve {
         #[arg(long, default_value_t = 7137)]
@@ -707,6 +730,27 @@ async fn main() -> anyhow::Result<()> {
             }
             GitCmd::Commit { message } => {
                 print!("{}", keplr_core::git::commit(&cli.root, &message)?);
+            }
+        },
+        Cmd::Lfs { cmd } => match cmd {
+            LfsCmd::Pull { include } => {
+                print!("{}", keplr_core::git::lfs_pull(&cli.root, include.as_deref())?);
+            }
+            LfsCmd::Fetch { include } => {
+                print!("{}", keplr_core::git::lfs_fetch(&cli.root, include.as_deref())?);
+            }
+            LfsCmd::LsFiles => {
+                for f in keplr_core::git::lfs_files(&cli.root)? {
+                    println!(
+                        "{} {} {}",
+                        f.oid.as_deref().unwrap_or("-"),
+                        f.size.map(|s| s.to_string()).unwrap_or_else(|| String::from("-")),
+                        f.path
+                    );
+                }
+            }
+            LfsCmd::Clone { url, dir, depth } => {
+                print!("{}", keplr_core::git::clone_partial(&url, &dir, depth)?);
             }
         },
         Cmd::Serve {
