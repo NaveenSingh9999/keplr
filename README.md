@@ -14,6 +14,7 @@ Plan F save/bench/auth/tui/gpu: `docs/superpowers/plans/2026-09-18-keplr-plan-f-
 Plan G all-in: `docs/superpowers/plans/2026-09-18-keplr-plan-g-all-in.md`
 Plan H roaming/wasm/gpu-text: `docs/superpowers/plans/2026-09-18-keplr-plan-h-roaming-wasm-gputext.md`
 Plan I all remaining: `docs/superpowers/plans/2026-09-18-keplr-plan-i-all-remaining.md`
+Plan J leftovers: `docs/superpowers/plans/2026-09-19-keplr-plan-j-leftovers.md`
 Remote ops: `docs/REMOTE.md`
 
 Fonts: SF Mono when macOS/Xcode provides it (Apple license, never vendored), else vendored JetBrains Mono OFL (`assets/fonts/`), else system monos. Override with `KEPLR_FONT`. `keplr fonts` shows the resolved stack.
@@ -153,5 +154,14 @@ cargo run -p keplr-cli --features desktop -- --root . snapshot --open Cargo.toml
 ```
 
 TUI vim (`--vim`) covers hjkl/wbe/0/$/^/gg/G, i/a/I/A/o/O, x/D/dd/yy/p/P, r, d/y + w/$, `:w :q :wq :x :q!`, multi-cursor with ctrl+d in insert mode. No undo stack — use `git checkout` to revert (stated in-editor on `u`).
+
+## Use (Plan J leftovers, production)
+
+```bash
+cargo run -p keplr-cli -- --root . lfs ls-files
+cargo run -p keplr-cli -- --root . sync --url ws://127.0.0.1:7137/sync/channel --name notes  # auto-reconnects
+curl '127.0.0.1:7137/highlight?path=src/main.rs&full=1' | head -c 300
+curl -X POST 127.0.0.1:7137/index/rebuild
+```
 
 CI runs `cargo test --workspace --all-targets`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo build --workspace` on every push.
