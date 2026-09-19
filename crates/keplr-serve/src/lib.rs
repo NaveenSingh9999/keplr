@@ -716,7 +716,7 @@ async fn push_frame(
     let frame = term_snapshot(term, cols, rows);
     let text = serde_json::to_string(&frame).unwrap_or_default();
     socket
-        .send(Message::Text(text.into()))
+        .send(Message::Text(text))
         .await
         .map_err(|e| anyhow::anyhow!("ws send failed: {e}"))?;
     Ok(())
