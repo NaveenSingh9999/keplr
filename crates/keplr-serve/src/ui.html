@@ -134,6 +134,34 @@
   #editorwrap { flex: 1; min-height: 0; overflow: hidden; position: relative; }
   #editorwrap .cm-editor { height: 100%; }
   #editorwrap .cm-scroller { overflow: auto; }
+  #previewwrap { flex: 1; min-height: 0; overflow: auto; display: none; background: var(--bg); }
+  #previewwrap.on { display: block; }
+  #previewwrap iframe.doc { width: 100%; height: 100%; border: none; background: #525659; }
+  #previewwrap img.doc { max-width: 100%; display: block; margin: 16px auto; background:
+    repeating-conic-gradient(#1a212b 0 25%, #141a21 0 50%) 0 0 / 20px 20px; }
+  .md { max-width: 860px; margin: 0 auto; padding: 24px 32px 60px; line-height: 1.65; font-size: 14px; }
+  .md h1, .md h2, .md h3, .md h4 { margin: 1.2em 0 .5em; line-height: 1.3; }
+  .md h1 { font-size: 1.7em; border-bottom: 1px solid var(--border); padding-bottom: .3em; }
+  .md h2 { font-size: 1.4em; border-bottom: 1px solid var(--border); padding-bottom: .3em; }
+  .md p { margin: .7em 0; }
+  .md a { color: var(--accent); }
+  .md code { background: var(--surface2); padding: .1em .35em; border-radius: 4px; font-size: .92em; }
+  .md pre { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; overflow-x: auto; }
+  .md pre code { background: none; padding: 0; }
+  .md .codelang { color: var(--dim); font-size: 11px; display: block; margin-bottom: 6px; }
+  .md blockquote { border-left: 3px solid var(--accent); margin: .7em 0; padding: .1em 0 .1em 1em; color: var(--dim); }
+  .md blockquote blockquote { margin: .3em 0; }
+  .md ul, .md ol { margin: .5em 0; padding-left: 1.6em; }
+  .md li { margin: .25em 0; }
+  .md li.task { list-style: none; margin-left: -1.6em; }
+  .md hr { border: none; border-top: 1px solid var(--border); margin: 1.2em 0; }
+  .md table { border-collapse: collapse; margin: .8em 0; width: 100%; }
+  .md th, .md td { border: 1px solid var(--border); padding: 5px 10px; text-align: left; }
+  .md th { background: var(--surface); }
+  .md img { max-width: 100%; }
+  .md del { color: var(--dim); }
+  #crumbs .vtoggle { float: right; background: none; border: 1px solid var(--border); color: var(--dim); border-radius: 4px; font: inherit; font-size: 11px; padding: 1px 8px; cursor: pointer; }
+  #crumbs .vtoggle.on { color: var(--accent); border-color: var(--accent); }
   #fallback {
     display: none; width: 100%; height: 100%; background: var(--bg); color: var(--text);
     border: none; outline: none; resize: none; padding: 8px 12px;
@@ -301,6 +329,7 @@
     <div id="tabsbar"></div>
     <div id="crumbs"><b>(no file)</b></div>
     <div id="editorwrap"><textarea id="fallback" spellcheck="false"></textarea></div>
+    <div id="previewwrap"></div>
   </div>
   <div class="dock hidden" id="right">
     <div class="docktabs"><button class="sel">symbols</button></div>
@@ -375,6 +404,18 @@ function fileIcon(lang, name) {
   const c = LANG_COLORS[lang] || LANG_COLORS.text;
   const label = (lang || "txt").slice(0, 3);
   return `<svg width="14" height="14" viewBox="0 0 16 16"><rect x="3" y="1.5" width="10" height="13" rx="1.5" fill="none" stroke="${c}" stroke-width="1.4"/><text x="8" y="10.5" font-size="5" text-anchor="middle" fill="${c}" font-family="monospace">${esc(label)}</text></svg>`;
+}
+function fileIconFor(path) {
+  const k = previewKind(path);
+  if (k === "pdf") return fileIconPdf();
+  if (k === "img") return fileIconImg();
+  return fileIcon(langOf(path));
+}
+function fileIconPdf() {
+  return `<svg width="14" height="14" viewBox="0 0 16 16"><rect x="3" y="1.5" width="10" height="13" rx="1.5" fill="none" stroke="#f85149" stroke-width="1.4"/><text x="8" y="10.5" font-size="4.5" text-anchor="middle" fill="#f85149" font-family="monospace">PDF</text></svg>`;
+}
+function fileIconImg() {
+  return `<svg width="14" height="14" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.5" fill="none" stroke="#a371f7" stroke-width="1.3"/><circle cx="5.5" cy="6.5" r="1.2" fill="#a371f7"/><path d="M2.5 12l3.5-3.5 2.5 2.5 2-2 3 3z" fill="#a371f7" opacity="0.7"/></svg>`;
 }
 const FOLDER_CLOSED = `<svg width="14" height="14" viewBox="0 0 16 16"><path d="M1.5 4.5c0-.8.7-1.5 1.5-1.5h3l1.5 2h6c.8 0 1.5.7 1.5 1.5v5c0 .8-.7 1.5-1.5 1.5h-11c-.8 0-1.5-.7-1.5-1.5z" fill="none" stroke="#8b949e" stroke-width="1.3"/></svg>`;
 const FOLDER_OPEN = `<svg width="14" height="14" viewBox="0 0 16 16"><path d="M1.5 3h4l1.5 2h7.5c.8 0 1.5.7 1.5 1.5v1h-13v-3c0-.8.7-1.5 1.5-1.5z" fill="#2a3340" stroke="#8b949e" stroke-width="1.1"/><rect x="1.5" y="7.5" width="13" height="5" rx="1" fill="#2a3340" stroke="#8b949e" stroke-width="1.1"/></svg>`;
@@ -575,11 +616,20 @@ function renderTabs() {
   crumbs.innerHTML = parts.map((p, i) =>
     i === parts.length - 1 ? "<b>" + esc(p) + "</b>" : esc(p)
   ).join(" <span style='opacity:.5'>›</span> ");
+  if (previewKind(t.path) === "md") {
+    const btn = document.createElement("button");
+    btn.className = "vtoggle" + (t.view === "preview" ? " on" : "");
+    btn.textContent = t.view === "preview" ? "edit" : "preview";
+    btn.onclick = ev => { ev.stopPropagation(); togglePreview(); };
+    crumbs.appendChild(document.createTextNode(" "));
+    crumbs.appendChild(btn);
+  }
   document.getElementById("slang").textContent = t.lang;
 }
 function snapshotTab() {
   const t = S.tabs[S.active];
   if (!t || !ED) return;
+  if (t.view && t.view !== "edit") return;
   t.text = ED.getDoc();
   try {
     if (ED.cm) {
@@ -593,20 +643,30 @@ function activateTab(i) {
   snapshotTab();
   S.active = i;
   const t = S.tabs[i];
-  if (ED.cm) {
-    ED.setDoc(t.text);
-    ED.setLang(t.lang);
-    try {
-      const pos = Math.min(t.sel || 0, ED.view.state.doc.length);
-      ED.view.dispatch({ selection: { anchor: pos } });
-    } catch (e) {}
+  const kind = previewKind(t.path);
+  if (kind === "pdf" || kind === "img") {
+    showEditorPane(false);
+    renderPreview(t);
+  } else if (kind === "md" && t.view === "preview") {
+    showEditorPane(false);
+    renderPreview(t);
   } else {
-    ED.setDoc(t.text);
+    showEditorPane(true);
+    if (ED.cm) {
+      ED.setDoc(t.text);
+      ED.setLang(t.lang);
+      try {
+        const pos = Math.min(t.sel || 0, ED.view.state.doc.length);
+        ED.view.dispatch({ selection: { anchor: pos } });
+      } catch (e) {}
+    } else {
+      ED.setDoc(t.text);
+    }
   }
   renderTabs();
   renderProblems();
   loadSymbols(t.path);
-  ED.focus();
+  if (!kind || kind === "md") ED.focus();
 }
 function closeTab(i) {
   const t = S.tabs[i];
@@ -629,14 +689,35 @@ async function openFile(path, line) {
   if (found >= 0) {
     activateTab(found);
   } else {
-    const j = await get("/open?path=" + encodeURIComponent(path));
-    if (j.error) throw new Error(j.error);
-    const lang = langOf(path);
-    S.tabs.push({ path, lang, text: j.text || "", saved: j.text || "", sel: 0, dirty: false });
-    S.active = -1;
-    activateTab(S.tabs.length - 1);
+    const kind = previewKind(path);
+    if (kind === "pdf" || kind === "img") {
+      const lang = langOf(path);
+      S.tabs.push({ path, lang, text: "", saved: "", sel: 0, dirty: false, view: "viewer" });
+      S.active = -1;
+      activateTab(S.tabs.length - 1);
+    } else {
+      const j = await get("/open?path=" + encodeURIComponent(path));
+      if (j.error) throw new Error(j.error);
+      const lang = langOf(path);
+      const view = kind === "md" ? "preview" : "edit";
+      S.tabs.push({ path, lang, text: j.text || "", saved: j.text || "", sel: 0, dirty: false, view });
+      S.active = -1;
+      activateTab(S.tabs.length - 1);
+    }
   }
-  if (line) gotoLine(line);
+  if (line) {
+    const t = S.tabs[S.active];
+    if (t && t.view && t.view !== "edit") {
+      if (previewKind(t.path) === "md") {
+        t.view = "edit";
+        showEditorPane(true);
+        renderTabs();
+      } else {
+        return;
+      }
+    }
+    gotoLine(line);
+  }
   document.querySelectorAll("#leftbody .trow").forEach(d => {
     d.classList.toggle("sel", d.dataset.path === path);
   });
@@ -652,6 +733,10 @@ function gotoLine(line) {
 async function saveActive() {
   const t = S.tabs[S.active];
   if (!t || !ED) return;
+  if (t.view && t.view !== "edit") {
+    msg("switch to edit mode to save");
+    return;
+  }
   snapshotTab();
   try {
     const j = await post("/save", { path: t.path, content: t.text });
@@ -665,6 +750,201 @@ async function saveActive() {
     if (t.lang === "laml") loadProblems(t.path);
     setDot(true);
   } catch (e) { setDot(false); msg(String(e), true); }
+}
+
+/* ============ previews (markdown, pdf, images) ============ */
+function previewKind(path) {
+  const ext = (path.split(".").pop() || "").toLowerCase();
+  if (ext === "md" || ext === "markdown") return "md";
+  if (ext === "pdf") return "pdf";
+  if (["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico"].includes(ext)) return "img";
+  return null;
+}
+function fileUrl(path) {
+  let u = "/file?path=" + encodeURIComponent(path);
+  if (token) u += "&token=" + encodeURIComponent(token);
+  return u;
+}
+function mdInline(src) {
+  const code = [];
+  src = src.replace(/`([^`\n]+)`/g, (m, c) => {
+    code.push("<code>" + esc(c) + "</code>");
+    return "\0" + (code.length - 1) + "\0";
+  });
+  src = esc(src);
+  src = src.replace(/!\[([^\]]*)\]\((https?:[^)\s]+)\)/g, '<img alt="$1" src="$2">');
+  src = src.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
+  src = src.replace(/\[([^\]]+)\]\(([^)\s]*)\)/g, "$1");
+  src = src.replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1");
+  src = src.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noreferrer">$1</a>');
+  src = src.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  src = src.replace(/__([^_]+)__/g, "<strong>$1</strong>");
+  src = src.replace(/(^|[\s(>])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+  src = src.replace(/(^|[\s(>])_([^_\n]+)_/g, "$1<em>$2</em>");
+  src = src.replace(/~~([^~]+)~~/g, "<del>$1</del>");
+  src = src.replace(/\0(\d+)\0/g, (m, i) => code[+i] || "");
+  src = src.split("\0BR\0").join("<br>");
+  return src;
+}
+function mdRender(text) {
+  const lines = text.split("\n");
+  let html = "";
+  let i = 0;
+  let inFence = false;
+  let fenceLang = "";
+  let fenceBuf = [];
+  const flushPara = para => {
+    if (!para.length) return;
+    html += "<p>" + mdInline(para.join(" ")) + "</p>";
+  };
+  let para = [];
+  const listStack = [];
+  const closeLists = to => {
+    while (listStack.length && listStack[listStack.length - 1].indent >= to) {
+      html += listStack[listStack.length - 1].ordered ? "</ol>" : "</ul>";
+      listStack.pop();
+    }
+  };
+  while (i < lines.length) {
+    const line = lines[i];
+    const fence = line.match(/^(`{3,}|~{3,})\s*([\w+-]*)\s*$/);
+    if (fence) {
+      if (!inFence) {
+        inFence = true;
+        fenceLang = fence[2] || "";
+        fenceBuf = [];
+      } else {
+        inFence = false;
+        html += "<pre>" + (fenceLang ? '<span class="codelang">' + esc(fenceLang) + "</span>" : "") + "<code>" + esc(fenceBuf.join("\n")) + "</code></pre>";
+      }
+      i++;
+      continue;
+    }
+    if (inFence) {
+      fenceBuf.push(line);
+      i++;
+      continue;
+    }
+    const heading = line.match(/^(#{1,6})\s+(.*)$/);
+    if (heading) {
+      flushPara(para); para = [];
+      closeLists(0);
+      const lvl = heading[1].length;
+      html += "<h" + lvl + ">" + mdInline(heading[2]) + "</h" + lvl + ">";
+      i++;
+      continue;
+    }
+    if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
+      flushPara(para); para = [];
+      closeLists(0);
+      html += "<hr>";
+      i++;
+      continue;
+    }
+    if (/^\s*\|.*\|\s*$/.test(line) && i + 1 < lines.length && /^\s*\|?[\s:|-]+\|?\s*$/.test(lines[i + 1]) && lines[i + 1].includes("-")) {
+      flushPara(para); para = [];
+      closeLists(0);
+      const cells = line.trim().replace(/^\||\|$/g, "").split("|").map(c => c.trim());
+      html += "<table><thead><tr>" + cells.map(c => "<th>" + mdInline(c) + "</th>").join("") + "</tr></thead><tbody>";
+      i += 2;
+      while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) {
+        const row = lines[i].trim().replace(/^\||\|$/g, "").split("|").map(c => c.trim());
+        html += "<tr>" + row.map(c => "<td>" + mdInline(c) + "</td>").join("") + "</tr>";
+        i++;
+      }
+      html += "</tbody></table>";
+      continue;
+    }
+    const quote = line.match(/^(\s*>)+\s?(.*)$/);
+    if (quote) {
+      flushPara(para); para = [];
+      const depth = (line.match(/>/g) || []).length;
+      const inner = mdRenderNested(quote[2], depth);
+      html += inner;
+      i++;
+      continue;
+    }
+    const task = line.match(/^(\s*)([-*+]|\d+[.)])\s+\[([ xX])\]\s+(.*)$/);
+    const item = line.match(/^(\s*)([-*+]|\d+[.)])\s+(.*)$/);
+    if (task || item) {
+      flushPara(para); para = [];
+      const m = task || item;
+      const indent = m[1].replace(/\t/g, "    ").length;
+      const ordered = /^\d/.test(m[2]);
+      closeLists(indent);
+      if (!listStack.length || listStack[listStack.length - 1].indent < indent) {
+        html += ordered ? "<ol>" : "<ul>";
+        listStack.push({ indent: indent, ordered: ordered });
+      }
+      if (task) {
+        const checked = task[3].toLowerCase() === "x";
+        html += '<li class="task"><input type="checkbox" disabled' + (checked ? " checked" : "") + "> " + mdInline(task[4]) + "</li>";
+      } else {
+        html += "<li>" + mdInline(item[3]) + "</li>";
+      }
+      i++;
+      continue;
+    }
+    if (/^\s*$/.test(line)) {
+      flushPara(para); para = [];
+      closeLists(0);
+      i++;
+      continue;
+    }
+    para.push(line.trim() + (/ {2}\s*$/.test(line) ? "\0BR\0" : ""));
+    i++;
+  }
+  flushPara(para);
+  closeLists(0);
+  if (inFence) {
+    html += "<pre><code>" + esc(fenceBuf.join("\n")) + "</code></pre>";
+  }
+  return html;
+}
+function mdRenderNested(text, depth) {
+  const inner = mdRender(text);
+  let out = inner;
+  for (let d = 0; d < depth; d++) out = "<blockquote>" + out + "</blockquote>";
+  return out;
+}
+function renderPreview(tab) {
+  const wrap = document.getElementById("previewwrap");
+  const kind = previewKind(tab.path);
+  if (kind === "md") {
+    wrap.innerHTML = '<div class="md">' + mdRender(tab.text) + "</div>";
+  } else if (kind === "pdf") {
+    wrap.innerHTML = "";
+    const f = document.createElement("iframe");
+    f.className = "doc";
+    f.title = rel(tab.path);
+    f.src = fileUrl(tab.path);
+    wrap.appendChild(f);
+  } else if (kind === "img") {
+    wrap.innerHTML = "";
+    const img = document.createElement("img");
+    img.className = "doc";
+    img.alt = rel(tab.path);
+    img.src = fileUrl(tab.path);
+    wrap.appendChild(img);
+  }
+  wrap.scrollTop = 0;
+}
+function showEditorPane(editing) {
+  document.getElementById("editorwrap").style.display = editing ? "" : "none";
+  document.getElementById("previewwrap").classList.toggle("on", !editing);
+  const btn = document.getElementById("viewtoggle");
+  if (btn) btn.classList.toggle("on", !editing);
+}
+function togglePreview() {
+  const t = S.tabs[S.active];
+  if (!t || previewKind(t.path) !== "md") return;
+  t.view = t.view === "preview" ? "edit" : "preview";
+  if (t.view === "preview") {
+    snapshotTab();
+    renderPreview(t);
+  }
+  showEditorPane(t.view === "edit");
+  renderTabs();
 }
 
 /* ============ file tree ============ */
@@ -721,8 +1001,7 @@ function renderTree(box, node, depth, base) {
       box.appendChild(kids);
       renderTree(kids, n.__kids, depth + 1, full);
     } else {
-      const lang = langOf(n.__full || name);
-      row.innerHTML = '<span class="tri"></span>' + fileIcon(lang) + "<span></span>";
+      row.innerHTML = '<span class="tri"></span>' + fileIconFor(n.__full || name) + "<span></span>";
       row.lastChild.textContent = name;
       row.dataset.path = n.__full;
       if (n.__full === (S.tabs[S.active] || {}).path) row.classList.add("sel");
