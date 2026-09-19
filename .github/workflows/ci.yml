@@ -62,3 +62,11 @@ jobs:
       - run: cargo build -p keplr-web --target wasm32-unknown-unknown --release
       - run: wasm-bindgen target/wasm32-unknown-unknown/release/keplr_web.wasm --out-dir /tmp/keplr-web --target web
       - run: ls -la /tmp/keplr-web && test -f /tmp/keplr-web/keplr_web_bg.wasm
+
+  bench-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo run -q -p keplr-cli -- --root /tmp/benchroot bench --files 200 --lines 20 --json
