@@ -191,7 +191,10 @@ async fn open(
 ) -> Json<serde_json::Value> {
     let rel = params.get("path").cloned().unwrap_or_default();
     let line: usize = params.get("line").and_then(|v| v.parse().ok()).unwrap_or(0);
-    let full = state.root.join(&rel);
+    let full = match safe_rel(&state.root, &rel) {
+        Ok(p) => p,
+        Err(e) => return Json(serde_json::json!({"error": format!("{e:#}")})),
+    };
     let Ok(buf) = keplr_core::buffer::Buffer::load(full) else {
         return Json(serde_json::json!({"error": "unreadable"}));
     };
@@ -200,6 +203,56 @@ async fn open(
     } else {
         Json(serde_json::json!({"lines": buf.len_lines(), "text": buf.line(line).unwrap_or_default()}))
     }
+}
+
+fn mime_for(path: &Path) -> &'static str {
+    match path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase().as_str() {
+        "pdf" => "application/pdf",
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "svg" => "image/svg+xml",
+        "bmp" => "image/bmp",
+        "ico" => "image/x-icon",
+        "mp4" => "video/mp4",
+        "mp3" => "audio/mpeg",
+        "wav" => "audio/wav",
+        _ => "application/octet-stream",
+    }
+}
+
+async fn file_blob(
+    State(state): State<AppState>,
+    Query(params): Query<HashMap<String, String>>,
+) -> axum::response::Response {
+    use axum::body::Body;
+    let rel = params.get("path").cloned().unwrap_or_default();
+    let full = match safe_rel(&state.root, &rel) {
+        Ok(p) => p,
+        Err(e) => {
+            return (
+                axum::http::StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error": format!("{e:#}")})),
+            )
+                .into_response()
+        }
+    };
+    let bytes = match std::fs::read(&full) {
+        Ok(b) => b,
+        Err(_) => {
+            return (
+                axum::http::StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "unreadable"})),
+            )
+                .into_response()
+        }
+    };
+    (
+        [(axum::http::header::CONTENT_TYPE, mime_for(&full))],
+        Body::from(bytes),
+    )
+        .into_response()
 }
 
 async fn files(
@@ -349,7 +402,10 @@ async fn symbols(
     Query(params): Query<HashMap<String, String>>,
 ) -> Json<serde_json::Value> {
     let rel = params.get("path").cloned().unwrap_or_default();
-    let full = state.root.join(&rel);
+    let full = match safe_rel(&state.root, &rel) {
+        Ok(p) => p,
+        Err(e) => return Json(serde_json::json!({"error": format!("{e:#}")})),
+    };
     let lang = keplr_lang::LangKind::from_path(&full);
     let text = keplr_core::buffer::Buffer::load(full)
         .map(|b| b.rope.to_string())
@@ -367,7 +423,10 @@ async fn diagnostics(
     Query(params): Query<HashMap<String, String>>,
 ) -> Json<serde_json::Value> {
     let rel = params.get("path").cloned().unwrap_or_default();
-    let full = state.root.join(&rel);
+    let full = match safe_rel(&state.root, &rel) {
+        Ok(p) => p,
+        Err(e) => return Json(serde_json::json!({"error": format!("{e:#}")})),
+    };
     let lang = keplr_lang::LangKind::from_path(&full);
     let diags = if lang == keplr_lang::LangKind::Laml {
         keplr_lang::laml_diagnostics(&full)
@@ -399,7 +458,10 @@ async fn highlight(
 ) -> Json<serde_json::Value> {
     let rel = params.get("path").cloned().unwrap_or_default();
     let line: usize = params.get("line").and_then(|v| v.parse().ok()).unwrap_or(1);
-    let full = state.root.join(&rel);
+    let full = match safe_rel(&state.root, &rel) {
+        Ok(p) => p,
+        Err(e) => return Json(serde_json::json!({"error": format!("{e:#}")})),
+    };
     let lang = keplr_lang::LangKind::from_path(&full);
     let text = keplr_core::buffer::Buffer::load(full)
         .ok()
@@ -704,7 +766,11 @@ async fn lfs_pointer(
     Query(params): Query<HashMap<String, String>>,
 ) -> Json<serde_json::Value> {
     let rel = params.get("path").cloned().unwrap_or_default();
-    let text = std::fs::read_to_string(state.root.join(&rel)).unwrap_or_default();
+    let full = match safe_rel(&state.root, &rel) {
+        Ok(p) => p,
+        Err(_) => return Json(serde_json::json!({"file": rel, "lfs": false})),
+    };
+    let text = std::fs::read_to_string(&full).unwrap_or_default();
     match keplr_sync::parse_lfs_pointer(&text) {
         Some(p) => Json(serde_json::json!({
             "file": rel,
@@ -1221,6 +1287,7 @@ pub async fn serve_full(
         .route("/health", get(health))
         .route("/search", get(search))
         .route("/open", get(open))
+        .route("/file", get(file_blob))
         .route("/files", get(files))
         .route("/tasks", get(tasks))
         .route("/tasks/graph", get(tasks_graph))
