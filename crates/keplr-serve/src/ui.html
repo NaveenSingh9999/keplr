@@ -296,6 +296,73 @@
   :focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
   button { transition: background-color .12s, color .12s; }
   .trow, .tab, #files div { transition: background-color .12s; }
+  /* ---- suggest widget (inline completions) ---- */
+  #suggest {
+    display: none; position: fixed; z-index: 25; min-width: 240px; max-width: 380px;
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 4px; box-shadow: 0 12px 40px rgba(0,0,0,.55);
+    animation: pop .12s ease-out;
+  }
+  #suggest.open { display: block; }
+  #suggest .sg {
+    display: flex; gap: 10px; align-items: baseline;
+    padding: 5px 10px; border-radius: 4px; cursor: pointer;
+  }
+  #suggest .sg.sel { background: var(--border); color: var(--accent); }
+  #suggest .sg .pre { font-weight: bold; }
+  #suggest .sg .desc { color: var(--dim); font-size: 11px; margin-left: auto; }
+  /* ---- settings panel ---- */
+  #settingswrap {
+    display: none; position: fixed; top: 0; right: 0; bottom: 0; z-index: 22;
+    width: min(380px, 92vw); background: var(--surface);
+    border-left: 1px solid var(--border);
+    box-shadow: -12px 0 40px rgba(0,0,0,.5);
+    flex-direction: column;
+    animation: slidein .16s ease-out;
+  }
+  #settingswrap.open { display: flex; }
+  #settingswrap header {
+    display: flex; align-items: center; padding: 12px 16px;
+    border-bottom: 1px solid var(--border); font-size: 14px;
+  }
+  #settingswrap header button { margin-left: auto; }
+  #settingsbody { overflow-y: auto; padding: 8px 16px 24px; }
+  #settingsbody h4 {
+    margin: 14px 0 4px; font-size: 11px; text-transform: uppercase;
+    letter-spacing: .06em; color: var(--dim); font-weight: normal;
+  }
+  #settingsbody .row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 0; border-bottom: 1px solid var(--surface2);
+  }
+  #settingsbody .row label { flex: 1; }
+  #settingsbody .row .hint { display: block; font-size: 11px; color: var(--dim); }
+  #settingsbody input[type="range"] { width: 110px; accent-color: var(--accent); }
+  #settingsbody input[type="number"] {
+    width: 70px; background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; padding: 3px 6px; font: inherit;
+  }
+  #settingsbody select {
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; padding: 3px 6px; font: inherit;
+  }
+  #settingsbody input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
+  #settingsbody .val { color: var(--dim); font-size: 11px; min-width: 34px; text-align: right; }
+  @keyframes pop { from { opacity: 0; transform: translateY(4px) scale(.98); } to { opacity: 1; } }
+  @keyframes slidein { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; } }
+  @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+  #palwrap.open, #modalwrap.open, #ctxmenu.open { animation: pop .12s ease-out; }
+  #leftbody, #bbody, #symbols, #files { scroll-behavior: smooth; }
+  #smsg { transition: opacity .3s; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    #leftbody, #bbody, #symbols, #files { scroll-behavior: auto; }
+  }
+  body.noanim *, body.noanim *::before, body.noanim *::after { animation: none !important; transition: none !important; }
+  body.noanim #leftbody, body.noanim #bbody, body.noanim #symbols, body.noanim #files { scroll-behavior: auto; }
+  body.noblink .cm-cursor, body.noblink .cm-fat-cursor { animation: none !important; }
+  body.calm .cm-cursor, body.calm .cm-fat-cursor { animation: none !important; }
+  body.calm #leftbody, body.calm #bbody, body.calm #symbols, body.calm #files { scroll-behavior: auto; }
 </style>
 <script type="importmap">
 {"imports": {
@@ -313,6 +380,7 @@
   <button class="iconbtn" id="t-left" title="project panel">◧</button>
   <button class="iconbtn" id="t-right" title="outline">◨</button>
   <button class="iconbtn" id="t-bottom" title="panel">◩</button>
+  <button class="iconbtn" id="t-settings" title="settings">⚙</button>
   <input id="token" type="password" placeholder="token (if gated)" autocomplete="off">
   <span id="dot"></span>
 </header>
@@ -352,6 +420,13 @@
   <span class="right"><span id="slang">–</span><span id="scursor">–</span><span id="sfiles">files: …</span></span>
 </div>
 <div id="ctxmenu"></div>
+<div id="suggest"></div>
+<div id="settingswrap">
+  <header>settings
+    <button class="iconbtn" id="settings-close" title="close">×</button>
+  </header>
+  <div id="settingsbody"></div>
+</div>
 <div id="modalwrap"><div id="modal"></div></div>
 <div id="palwrap"><input id="palinput" placeholder="type a command or filename…" autocomplete="off" spellcheck="false"><div id="palist"></div></div>
 <script type="module">
@@ -496,24 +571,45 @@ async function bootEditor() {
       try { mods[k.replace("javascript", "javascript")] = await import(loads[k]); }
       catch (e) { /* language stays plain on CDN failure */ }
     }
+    try { mods.lang = await import("@codemirror/language"); } catch (e) {}
     const langConf = new state.Compartment();
+    const tabConf = new state.Compartment();
+    const wrapConf = new state.Compartment();
+    const themeConf = new state.Compartment();
+    const wsConf = new state.Compartment();
+    const indentUnit = (mods.lang && mods.lang.indentUnit) || null;
+    const hlWS = view.highlightWhitespace || null;
     const onChange = view.EditorView.updateListener.of(v => {
-      if (v.docChanged) markDirty(true);
+      if (v.docChanged) {
+        markDirty(true);
+        scheduleSuggest();
+        scheduleLiveDiag();
+        scheduleAutosave();
+      }
       const s = v.state.selection.main;
       const line = v.state.doc.lineAt(s.head);
       setCursor(line.number, s.head - line.from + 1);
     });
     const saveKey = { key: "Mod-s", preventDefault: true, run: () => { saveActive(); return true; } };
+    const suggestKeys = [
+      { key: "Tab", run: () => acceptSuggest() },
+      { key: "Enter", run: () => acceptSuggest() },
+      { key: "Escape", run: () => hideSuggest() },
+      { key: "ArrowDown", run: () => suggestMove(1) },
+      { key: "ArrowUp", run: () => suggestMove(-1) },
+    ];
     const ed = new cm.EditorView({
       doc: "",
       extensions: [
-        cm.basicSetup, theme.oneDark, view.EditorView.lineWrapping,
-        langConf.of([]), view.keymap.of([saveKey]), onChange
+        view.keymap.of(suggestKeys),
+        cm.basicSetup, theme.oneDark,
+        langConf.of([]), tabConf.of([]), wrapConf.of([]), themeConf.of([]), wsConf.of([]),
+        view.keymap.of([saveKey]), onChange
       ],
       parent: wrap
     });
     ED = {
-      cm: true, view: ed, langConf, mods, state,
+      cm: true, view: ed, langConf, tabConf, wrapConf, themeConf, wsConf, mods, state,
       async setLang(label) {
         const ext = langExt(label, mods);
         ed.dispatch({ effects: langConf.reconfigure(ext) });
@@ -527,13 +623,37 @@ async function bootEditor() {
           ed.focus();
         } catch (e) {}
       },
-      focus() { ed.focus(); }
+      focus() { ed.focus(); },
+      applySettings() {
+        const s = S.settings;
+        try {
+          ed.dispatch({ effects: tabConf.reconfigure(indentUnit ? indentUnit.of(" ".repeat(s.tabSize)) : []) });
+        } catch (e) {}
+        try {
+          ed.dispatch({ effects: wrapConf.reconfigure(s.wordWrap ? view.EditorView.lineWrapping : []) });
+        } catch (e) {}
+        try {
+          ed.dispatch({ effects: themeConf.reconfigure(view.EditorView.theme({
+            "&": { fontSize: s.fontSize + "px", fontFamily: s.fontFamily },
+            ".cm-content": { "font-feature-settings": s.ligatures ? '"liga" 1' : '"liga" 0' }
+          })) });
+        } catch (e) {}
+        try {
+          ed.dispatch({ effects: wsConf.reconfigure((s.renderWhitespace && hlWS) ? hlWS() : []) });
+        } catch (e) {}
+        document.body.classList.toggle("noblink", !s.cursorBlink);
+      }
     };
+    attachWheel();
     log("console", "editor: CodeMirror 6");
   } catch (e) {
     const ta = document.getElementById("fallback");
     ta.style.display = "block";
-    ta.addEventListener("input", () => markDirty(true));
+    ta.addEventListener("input", () => {
+      markDirty(true);
+      scheduleLiveDiag();
+      scheduleAutosave();
+    });
     ta.addEventListener("keydown", ev => {
       if ((ev.ctrlKey || ev.metaKey) && ev.key === "s") { ev.preventDefault(); saveActive(); }
       else if (ev.key === "Tab") {
@@ -640,11 +760,15 @@ function snapshotTab() {
 }
 function activateTab(i) {
   if (i < 0 || i >= S.tabs.length) return;
+  hideSuggest();
   snapshotTab();
   S.active = i;
   const t = S.tabs[i];
   const kind = previewKind(t.path);
   if (kind === "pdf" || kind === "img") {
+    showEditorPane(false);
+    renderPreview(t);
+  } else if (t.view === "large") {
     showEditorPane(false);
     renderPreview(t);
   } else if (kind === "md" && t.view === "preview") {
@@ -699,8 +823,13 @@ async function openFile(path, line) {
       const j = await get("/open?path=" + encodeURIComponent(path));
       if (j.error) throw new Error(j.error);
       const lang = langOf(path);
-      const view = kind === "md" ? "preview" : "edit";
-      S.tabs.push({ path, lang, text: j.text || "", saved: j.text || "", sel: 0, dirty: false, view });
+      const text = j.text || "";
+      if (!kind && text.length > 2000000) {
+        S.tabs.push({ path, lang, text, saved: text, sel: 0, dirty: false, view: "large" });
+      } else {
+        const view = kind === "md" ? "preview" : "edit";
+        S.tabs.push({ path, lang, text, saved: text, sel: 0, dirty: false, view });
+      }
       S.active = -1;
       activateTab(S.tabs.length - 1);
     }
@@ -733,6 +862,7 @@ function gotoLine(line) {
 async function saveActive() {
   const t = S.tabs[S.active];
   if (!t || !ED) return;
+  hideSuggest();
   if (t.view && t.view !== "edit") {
     msg("switch to edit mode to save");
     return;
@@ -926,6 +1056,23 @@ function renderPreview(tab) {
     img.alt = rel(tab.path);
     img.src = fileUrl(tab.path);
     wrap.appendChild(img);
+  } else if (tab.view === "large") {
+    wrap.innerHTML = "";
+    const box = document.createElement("div");
+    box.className = "md";
+    const kb = (tab.text.length / 1024).toFixed(0);
+    box.innerHTML = "<h3>Large file</h3><p>" + esc(rel(tab.path)) + " is about " + kb + " KB — too big for live editing.</p>";
+    const btn = document.createElement("button");
+    btn.textContent = "Open anyway";
+    btn.style.cssText = "background:var(--border);color:var(--text);border:none;border-radius:6px;font:inherit;padding:6px 14px;cursor:pointer;";
+    btn.onclick = () => {
+      tab.view = "edit";
+      showEditorPane(true);
+      activateTab(S.tabs.indexOf(tab));
+      log("console", "large file opened anyway: " + rel(tab.path));
+    };
+    box.appendChild(btn);
+    wrap.appendChild(box);
   }
   wrap.scrollTop = 0;
 }
@@ -1172,12 +1319,22 @@ function termFont(px) {
 }
 
 function termMeasure() {
+  const px = (S.settings && S.settings.terminalFontSize) || 13;
   const c = document.createElement("canvas").getContext("2d");
-  c.font = termFont(13);
+  c.font = termFont(px);
   TERM.cellW = Math.max(5, Math.ceil(c.measureText("M").width));
-  TERM.cellH = Math.ceil(13 * 1.4);
-  TERM.font = termFont(13);
+  TERM.cellH = Math.ceil(px * 1.4);
+  TERM.font = termFont(px);
 }
+window.__termRefresh = function () {
+  if (!TERM.canvas) return;
+  termMeasure();
+  if (TERM.socket && TERM.socket.readyState === 1) {
+    const d = termDims();
+    TERM.socket.send("resize:" + d.cols + "x" + d.rows);
+  }
+  if (TERM.grid) termDraw();
+};
 
 function termDims() {
   const body = document.getElementById("bbody");
@@ -1445,6 +1602,7 @@ function showMenu(x, y, items) {
 }
 document.addEventListener("click", e => {
   if (!e.target.closest("#ctxmenu")) hideMenu();
+  if (!e.target.closest("#suggest") && !e.target.closest(".cm-content")) hideSuggest();
 });
 document.addEventListener("keydown", e => {
   if (e.key === "Escape") hideMenu();
@@ -1860,6 +2018,327 @@ async function loadScm() {
   await reloadScm();
 }
 
+/* ============ settings ============ */
+const DEFAULT_SETTINGS = {
+  fontSize: 13,
+  fontFamily: "\"JetBrains Mono\",\"SF Mono\",ui-monospace,Menlo,monospace",
+  tabSize: 2,
+  wordWrap: true,
+  cursorBlink: true,
+  ligatures: true,
+  renderWhitespace: false,
+  mouseWheelZoom: true,
+  scrollSpeed: 1.0,
+  autoSave: false,
+  autoSaveDelay: 1000,
+  inlineSuggest: true,
+  liveDiagnostics: true,
+  animations: "full",
+  terminalFontSize: 13
+};
+S.settings = loadSettings();
+function loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem("keplr-settings") || "null");
+    if (s && typeof s === "object") return Object.assign({}, DEFAULT_SETTINGS, s);
+  } catch (e) {}
+  return Object.assign({}, DEFAULT_SETTINGS);
+}
+function saveSettings() {
+  try { localStorage.setItem("keplr-settings", JSON.stringify(S.settings)); } catch (e) {}
+}
+const FONT_CHOICES = [
+  ["JetBrains Mono", "\"JetBrains Mono\",\"SF Mono\",ui-monospace,Menlo,monospace"],
+  ["SF Mono", "\"SF Mono\",\"JetBrains Mono\",ui-monospace,Menlo,monospace"],
+  ["System monospace", "ui-monospace,SFMono-Regular,Menlo,monospace"]
+];
+function fontChoiceName(css) {
+  for (const [n, v] of FONT_CHOICES) if (v === css) return n;
+  return "Custom";
+}
+const SETTING_DEFS = [
+  ["Editor", [
+    ["fontSize", "number", "Font size", "Editor font size in pixels", { min: 10, max: 20 }],
+    ["fontFamily", "select", "Font family", "Monospace stack for code", { options: FONT_CHOICES }],
+    ["tabSize", "select", "Tab size", "Spaces per indent level", { options: [["2", 2], ["4", 4], ["8", 8]] }],
+    ["wordWrap", "bool", "Word wrap", "Soft-wrap long lines", {}],
+    ["cursorBlink", "bool", "Cursor blink", "Blinking block cursor", {}],
+    ["ligatures", "bool", "Font ligatures", "Requires a ligature font", {}],
+    ["renderWhitespace", "bool", "Render whitespace", "Show spaces and tabs", {}],
+  ]],
+  ["Mouse", [
+    ["mouseWheelZoom", "bool", "Ctrl+wheel zoom", "Pinch-style font zoom in the editor", {}],
+    ["scrollSpeed", "range", "Scroll speed", "Wheel multiplier, 0.5–2.0", { min: 0.5, max: 2, step: 0.1 }],
+  ]],
+  ["Files", [
+    ["autoSave", "select", "Auto save", "Save dirty files automatically", { options: [["off", false], ["after delay", true]] }],
+    ["autoSaveDelay", "number", "Auto save delay", "Idle milliseconds before auto save", { min: 500, max: 10000 }],
+    ["inlineSuggest", "bool", "Inline suggestions", "Snippet popup while typing", {}],
+    ["liveDiagnostics", "bool", "Live diagnostics", "Re-check errors while typing", {}],
+  ]],
+  ["Interface", [
+    ["animations", "select", "Animations", "Motion across the interface", { options: [["full", "full"], ["reduced", "reduced"], ["none", "none"]] }],
+    ["terminalFontSize", "number", "Terminal font size", "Canvas terminal glyph size", { min: 10, max: 18 }],
+  ]],
+];
+function renderSettings() {
+  const body = document.getElementById("settingsbody");
+  body.innerHTML = "";
+  SETTING_DEFS.forEach(([section, rows]) => {
+    const h = document.createElement("h4");
+    h.textContent = section;
+    body.appendChild(h);
+    rows.forEach(([key, type, label, hint, opts]) => {
+      const row = document.createElement("div");
+      row.className = "row";
+      const lab = document.createElement("label");
+      lab.textContent = label;
+      const sub = document.createElement("span");
+      sub.className = "hint";
+      sub.textContent = hint;
+      lab.appendChild(document.createElement("br"));
+      lab.appendChild(sub);
+      row.appendChild(lab);
+      const cur = S.settings[key];
+      const changed = () => { saveSettings(); applySettings(); };
+      if (type === "bool") {
+        const c = document.createElement("input");
+        c.type = "checkbox";
+        c.checked = !!cur;
+        c.onchange = () => { S.settings[key] = c.checked; changed(); };
+        row.appendChild(c);
+      } else if (type === "number" || type === "range") {
+        const n = document.createElement("input");
+        n.type = type === "range" ? "range" : "number";
+        n.min = opts.min; n.max = opts.max;
+        if (opts.step) n.step = opts.step;
+        n.value = cur;
+        const val = document.createElement("span");
+        val.className = "val";
+        val.textContent = cur;
+        n.oninput = () => {
+          let v = type === "range" ? parseFloat(n.value) : parseInt(n.value, 10);
+          if (!isFinite(v)) return;
+          v = Math.min(opts.max, Math.max(opts.min, v));
+          S.settings[key] = v;
+          val.textContent = v;
+          changed();
+        };
+        row.appendChild(n);
+        row.appendChild(val);
+      } else if (type === "select") {
+        const s = document.createElement("select");
+        opts.options.forEach(([name, v]) => {
+          const o = document.createElement("option");
+          o.value = JSON.stringify(v);
+          o.textContent = name;
+          if (JSON.stringify(cur) === JSON.stringify(v)) o.selected = true;
+          s.appendChild(o);
+        });
+        s.onchange = () => { S.settings[key] = JSON.parse(s.value); changed(); };
+        row.appendChild(s);
+      }
+      body.appendChild(row);
+    });
+  });
+  const reset = document.createElement("button");
+  reset.textContent = "Reset to defaults";
+  reset.style.cssText = "margin-top:14px;background:var(--border);color:var(--text);border:none;border-radius:6px;font:inherit;padding:6px 14px;cursor:pointer;";
+  reset.onclick = () => {
+    S.settings = Object.assign({}, DEFAULT_SETTINGS);
+    saveSettings();
+    applySettings();
+    renderSettings();
+  };
+  body.appendChild(reset);
+}
+function applySettings() {
+  const a = S.settings.animations;
+  document.body.classList.toggle("noanim", a === "none");
+  document.body.classList.toggle("calm", a === "reduced");
+  if (ED && ED.applySettings) {
+    try { ED.applySettings(); } catch (e) {}
+  }
+  if (S.bottomTab === "terminal" && window.__termRefresh) {
+    try { window.__termRefresh(); } catch (e) {}
+  }
+}
+function toggleSettings(force) {
+  const w = document.getElementById("settingswrap");
+  const show = force !== undefined ? force : !w.classList.contains("open");
+  w.classList.toggle("open", show);
+  document.getElementById("t-settings").classList.toggle("on", show);
+  if (show) renderSettings();
+}
+let wheelAttached = false;
+function attachWheel() {
+  if (wheelAttached) return;
+  wheelAttached = true;
+  const wrap = document.getElementById("editorwrap");
+  wrap.addEventListener("wheel", e => {
+    const s = S.settings;
+    if ((e.ctrlKey || e.metaKey) && s.mouseWheelZoom) {
+      e.preventDefault();
+      const d = e.deltaY < 0 ? 1 : -1;
+      s.fontSize = Math.min(20, Math.max(10, s.fontSize + d));
+      saveSettings();
+      applySettings();
+      renderSettings();
+      return;
+    }
+    if (s.scrollSpeed !== 1) {
+      e.preventDefault();
+      const sc = wrap.querySelector(".cm-scroller") || wrap;
+      sc.scrollTop += e.deltaY * (s.scrollSpeed - 1);
+    }
+  }, { passive: false });
+}
+
+/* ============ inline suggest ============ */
+const SG = { open: false, items: [], sel: 0, word: "", timer: 0, cacheLang: "", cache: [] };
+function suggestAnchor() {
+  const wrap = document.getElementById("editorwrap");
+  const r = wrap.getBoundingClientRect();
+  if (ED && ED.cm) {
+    try {
+      const s = ED.view.state.selection.main;
+      const c = ED.view.coordsAtPos(s.head);
+      if (c) return { x: Math.min(c.left, window.innerWidth - 400), y: Math.min(c.bottom + 4, window.innerHeight - 200) };
+    } catch (e) {}
+  }
+  return { x: r.left + 60, y: r.top + 60 };
+}
+function hideSuggest() {
+  const was = SG.open;
+  SG.open = false;
+  document.getElementById("suggest").classList.remove("open");
+  return was;
+}
+function suggestMove(d) {
+  if (!SG.open) return false;
+  SG.sel = (SG.sel + d + SG.items.length) % Math.max(1, SG.items.length);
+  paintSuggest();
+  return true;
+}
+function paintSuggest() {
+  const box = document.getElementById("suggest");
+  box.innerHTML = "";
+  SG.items.slice(0, 8).forEach((it, i) => {
+    const d = document.createElement("div");
+    if (i === SG.sel) d.classList.add("sel");
+    d.innerHTML = "<span></span>";
+    d.firstChild.textContent = it.prefix;
+    const desc = document.createElement("span");
+    desc.className = "desc";
+    desc.textContent = it.description;
+    d.appendChild(desc);
+    d.onmousedown = e => { e.preventDefault(); SG.sel = i; acceptSuggest(); };
+    box.appendChild(d);
+  });
+  const p = suggestAnchor();
+  box.style.left = p.x + "px";
+  box.style.top = p.y + "px";
+  box.classList.add("open");
+}
+function currentWord() {
+  const t = S.tabs[S.active];
+  if (!t || !ED) return { lang: "text", word: "", pos: 0 };
+  const doc = ED.getDoc();
+  let pos = 0;
+  try {
+    if (ED.cm) pos = ED.view.state.selection.main.head;
+    else {
+      const ta = document.getElementById("fallback");
+      pos = ta.selectionStart;
+    }
+  } catch (e) {}
+  let s = pos;
+  while (s > 0 && /[A-Za-z0-9_]/.test(doc[s - 1] || "")) s--;
+  return { lang: t.lang, word: doc.slice(s, pos), pos: pos, start: s };
+}
+function scheduleSuggest() {
+  if (!S.settings.inlineSuggest || !ED || !ED.cm) return;
+  clearTimeout(SG.timer);
+  SG.timer = setTimeout(refreshSuggest, 180);
+}
+async function refreshSuggest() {
+  const t = S.tabs[S.active];
+  if (!t || t.view === "preview") { hideSuggest(); return; }
+  const { lang, word } = currentWord();
+  if (word.length < 2) { hideSuggest(); return; }
+  try {
+    if (SG.cacheLang !== lang) {
+      const j = await get("/snippets?lang=" + encodeURIComponent(lang));
+      SG.cache = j.snippets || [];
+      SG.cacheLang = lang;
+    }
+    const items = SG.cache.filter(s => s.prefix.startsWith(word) && s.prefix !== word).slice(0, 8);
+    if (!items.length) { hideSuggest(); return; }
+    SG.items = items;
+    SG.sel = 0;
+    SG.word = word;
+    paintSuggest();
+    SG.open = true;
+  } catch (e) { hideSuggest(); }
+}
+async function acceptSuggest() {
+  if (!SG.open || !SG.items.length || !ED) return false;
+  const t = S.tabs[S.active];
+  if (!t) { hideSuggest(); return true; }
+  const item = SG.items[SG.sel] || SG.items[0];
+  hideSuggest();
+  try {
+    const j = await get("/snippets?lang=" + encodeURIComponent(t.lang) + "&prefix=" + encodeURIComponent(item.prefix));
+    if (j.error || !j.text) return true;
+    const { word, pos, start } = currentWord();
+    void word;
+    if (ED.cm) {
+      ED.view.dispatch({
+        changes: { from: start, to: pos, insert: j.text },
+        selection: { anchor: start + (j.cursor === null || j.cursor === undefined ? j.text.length : j.cursor) }
+      });
+      ED.focus();
+    } else {
+      const ta = document.getElementById("fallback");
+      ta.value = ta.value.slice(0, start) + j.text + ta.value.slice(pos);
+      ta.selectionStart = ta.selectionEnd = start + (j.cursor === null || j.cursor === undefined ? j.text.length : j.cursor);
+      markDirty(true);
+    }
+  } catch (e) {}
+  return true;
+}
+
+/* ============ live diagnostics + autosave ============ */
+let liveTimer = 0;
+let saveTimer = 0;
+function scheduleLiveDiag() {
+  if (!S.settings.liveDiagnostics) return;
+  clearTimeout(liveTimer);
+  liveTimer = setTimeout(refreshLiveDiag, 800);
+}
+async function refreshLiveDiag() {
+  const t = S.tabs[S.active];
+  if (!t || (t.view && t.view !== "edit") || !ED) return;
+  if (!["rust", "python", "javascript", "typescript", "tsx", "go"].includes(t.lang)) return;
+  try {
+    const j = await post("/diagnostics/content", { path: t.path, content: ED.getDoc() });
+    S.problems = (j.diagnostics || []).filter(d => d.severity === "error");
+    document.getElementById("serrors").textContent = "errors: " + S.problems.length;
+    renderProblems();
+  } catch (e) {}
+}
+function scheduleAutosave() {
+  if (!S.settings.autoSave) return;
+  clearTimeout(saveTimer);
+  const delay = Math.min(10000, Math.max(500, S.settings.autoSaveDelay || 1000));
+  saveTimer = setTimeout(async () => {
+    const t = S.tabs[S.active];
+    if (t && t.dirty && (!t.view || t.view === "edit")) {
+      await saveActive();
+    }
+  }, delay);
+}
+
 /* ============ palette ============ */
 const COMMANDS = [
   ["open file…", () => setLeftTab("project") || true, "finder"],
@@ -2017,6 +2496,8 @@ document.addEventListener("keydown", e => {
     }
   } else if (e.key === "Escape") {
     if (document.getElementById("palwrap").classList.contains("open")) palClose();
+    else if (document.getElementById("settingswrap").classList.contains("open")) toggleSettings(false);
+    else hideSuggest();
   }
 });
 
@@ -2032,6 +2513,9 @@ document.addEventListener("keydown", e => {
     document.getElementById("token").value = token;
   }
   await bootEditor();
+  applySettings();
+  document.getElementById("t-settings").onclick = () => toggleSettings();
+  document.getElementById("settings-close").onclick = () => toggleSettings(false);
   health();
   loadFiles();
   renderProblems();

@@ -452,6 +452,36 @@ async fn diagnostics(
     }))
 }
 
+#[derive(serde::Deserialize)]
+struct DiagContentReq {
+    path: String,
+    #[serde(default)]
+    content: String,
+}
+
+async fn diagnostics_content(
+    State(_state): State<AppState>,
+    Json(req): Json<DiagContentReq>,
+) -> Json<serde_json::Value> {
+    let full = Path::new(&req.path);
+    let lang = keplr_lang::LangKind::from_path(full);
+    let diags = match lang {
+        keplr_lang::LangKind::Rust
+        | keplr_lang::LangKind::Python
+        | keplr_lang::LangKind::JavaScript
+        | keplr_lang::LangKind::TypeScript
+        | keplr_lang::LangKind::Tsx
+        | keplr_lang::LangKind::Go => {
+            keplr_lang::syntax_errors(lang, full, &req.content)
+        }
+        _ => Vec::new(),
+    };
+    Json(serde_json::json!({
+        "lang": format!("{lang:?}"),
+        "diagnostics": diags,
+    }))
+}
+
 async fn highlight(
     State(state): State<AppState>,
     Query(params): Query<HashMap<String, String>>,
@@ -1295,6 +1325,7 @@ pub async fn serve_full(
         .route("/scene", get(scene))
         .route("/index/status", get(index_status))
         .route("/diagnostics", get(diagnostics))
+        .route("/diagnostics/content", post(diagnostics_content))
         .route("/highlight", get(highlight))
         .route("/symbols", get(symbols))
         .route("/snippets", get(snippets))
