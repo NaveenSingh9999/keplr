@@ -17,6 +17,7 @@ Plan I all remaining: `docs/superpowers/plans/2026-09-18-keplr-plan-i-all-remain
 Remote ops: `docs/REMOTE.md`
 
 Fonts: SF Mono when macOS/Xcode provides it (Apple license, never vendored), else vendored JetBrains Mono OFL (`assets/fonts/`), else system monos. Override with `KEPLR_FONT`. `keplr fonts` shows the resolved stack.
+Icon: orbit mark in Zed-dark tokens (`assets/icon/keplr.svg`, PNGs 16–512).
 
 ## Use (foundation CLI, production)
 
