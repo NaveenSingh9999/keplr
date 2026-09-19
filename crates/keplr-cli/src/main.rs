@@ -191,6 +191,96 @@ enum Cmd {
     },
 }
 
+async fn sync_session(
+    url: &str,
+    name: &str,
+    file: &Option<PathBuf>,
+    token: &str,
+    once: bool,
+) -> anyhow::Result<()> {
+    use futures_util::{SinkExt, StreamExt};
+    let mut target = url.to_string();
+    if !target.contains('?') {
+        target.push_str(&format!("?name={name}"));
+    }
+    if !token.is_empty() {
+        target.push_str(&format!("&token={token}"));
+    }
+    let req = http::Request::builder()
+        .uri(target)
+        .header("Authorization", format!("Bearer {token}"))
+        .body(())?;
+    let (stream, _) = tokio_tungstenite::connect_async(req).await?;
+    let (mut sink, mut source) = stream.split();
+    let doc = keplr_sync::SyncDoc::new(name);
+    if let Some(f) = file {
+        let seed = std::fs::read_to_string(f).unwrap_or_default();
+        doc.push(&seed);
+    }
+    sink.send(tokio_tungstenite::tungstenite::Message::Binary(
+        doc.encode_update().into(),
+    ))
+    .await?;
+    let mut last_write = file
+        .as_ref()
+        .and_then(|f| std::fs::metadata(f).ok())
+        .and_then(|m| m.modified().ok());
+    let mut tick = tokio::time::interval(std::time::Duration::from_millis(500));
+    tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    // File bridge semantics: the session doc accumulates op history while
+    // both sides run live; an external file rewrite is bridged as a fresh
+    // full update. Concurrent same-file edits merge at op level live.
+    loop {
+        tokio::select! {
+            msg = source.next() => {
+                match msg {
+                    Some(Ok(tokio_tungstenite::tungstenite::Message::Binary(bytes))) => {
+                        doc.apply_update(&bytes)?;
+                        if let Some(f) = file {
+                            std::fs::write(f, doc.content())?;
+                            last_write = std::fs::metadata(f).ok().and_then(|m| m.modified().ok());
+                            println!("sync: received {} bytes, wrote {}", bytes.len(), f.display());
+                        } else {
+                            println!("sync: received {} bytes", bytes.len());
+                        }
+                        if once {
+                            return Ok(());
+                        }
+                    }
+                    Some(Ok(_)) => {}
+                    _ => {
+                        eprintln!("sync: channel closed");
+                        return Ok(());
+                    }
+                }
+            }
+            _ = tick.tick() => {
+                if once {
+                    continue;
+                }
+                if let Some(f) = file {
+                    let changed = std::fs::metadata(f)
+                        .ok()
+                        .and_then(|m| m.modified().ok())
+                        .map(|t| Some(t) != last_write)
+                        .unwrap_or(false);
+                    if changed {
+                        let text = std::fs::read_to_string(f).unwrap_or_default();
+                        if text != doc.content() {
+                            let fresh = keplr_sync::SyncDoc::from_text(name, &text);
+                            let update = fresh.encode_update();
+                            doc.apply_update(&update)?;
+                            sink.send(tokio_tungstenite::tungstenite::Message::Binary(update.into())).await?;
+                            println!("sync: sent file change");
+                        }
+                        last_write = std::fs::metadata(f).ok().and_then(|m| m.modified().ok());
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
@@ -617,85 +707,17 @@ async fn main() -> anyhow::Result<()> {
             token,
             once,
         } => {
-            use futures_util::{SinkExt, StreamExt};
-            let mut target = url.clone();
-            if !target.contains('?') {
-                target.push_str(&format!("?name={name}"));
-            }
-            if !token.is_empty() {
-                target.push_str(&format!("&token={token}"));
-            }
-            let req = http::Request::builder()
-                .uri(target)
-                .header("Authorization", format!("Bearer {token}"))
-                .body(())?;
-            let (stream, _) = tokio_tungstenite::connect_async(req).await?;
-            let (mut sink, mut source) = stream.split();
-            let doc = keplr_sync::SyncDoc::new(&name);
-            if let Some(f) = &file {
-                let seed = std::fs::read_to_string(f).unwrap_or_default();
-                doc.push(&seed);
-            }
-            sink.send(tokio_tungstenite::tungstenite::Message::Binary(
-                doc.encode_update().into(),
-            ))
-            .await?;
-            let mut last_write = file
-                .as_ref()
-                .and_then(|f| std::fs::metadata(f).ok())
-                .and_then(|m| m.modified().ok());
-            let mut tick =
-                tokio::time::interval(std::time::Duration::from_millis(500));
-            tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-            // File bridge semantics: the session doc accumulates op history while
-            // both sides run live; an external file rewrite is bridged as a fresh
-            // full update. Concurrent same-file edits merge at op level live.
+            let mut backoff = std::time::Duration::from_secs(1);
             loop {
-                tokio::select! {
-                    msg = source.next() => {
-                        match msg {
-                            Some(Ok(tokio_tungstenite::tungstenite::Message::Binary(bytes))) => {
-                                doc.apply_update(&bytes)?;
-                                if let Some(f) = &file {
-                                    std::fs::write(f, doc.content())?;
-                                    last_write = std::fs::metadata(f).ok().and_then(|m| m.modified().ok());
-                                    println!("sync: received {} bytes, wrote {}", bytes.len(), f.display());
-                                } else {
-                                    println!("sync: received {} bytes", bytes.len());
-                                }
-                                if once {
-                                    return Ok(());
-                                }
-                            }
-                            Some(Ok(_)) => {}
-                            _ => {
-                                eprintln!("sync: channel closed");
-                                return Ok(());
-                            }
-                        }
-                    }
-                    _ = tick.tick() => {
+                match sync_session(&url, &name, &file, &token, once).await {
+                    Ok(()) => break,
+                    Err(e) => {
                         if once {
-                            continue;
+                            return Err(e);
                         }
-                        if let Some(f) = &file {
-                            let changed = std::fs::metadata(f)
-                                .ok()
-                                .and_then(|m| m.modified().ok())
-                                .map(|t| Some(t) != last_write)
-                                .unwrap_or(false);
-                            if changed {
-                                let text = std::fs::read_to_string(f).unwrap_or_default();
-                                if text != doc.content() {
-                                    let fresh = keplr_sync::SyncDoc::from_text(&name, &text);
-                                    let update = fresh.encode_update();
-                                    doc.apply_update(&update)?;
-                                    sink.send(tokio_tungstenite::tungstenite::Message::Binary(update.into())).await?;
-                                    println!("sync: sent file change");
-                                }
-                                last_write = std::fs::metadata(f).ok().and_then(|m| m.modified().ok());
-                            }
-                        }
+                        eprintln!("sync: {e:#}; retrying in {}s", backoff.as_secs());
+                        tokio::time::sleep(backoff).await;
+                        backoff = (backoff * 2).min(std::time::Duration::from_secs(30));
                     }
                 }
             }

@@ -23,6 +23,7 @@ struct AppState {
     daemons: DaemonMap,
     sync_docs: Arc<Mutex<HashMap<String, keplr_sync::SyncDoc>>>,
     sync_tx: Arc<Mutex<HashMap<String, tokio::sync::broadcast::Sender<Vec<u8>>>>>,
+    sync_peers: Arc<Mutex<HashMap<String, u32>>>,
 }
 
 #[derive(Clone)]
@@ -1193,6 +1194,7 @@ pub async fn serve_full(
         daemons: Arc::new(Mutex::new(HashMap::new())),
         sync_docs: Arc::new(Mutex::new(HashMap::new())),
         sync_tx: Arc::new(Mutex::new(HashMap::new())),
+        sync_peers: Arc::new(Mutex::new(HashMap::new())),
     };
     if let Ok(tasks) = keplr_build::load_tasks(&root.join("keplr.json")) {
         for (name, def) in &tasks {
@@ -1254,6 +1256,7 @@ pub async fn serve_full(
         .route("/daemons/restart", post(daemon_restart))
         .route("/tasks/log", get(task_log))
         .route("/sync/channel", get(sync_channel))
+        .route("/sync/status", get(sync_status))
         .route("/terms/ws", get(term_ws))
         .route("/web/*path", get(web_file))
         .layer(axum::middleware::from_fn_with_state(
@@ -1370,13 +1373,27 @@ async fn channel_loop(
             .entry(name.clone())
             .or_insert_with(|| tokio::sync::broadcast::channel(64).0)
             .clone();
+        state
+            .sync_peers
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .entry(name.clone())
+            .and_modify(|n| *n += 1)
+            .or_insert(1);
         (full, tx.subscribe())
     };
     if socket.send(Message::Binary(full)).await.is_err() {
+        unpeer(&state, &name);
         return;
     }
+    let mut heartbeat = tokio::time::interval(std::time::Duration::from_secs(30));
     loop {
         tokio::select! {
+            _ = heartbeat.tick() => {
+                if socket.send(Message::Ping(Vec::new())).await.is_err() {
+                    break;
+                }
+            }
             msg = socket.recv() => {
                 match msg {
                     Some(Ok(Message::Binary(bytes))) => {
@@ -1408,4 +1425,30 @@ async fn channel_loop(
             }
         }
     }
+    unpeer(&state, &name);
+}
+
+fn unpeer(state: &AppState, name: &str) {
+    let mut peers = state.sync_peers.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(n) = peers.get_mut(name) {
+        *n = n.saturating_sub(1);
+        if *n == 0 {
+            peers.remove(name);
+        }
+    }
+}
+
+async fn sync_status(State(state): State<AppState>) -> Json<serde_json::Value> {
+    let peers = state.sync_peers.lock().unwrap_or_else(|e| e.into_inner());
+    let docs = state.sync_docs.lock().unwrap_or_else(|e| e.into_inner());
+    let list: Vec<serde_json::Value> = docs
+        .keys()
+        .map(|name| {
+            serde_json::json!({
+                "name": name,
+                "peers": peers.get(name).cloned().unwrap_or(0),
+            })
+        })
+        .collect();
+    Json(serde_json::json!({ "docs": list }))
 }
