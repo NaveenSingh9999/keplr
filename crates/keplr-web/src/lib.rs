@@ -15,10 +15,11 @@ fn canvas_by_id(id: &str) -> Result<HtmlCanvasElement, JsValue> {
 }
 
 fn ctx2d(canvas: &HtmlCanvasElement) -> Result<CanvasRenderingContext2d, JsValue> {
-    let ctx: JsValue = canvas
+    let obj = canvas
         .get_context("2d")?
         .ok_or_else(|| JsValue::from_str("no 2d context"))?;
-    ctx.dyn_into()
+    let val: JsValue = obj.into();
+    val.dyn_into()
 }
 
 #[wasm_bindgen]

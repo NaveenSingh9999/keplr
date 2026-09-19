@@ -918,6 +918,7 @@ pub fn expand_snippet(lang: LangKind, prefix: &str) -> Option<(String, Option<us
         .map(|s| expand_markers(&s.body))
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn ts_language(lang: LangKind) -> Option<tree_sitter::Language> {
     match lang {
         LangKind::Rust => Some(tree_sitter_rust::LANGUAGE.into()),
@@ -930,6 +931,7 @@ fn ts_language(lang: LangKind) -> Option<tree_sitter::Language> {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn parse_sexp(lang: LangKind, text: &str) -> Option<String> {
     let language = ts_language(lang)?;
     let mut parser = tree_sitter::Parser::new();
@@ -937,6 +939,12 @@ pub fn parse_sexp(lang: LangKind, text: &str) -> Option<String> {
     parser.parse(text, None).map(|t| t.root_node().to_sexp())
 }
 
+#[cfg(target_arch = "wasm32")]
+pub fn parse_sexp(_lang: LangKind, _text: &str) -> Option<String> {
+    None
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 pub fn syntax_errors(lang: LangKind, path: &Path, text: &str) -> Vec<Diagnostic> {
     let label = path.display().to_string();
     let language = match ts_language(lang) {
@@ -982,4 +990,9 @@ pub fn syntax_errors(lang: LangKind, path: &Path, text: &str) -> Vec<Diagnostic>
     }
     out.sort_by(|a, b| (a.line, a.col).cmp(&(b.line, b.col)));
     out
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn syntax_errors(_lang: LangKind, _path: &Path, _text: &str) -> Vec<Diagnostic> {
+    Vec::new()
 }

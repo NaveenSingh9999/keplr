@@ -273,9 +273,12 @@ pub fn snapshot_scene_png(scene_json: &str, width: u32, height: u32) -> anyhow::
     let img: ImageBuffer<Rgba<u8>, Vec<u8>> =
         ImageBuffer::from_raw(w, h, px).ok_or_else(|| anyhow::anyhow!("bad pixels"))?;
     let mut png = Vec::new();
-    image::codecs::png::PngEncoder::new(&mut png)
-        .encode(img.as_raw(), w, h, image::ExtendedColorType::Rgba8)
-        .map_err(|e| anyhow::anyhow!("png encode: {e}"))?;
+    {
+        use image::ImageEncoder;
+        image::codecs::png::PngEncoder::new(&mut png)
+            .write_image(img.as_raw(), w, h, image::ExtendedColorType::Rgba8)
+            .map_err(|e| anyhow::anyhow!("png encode: {e}"))?;
+    }
     Ok(png)
 }
 
