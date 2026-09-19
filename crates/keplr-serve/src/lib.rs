@@ -638,12 +638,6 @@ fn term_css(c: &alacritty_terminal::vte::ansi::Color) -> Option<String> {
         Color::Spec(rgb) => Some(format!("#{:02x}{:02x}{:02x}", rgb.r, rgb.g, rgb.b)),
     }
 }
-            .to_string(),
-        ),
-        Color::Indexed(i) => Some(indexed_css(*i)),
-        Color::Rgb(rgb) => Some(format!("#{:02x}{:02x}{:02x}", rgb.r, rgb.g, rgb.b)),
-    }
-}
 
 fn indexed_css(i: u8) -> String {
     const BASE: [&str; 16] = [
