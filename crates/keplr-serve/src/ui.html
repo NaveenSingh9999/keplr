@@ -565,7 +565,8 @@ async function bootEditor() {
       go: "@codemirror/lang-go", html: "@codemirror/lang-html",
       css: "@codemirror/lang-css", json: "@codemirror/lang-json",
       markdown: "@codemirror/lang-markdown", sql: "@codemirror/lang-sql",
-      php: "@codemirror/lang-php", java: "@codemirror/lang-java"
+      php: "@codemirror/lang-php", java: "@codemirror/lang-java",
+      vim: "@codemirror/vim"
     };
     for (const k of Object.keys(loads)) {
       try { mods[k.replace("javascript", "javascript")] = await import(loads[k]); }
@@ -577,6 +578,7 @@ async function bootEditor() {
     const wrapConf = new state.Compartment();
     const themeConf = new state.Compartment();
     const wsConf = new state.Compartment();
+    const vimConf = new state.Compartment();
     const indentUnit = (mods.lang && mods.lang.indentUnit) || null;
     const hlWS = view.highlightWhitespace || null;
     const onChange = view.EditorView.updateListener.of(v => {
@@ -603,13 +605,13 @@ async function bootEditor() {
       extensions: [
         view.keymap.of(suggestKeys),
         cm.basicSetup, theme.oneDark,
-        langConf.of([]), tabConf.of([]), wrapConf.of([]), themeConf.of([]), wsConf.of([]),
+        langConf.of([]), tabConf.of([]), wrapConf.of([]), themeConf.of([]), wsConf.of([]), vimConf.of([]),
         view.keymap.of([saveKey]), onChange
       ],
       parent: wrap
     });
     ED = {
-      cm: true, view: ed, langConf, tabConf, wrapConf, themeConf, wsConf, mods, state,
+      cm: true, view: ed, langConf, tabConf, wrapConf, themeConf, wsConf, vimConf, mods, state,
       async setLang(label) {
         const ext = langExt(label, mods);
         ed.dispatch({ effects: langConf.reconfigure(ext) });
@@ -628,6 +630,9 @@ async function bootEditor() {
         const s = S.settings;
         try {
           ed.dispatch({ effects: tabConf.reconfigure(indentUnit ? indentUnit.of(" ".repeat(s.tabSize)) : []) });
+        } catch (e) {}
+        try {
+          ed.dispatch({ effects: vimConf.reconfigure((s.vimMode && mods.vim && mods.vim.vim) ? mods.vim.vim() : []) });
         } catch (e) {}
         try {
           ed.dispatch({ effects: wrapConf.reconfigure(s.wordWrap ? view.EditorView.lineWrapping : []) });
@@ -2033,6 +2038,7 @@ const DEFAULT_SETTINGS = {
   autoSaveDelay: 1000,
   inlineSuggest: true,
   liveDiagnostics: true,
+  vimMode: false,
   animations: "full",
   terminalFontSize: 13
 };
@@ -2075,6 +2081,7 @@ const SETTING_DEFS = [
     ["autoSaveDelay", "number", "Auto save delay", "Idle milliseconds before auto save", { min: 500, max: 10000 }],
     ["inlineSuggest", "bool", "Inline suggestions", "Snippet popup while typing", {}],
     ["liveDiagnostics", "bool", "Live diagnostics", "Re-check errors while typing", {}],
+    ["vimMode", "bool", "Vim mode", "CodeMirror only; TUI uses --vim", {}],
   ]],
   ["Interface", [
     ["animations", "select", "Animations", "Motion across the interface", { options: [["full", "full"], ["reduced", "reduced"], ["none", "none"]] }],
@@ -2348,6 +2355,7 @@ const COMMANDS = [
   ["run all tasks", () => runAllTasks(), "task"],
   ["show problems", () => setBottomTab("problems"), "view"],
   ["show tasks", () => setBottomTab("tasks"), "view"],
+  ["toggle vim mode", () => { S.settings.vimMode = !S.settings.vimMode; saveSettings(); applySettings(); renderSettings(); }, "view"],
   ["show source control", () => { if (!S.docks.left) toggleDock("left", true); setLeftTab("source"); }, "view"],
   ["new file", async () => {
     const name = await askInput({ title: "New file", placeholder: "name.ext" });
