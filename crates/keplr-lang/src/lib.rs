@@ -988,7 +988,7 @@ pub fn syntax_errors(lang: LangKind, path: &Path, text: &str) -> Vec<Diagnostic>
             }
         }
     }
-    out.sort_by(|a, b| (a.line, a.col).cmp(&(b.line, b.col)));
+    out.sort_by_key(|a| (a.line, a.col));
     out
 }
 
