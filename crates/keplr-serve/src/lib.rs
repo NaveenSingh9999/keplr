@@ -581,6 +581,25 @@ async fn git_diff(State(state): State<AppState>) -> Json<serde_json::Value> {
     }
 }
 
+async fn git_filediff(
+    State(state): State<AppState>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Json<serde_json::Value> {
+    let rel = params.get("path").cloned().unwrap_or_default();
+    let full = match safe_rel(&state.root, &rel) {
+        Ok(p) => p,
+        Err(e) => return Json(serde_json::json!({ "error": format!("{e:#}") })),
+    };
+    let relpath = full
+        .strip_prefix(&state.root)
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or(rel);
+    match keplr_core::git::file_hunks(&state.root, &relpath) {
+        Ok((hunks, untracked)) => Json(serde_json::json!({ "hunks": hunks, "untracked": untracked })),
+        Err(e) => Json(serde_json::json!({ "error": format!("{e:#}") })),
+    }
+}
+
 fn safe_rel(root: &Path, rel: &str) -> anyhow::Result<PathBuf> {
     use std::path::Component;
     let p = Path::new(rel);
@@ -1586,6 +1605,7 @@ pub async fn serve_full(
         .route("/git/log", get(git_log))
         .route("/git/branches", get(git_branches))
         .route("/git/diff", get(git_diff))
+        .route("/git/filediff", get(git_filediff))
         .route("/git/stage", post(git_stage))
         .route("/git/unstage", post(git_unstage))
         .route("/git/discard", post(git_discard))

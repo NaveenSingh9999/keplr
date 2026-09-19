@@ -635,6 +635,101 @@
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .kempty .recent button:hover { background: var(--raised); color: var(--text); }
+
+  /* ============ PHASE 3 editor chrome ============ */
+  #tabsbar {
+    position: relative; display: flex; align-items: stretch;
+    height: 36px; overflow-x: auto; overflow-y: hidden; flex: none;
+    background: var(--bg); scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+  }
+  #tabsbar::-webkit-scrollbar { display: none; }
+  #tabsbar.nofade { -webkit-mask-image: none; mask-image: none; }
+  .tab {
+    display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 8px 0 12px;
+    cursor: pointer; white-space: nowrap; color: var(--text2); font-size: var(--fs-ui);
+    border-bottom: 2px solid transparent; flex: none;
+    animation: ktab-in var(--d1) var(--ease);
+  }
+  @keyframes ktab-in { from { opacity: 0; transform: scale(.96); } }
+  .tab:hover { color: var(--text); }
+  .tab.sel { color: var(--text); }
+  .tab.preview span.nm { font-style: italic; color: var(--text2); }
+  .tab.sel.preview span.nm { color: var(--text); }
+  .tab .nm { overflow: hidden; text-overflow: ellipsis; }
+  .tab .dot { display: none; width: 7px; height: 7px; border-radius: 50%; background: var(--warn); flex: none; }
+  .tab.dirty .dot { display: inline-block; }
+  .tab.dirty:hover .dot { display: none; }
+  .tab .x {
+    display: none; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 5px; color: var(--text3); font-size: 13px; flex: none;
+  }
+  .tab:hover .x { display: inline-flex; }
+  .tab .x:hover { color: var(--text); background: var(--raised); }
+  .tab.sel { border-bottom-color: transparent; }
+  .tab.dirty .x { display: none; }
+  .tab.dirty:hover .x { display: inline-flex; }
+  .tab.drop-before { box-shadow: inset 2px 0 var(--accent); }
+  .tab.drop-after { box-shadow: inset -2px 0 var(--accent); }
+  #tabslide {
+    position: absolute; bottom: 0; height: 2px; background: var(--accent); border-radius: 2px;
+    transition: left var(--d2) var(--ease), width var(--d2) var(--ease), opacity var(--d1) var(--ease);
+    pointer-events: none;
+  }
+  #crumbs {
+    display: flex; align-items: center; gap: 6px; height: 24px; padding: 0 14px;
+    color: var(--text3); font-size: 12px; border-bottom: 1px solid var(--sep); flex: none;
+    overflow: hidden; white-space: nowrap;
+  }
+  #crumbs b { color: var(--text2); font-weight: 500; }
+  #crumbs .sym { color: var(--accent); }
+  #crumbs .vtoggle { margin-left: auto; }
+  .cm-editor { background: var(--bg); }
+  .cm-editor.cm-focused { outline: none; }
+  .cm-gutters { background: var(--bg); border-right: 0; color: var(--text3); }
+  .cm-lineNumbers .cm-gutterElement { padding: 0 10px 0 12px; font-size: 12px; }
+  .cm-activeLineGutter { color: var(--text); background: transparent; }
+  .cm-activeLine { background: rgba(255,255,255,.03); }
+  .cm-selectionBackground { background: color-mix(in srgb, var(--accent) 28%, transparent) !important; }
+  .cm-matchingBracket { outline: 1px solid color-mix(in srgb, var(--accent) 70%, transparent); border-radius: 3px; }
+  .cm-cursor { border-left-color: var(--accent); border-left-width: 2px; transition: transform 60ms linear; }
+  .cm-content { caret-color: var(--accent); }
+  .tok-keyword { color: var(--syn-keyword); }
+  .tok-string { color: var(--syn-string); }
+  .tok-comment { color: var(--syn-comment); }
+  .tok-number { color: var(--syn-number); }
+  .tok-type { color: var(--syn-type); }
+  .tok-function { color: var(--syn-function); }
+  .tok-macro { color: var(--syn-macro); }
+  .tok-attribute { color: var(--syn-macro); }
+  .tok-constant { color: var(--syn-constant); }
+  .tok-parameter { color: var(--syn-plain); }
+  .tok-punctuation { color: var(--text3); }
+  .cm-line.gitadd { box-shadow: inset 3px 0 var(--ok); }
+  .cm-line.gitmod { box-shadow: inset 3px 0 var(--warn); }
+  .cm-line.gitdel { box-shadow: inset 3px 0 var(--error); }
+  .cm-line.diagerr { background: color-mix(in srgb, var(--error) 9%, transparent); }
+  .cm-line.diagwarn { background: color-mix(in srgb, var(--warn) 9%, transparent); }
+  .indent-lead { color: rgba(255,255,255,.10); }
+  .kfind-mark { background: color-mix(in srgb, var(--yellow) 32%, transparent); border-radius: 2px; }
+  .kfind-cur { background: var(--accent); border-radius: 2px; }
+  .kfind-cur * { color: #fff !important; }
+  #findcard {
+    position: fixed; top: 48px; right: 16px; z-index: 150; width: 340px;
+    background: var(--overlay); -webkit-backdrop-filter: blur(var(--overlay-blur)); backdrop-filter: blur(var(--overlay-blur));
+    border: 1px solid var(--sep); box-shadow: inset 0 .5px rgba(255,255,255,.06), 0 16px 50px rgba(0,0,0,.6);
+    border-radius: var(--r-lg); padding: 10px; display: none; flex-direction: column; gap: 8px;
+    animation: kfind-in var(--d2) var(--ease);
+  }
+  #findcard.open { display: flex; }
+  @keyframes kfind-in { from { opacity: 0; transform: translateY(-8px) scale(.98); } }
+  #findcard .frow { display: flex; gap: 6px; align-items: center; }
+  #findcard .frow .kinput { flex: 1; min-width: 0; }
+  #findcard .count { font-size: 12px; color: var(--text2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  #findcard .tgl { font-size: 12px; color: var(--text2); display: inline-flex; gap: 4px; align-items: center; cursor: pointer; padding: 4px 6px; border-radius: 5px; }
+  #findcard .tgl.on { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  #oruler { position: absolute; top: 0; right: 0; bottom: 0; width: 10px; z-index: 5; pointer-events: none; opacity: .85; }
 </style>
 <script type="importmap">
 {"imports": {
@@ -750,6 +845,23 @@
 </div>
 <div id="modalwrap"><div id="modal"></div></div>
 <div id="palwrap"><input id="palinput" placeholder="type a command or filename…" autocomplete="off" spellcheck="false"><div id="palist"></div></div>
+<div id="findcard" role="search">
+  <div class="frow">
+    <input id="findneedle" class="kinput" placeholder="Find in file" autocomplete="off" spellcheck="false">
+    <span class="count" id="findcount"></span>
+    <button class="kicon" id="findclose" data-tip="Close (Esc)"><svg class="ic"><use href="#i-x"/></svg></button>
+  </div>
+  <div class="frow">
+    <input id="findrepl" class="kinput" placeholder="Replace with" autocomplete="off" spellcheck="false">
+    <button class="kbtn" id="findrep">Replace</button>
+    <button class="kbtn" id="findall">All</button>
+  </div>
+  <div class="frow">
+    <button class="kbtn kbtn-ghost" id="findprev">↑ Prev</button>
+    <button class="kbtn kbtn-ghost" id="findnext">Next ↓</button>
+    <span class="tgl" id="findcase" role="switch" aria-checked="false" tabindex="0">Aa match case</span>
+  </div>
+</div>
 <script type="module">
 import { EditorView, basicSetup } from "codemirror";
 import { EditorState, Compartment } from "@codemirror/state";
@@ -912,6 +1024,8 @@ const S = {
   palSearch: [],
   symCache: null,
   gitStatus: {},
+  cursorLine: 1,
+  marks: null,
   log: [],
   docks: { left: true, right: false, bottom: false },
   layout: { left: 264, right: 232, bottom: 192 },
@@ -1075,7 +1189,8 @@ async function ensureCmMods() {
   _cmMods = mods;
   return mods;
 }
-async function makeEditor(parentEl) {
+async function makeEditor(parentEl, gi) {
+  gi = gi || 0;
   const mods = await ensureCmMods();
   const cm = await import("codemirror");
   const state = await import("@codemirror/state");
@@ -1089,17 +1204,20 @@ async function makeEditor(parentEl) {
   const vimConf = new state.Compartment();
   const indentUnit = (mods.lang && mods.lang.indentUnit) || null;
   const hlWS = view.highlightWhitespace || null;
-  const onChange = view.EditorView.updateListener.of(v => {
-    if (v.docChanged) {
-      markDirty(true);
-      scheduleSuggest();
-      scheduleLiveDiag();
-      scheduleAutosave();
-    }
-    const s = v.state.selection.main;
-    const line = v.state.doc.lineAt(s.head);
-    setCursor(line.number, s.head - line.from + 1);
-  });
+    const onChange = view.EditorView.updateListener.of(v => {
+      if (v.docChanged) {
+        markDirty(true);
+        scheduleSuggest();
+        scheduleLiveDiag();
+        scheduleAutosave();
+        scheduleMarks();
+      }
+      const s = v.state.selection.main;
+      const line = v.state.doc.lineAt(s.head);
+      setCursor(line.number, s.head - line.from + 1);
+      S.cursorLine = line.number;
+      refreshCrumb();
+    });
   const saveKey = { key: "Mod-s", preventDefault: true, run: () => { saveActive(); return true; } };
   const suggestKeys = [
     { key: "Tab", run: () => acceptSuggest() },
@@ -1118,8 +1236,76 @@ async function makeEditor(parentEl) {
     ],
     parent: parentEl
   });
+  const KIND = { Keyword: "keyword", Str: "string", Comment: "comment", Number: "number", Type: "type", Function: "function", Macro: "macro", Attribute: "attribute", Constant: "constant", Parameter: "parameter", Punctuation: "punctuation", Other: "" };
+  function buildMarks(st) {
+    const gg = S.groups[gi] || { tabs: [], active: -1 };
+    const tab = gg.tabs[gg.active];
+    const M = S.marks;
+    if (!tab || !M || M.path !== tab.path) return view.Decoration.none;
+    const doc = st.doc;
+    const B = new state.RangeSetBuilder();
+    const atLine = n => {
+      try {
+        return doc.line(Math.max(1, Math.min(n, doc.lines)));
+      } catch (e) { return null; }
+    };
+    for (const s of M.spans || []) {
+      const L = atLine(s.line);
+      if (!L) continue;
+      const a = Math.min(L.from + Math.max(0, s.col - 1), L.to);
+      const b = Math.min(a + Math.max(0, s.len), L.to);
+      if (b <= a) continue;
+      const cls = KIND[s.kind];
+      if (cls) B.add(a, b, view.Decoration.mark({ class: "tok-" + cls }));
+    }
+    for (const h of M.hunks || []) {
+      if (h.len === 0) {
+        const L = atLine(h.start);
+        if (L) B.add(L.from, L.from, view.Decoration.line({ class: "gitdel" }));
+      } else {
+        for (let i = 0; i < h.len; i++) {
+          const L = atLine(h.start + i);
+          if (!L) break;
+          B.add(L.from, L.from, view.Decoration.line({ class: h.kind === "add" ? "gitadd" : "gitmod" }));
+        }
+      }
+    }
+    if (M.untracked && doc.lines <= 2000) {
+      for (let i = 1; i <= doc.lines; i++) {
+        const L = atLine(i);
+        if (L) B.add(L.from, L.from, view.Decoration.line({ class: "gitadd" }));
+      }
+    }
+    for (const d of M.diags || []) {
+      const L = atLine(d.line);
+      if (L) B.add(L.from, L.from, view.Decoration.line({ class: d.sev === "warn" ? "diagwarn" : "diagerr" }));
+    }
+    if (doc.lines <= 5000) {
+      for (let i = 1; i <= doc.lines; i++) {
+        const L = atLine(i);
+        if (!L) continue;
+        const m = /^[ \t]+/.exec(L.text);
+        if (m) B.add(L.from, L.from + m[0].length, view.Decoration.mark({ class: "indent-lead" }));
+      }
+    }
+    for (const f of M.find || []) {
+      if (f.to > f.from) B.add(f.from, f.to, view.Decoration.mark({ class: f.cur ? "kfind-cur" : "kfind-mark" }));
+    }
+    return B.finish();
+  }
+  const markTick = state.StateEffect.define();
+  const markField = state.StateField.define({
+    create: () => 0,
+    update: (v, tr) => {
+      for (const e of tr.effects) if (e.is(markTick)) return v + 1;
+      return v;
+    },
+    provide: f => view.EditorView.decorations.from(f, () => buildMarks(ed.state)),
+  });
+  ed.dispatch({ effects: state.StateEffect.appendConfig.of([markField]) });
   return {
-    cm: true, view: ed, langConf, tabConf, wrapConf, themeConf, wsConf, vimConf, mods, state,
+    cm: true, view: ed, langConf, tabConf, wrapConf, themeConf, wsConf, vimConf, mods, state, group: gi,
+    remark() { try { ed.dispatch({ effects: markTick.of(null) }); } catch (e) {} },
     async setLang(label) {
       const ext = langExt(label, mods);
       ed.dispatch({ effects: langConf.reconfigure(ext) });
@@ -1133,7 +1319,16 @@ async function makeEditor(parentEl) {
         ed.focus();
       } catch (e) {}
     },
-    focus() { ed.focus(); },
+      focus() { ed.focus(); },
+      sel(off, len) {
+        try {
+          ed.dispatch({
+            selection: { anchor: off, head: off + (len || 0) },
+            effects: view.EditorView.scrollIntoView(off, { y: "center" }),
+          });
+          ed.focus();
+        } catch (e) {}
+      },
     applySettings() {
       const s = S.settings;
       try { ed.dispatch({ effects: tabConf.reconfigure(indentUnit ? indentUnit.of(" ".repeat(s.tabSize)) : []) }); } catch (e) {}
@@ -1152,7 +1347,7 @@ async function makeEditor(parentEl) {
 }
 async function bootEditor() {
   try {
-    ED = await makeEditor(document.getElementById("editorwrap"));
+    ED = await makeEditor(document.getElementById("editorwrap"), 0);
     ED_ALL[0] = ED;
     attachWheel();
     log("console", "editor: CodeMirror 6");
@@ -1178,6 +1373,80 @@ async function bootEditor() {
     };
     ED_ALL[0] = ED;
     log("console", "editor: offline fallback (CDN unreachable)");
+  }
+}
+
+/* ============ editor marks (tree-sitter spans, git gutter, diagnostics, find) ============
+   Colors come from the LOCAL /highlight + /git/filediff + /diagnostics endpoints
+   (saved-file truth). Live typing colors come from CodeMirror modes. */
+let marksTimer = 0;
+function scheduleMarks() {
+  clearTimeout(marksTimer);
+  marksTimer = setTimeout(() => { refreshMarks(); }, 1500);
+}
+async function refreshMarks() {
+  const t = A();
+  if (!t || !ED) return;
+  const path = t.path;
+  try {
+    const results = await Promise.all([
+      get("/highlight?path=" + encodeURIComponent(path) + "&full=1").catch(() => null),
+      get("/git/filediff?path=" + encodeURIComponent(path)).catch(() => null),
+      get("/diagnostics?path=" + encodeURIComponent(path)).catch(() => null),
+    ]);
+    const cur = A();
+    if (!cur || cur.path !== path) return;
+    const sp = results[0], hu = results[1], dg = results[2];
+    S.marks = {
+      path,
+      spans: (sp && sp.spans) || [],
+      hunks: (hu && hu.hunks) || [],
+      untracked: !!(hu && hu.untracked),
+      diags: ((dg && dg.diagnostics) || []).map(d => ({ line: d.line, sev: d.severity === "warning" ? "warn" : "err" })),
+      find: (S.marks && S.marks.path === path) ? (S.marks.find || []) : [],
+    };
+  } catch (e) {
+    S.marks = { path, spans: [], hunks: [], untracked: false, diags: [], find: [] };
+  }
+  for (const ed of ED_ALL) {
+    if (ed && ed.remark) { try { ed.remark(); } catch (err) {} }
+  }
+  renderRuler();
+}
+function renderRuler() {
+  const wrap = document.getElementById(S.focus === 1 ? "editorwrap1" : "editorwrap");
+  if (!wrap) return;
+  let r = wrap.querySelector(":scope > .oruler");
+  if (!r) {
+    r = document.createElement("div");
+    r.className = "oruler";
+    wrap.appendChild(r);
+  }
+  r.innerHTML = "";
+  const t = A();
+  const M = S.marks;
+  if (!t || !M || M.path !== t.path || !ED || !ED.cm) return;
+  let lines = 1;
+  try { lines = ED.view.state.doc.lines; } catch (e) { return; }
+  if (lines < 2) return;
+  const dot = (line, color) => {
+    const d = document.createElement("div");
+    d.style.cssText = "position:absolute;right:2px;width:6px;height:6px;border-radius:50%;background:" + color + ";top:" + Math.min(100, (line / lines) * 100) + "%;";
+    r.appendChild(d);
+  };
+  let shown = 0;
+  for (const h of M.hunks || []) {
+    if (shown > 300) break;
+    const n = h.len === 0 ? 1 : Math.min(h.len, 8);
+    for (let i = 0; i < n; i++) {
+      dot(h.start + i, h.kind === "add" ? "var(--ok)" : h.kind === "del" ? "var(--error)" : "var(--warn)");
+      shown++;
+    }
+  }
+  for (const d of M.diags || []) {
+    if (shown > 340) break;
+    dot(d.line, d.sev === "warn" ? "var(--warn)" : "var(--error)");
+    shown++;
   }
 }
 
@@ -1233,7 +1502,7 @@ function buildEmpty() {
       const b = document.createElement("button");
       b.textContent = rel(p);
       b.title = p;
-      b.onclick = () => openFile(p, 0).catch(e => msg(String(e), true));
+      b.onclick = () => openFile(p, 0, true).catch(e => msg(String(e), true));
       rl.appendChild(b);
     });
     d.appendChild(rl);
@@ -1258,6 +1527,7 @@ function markDirty(d) {
   const t = A();
   if (!t) return;
   t.dirty = d;
+  if (d) t.preview = false;
   renderTabs();
 }
 function renderTabs() {
@@ -1266,18 +1536,69 @@ function renderTabs() {
   bar.innerHTML = "";
   g.tabs.forEach((t, i) => {
     const d = document.createElement("div");
-    d.className = "tab" + (i === g.active ? " sel" : "");
+    d.className = "tab" + (i === g.active ? " sel" : "") + (t.preview ? " preview" : "") + (t.dirty ? " dirty" : "");
+    d.draggable = true;
     const nm = document.createElement("span");
-    nm.textContent = rel(t.path).split("/").pop() + (t.dirty ? " ●" : "");
-    if (t.dirty) nm.classList.add("dirty");
+    nm.className = "nm";
+    nm.textContent = rel(t.path).split("/").pop();
+    const dot = document.createElement("span");
+    dot.className = "dot";
     const x = document.createElement("span");
     x.className = "x";
     x.textContent = "×";
     x.onclick = ev => { ev.stopPropagation(); closeTab(i); };
     d.appendChild(nm);
+    d.appendChild(dot);
     d.appendChild(x);
     d.onclick = () => activateTab(i);
+    d.onmousedown = ev => {
+      if (ev.button === 1) { ev.preventDefault(); closeTab(i); }
+    };
+    d.ondblclick = ev => {
+      ev.stopPropagation();
+      if (t.preview) { t.preview = false; renderTabs(); }
+    };
     d.title = rel(t.path);
+    d.ondragstart = ev => {
+      ev.dataTransfer.setData("text/kdrag", String(i));
+      ev.dataTransfer.effectAllowed = "move";
+    };
+    d.ondragover = ev => {
+      ev.preventDefault();
+      const r = d.getBoundingClientRect();
+      const before = (ev.clientX - r.left) < r.width / 2;
+      d.classList.toggle("drop-before", before);
+      d.classList.toggle("drop-after", !before);
+    };
+    d.ondragleave = () => { d.classList.remove("drop-before"); d.classList.remove("drop-after"); };
+    d.ondrop = ev => {
+      ev.preventDefault();
+      const from = parseInt(ev.dataTransfer.getData("text/kdrag"), 10);
+      const r = d.getBoundingClientRect();
+      let to = i + ((ev.clientX - r.left) < r.width / 2 ? 0 : 1);
+      if (isNaN(from) || from === to || from + 1 === to) { renderTabs(); return; }
+      const gg = G();
+      const before = d.getBoundingClientRect().left;
+      const [mv] = gg.tabs.splice(from, 1);
+      if (from < to) to -= 1;
+      gg.tabs.splice(to, 0, mv);
+      if (gg.active === from) gg.active = to;
+      else if (gg.active > from && gg.active <= to) gg.active -= 1;
+      else if (gg.active < from && gg.active >= to) gg.active += 1;
+      renderTabs();
+      const now = Array.from(bar.children).find(el => el.title === rel(mv.path));
+      if (now) {
+        const dx = before - now.getBoundingClientRect().left;
+        if (dx) {
+          now.style.transition = "none";
+          now.style.transform = `translateX(${dx}px)`;
+          requestAnimationFrame(() => {
+            now.style.transition = "";
+            now.style.transform = "";
+          });
+        }
+      }
+    };
     d.oncontextmenu = ev => {
       ev.preventDefault();
       ev.stopPropagation();
@@ -1302,13 +1623,36 @@ function renderTabs() {
     };
     bar.appendChild(d);
   });
+  let slide = document.getElementById("tabslide");
+  if (!slide) {
+    slide = document.createElement("div");
+    slide.id = "tabslide";
+    bar.appendChild(slide);
+  } else {
+    bar.appendChild(slide);
+  }
+  const sel = bar.querySelector(".tab.sel");
+  if (sel) {
+    slide.style.opacity = "1";
+    slide.style.left = sel.offsetLeft + "px";
+    slide.style.width = sel.offsetWidth + "px";
+    sel.scrollIntoView({ block: "nearest", inline: "nearest" });
+  } else {
+    slide.style.opacity = "0";
+  }
+  const over = bar.scrollWidth > bar.clientWidth + 2;
+  bar.classList.toggle("nofade", !over);
+  bar.onscroll = () => bar.classList.toggle("nofade", !(bar.scrollWidth > bar.clientWidth + 2));
+  renderCrumb();
+}
+function renderCrumb() {
   const crumbs = document.getElementById("crumbs");
   const t = A();
   if (!t) { crumbs.innerHTML = ""; refreshEmpty(); return; }
   const parts = rel(t.path).split("/");
   crumbs.innerHTML = parts.map((p, i) =>
     i === parts.length - 1 ? "<b>" + esc(p) + "</b>" : esc(p)
-  ).join(" <span style='opacity:.5'>›</span> ");
+  ).join(" <span style='opacity:.5'>›</span> ") + '<span class="sym" id="crumbsym"></span>';
   if (previewKind(t.path) === "md") {
     const btn = document.createElement("button");
     btn.className = "vtoggle" + (t.view === "preview" ? " on" : "");
@@ -1318,6 +1662,24 @@ function renderTabs() {
     crumbs.appendChild(btn);
   }
   document.getElementById("slang").textContent = t.lang;
+  refreshCrumb();
+  refreshEmpty();
+}
+function refreshCrumb() {
+  const el = document.getElementById("crumbsym");
+  if (!el) return;
+  const t = A();
+  let sym = "";
+  if (t && S.symCache && S.symCache.path === t.path) {
+    const ln = S.cursorLine || 0;
+    let best = null;
+    for (const s of S.symCache.items) {
+      if ((s.line || 0) <= ln) best = s;
+      else break;
+    }
+    if (best) sym = " › " + best.name;
+  }
+  el.textContent = sym;
 }
 function snapshotTab() {
   const t = A();
@@ -1364,7 +1726,10 @@ function activateTab(i) {
   renderTabs();
   renderProblems();
   loadSymbols(t.path);
-  if (!kind || kind === "md") ED.focus();
+  if (!kind || kind === "md") {
+    ED.focus();
+    refreshMarks();
+  }
 }
 function closeTab(i) {
   const g = G();
@@ -1396,31 +1761,42 @@ function openToSide(tab) {
 function ensureGroup(i) {
   while (S.groups.length <= i) S.groups.push({ tabs: [], active: -1 });
 }
-async function openFile(path, line) {
+async function openFile(path, line, preview) {
   const g = G();
   const found = g.tabs.findIndex(t => t.path === path);
   if (found >= 0) {
+    if (!preview) g.tabs[found].preview = false;
     activateTab(found);
   } else {
     const kind = previewKind(path);
-    if (kind === "pdf" || kind === "img") {
-      const lang = langOf(path);
-      g.tabs.push({ path, lang, text: "", saved: "", sel: 0, dirty: false, view: "viewer" });
+    const place = tab => {
+      if (preview) {
+        const pi = g.tabs.findIndex(t => t.preview && !t.dirty);
+        if (pi >= 0) {
+          g.tabs.splice(pi, 1, Object.assign({ preview: true }, tab));
+          g.active = -1;
+          activateTab(pi);
+          return;
+        }
+      }
+      g.tabs.push(Object.assign({ preview: !!preview }, tab));
       g.active = -1;
       activateTab(g.tabs.length - 1);
+    };
+    if (kind === "pdf" || kind === "img") {
+      const lang = langOf(path);
+      place({ path, lang, text: "", saved: "", sel: 0, dirty: false, view: "viewer" });
     } else {
       const j = await get("/open?path=" + encodeURIComponent(path));
       if (j.error) throw new Error(j.error);
       const lang = langOf(path);
       const text = j.text || "";
       if (!kind && text.length > 2000000) {
-        g.tabs.push({ path, lang, text, saved: text, sel: 0, dirty: false, view: "large" });
+        place({ path, lang, text, saved: text, sel: 0, dirty: false, view: "large" });
       } else {
         const view = kind === "md" ? "preview" : "edit";
-        g.tabs.push({ path, lang, text, saved: text, sel: 0, dirty: false, view });
+        place({ path, lang, text, saved: text, sel: 0, dirty: false, view });
       }
-      g.active = -1;
-      activateTab(g.tabs.length - 1);
     }
   }
   if (line) {
@@ -1709,14 +2085,47 @@ function treeFocusRow(row) {
   row.classList.add("kb-focus");
   row.scrollIntoView({ block: "nearest" });
 }
-async function inlineRename(abs) {
+async function inlineRename(abs, rowEl) {
   const base = rel(abs).split("/").pop();
-  const name = await askInput({ title: "Rename", value: base, okLabel: "Rename" });
-  if (!name || name === base) return;
-  const dir = rel(abs).split("/").slice(0, -1).join("/");
-  const to = dir ? dir + "/" + name : name;
-  await fsOp("/fs/rename", { from: rel(abs), to });
-  await renameTabs(abs, to);
+  const commitModal = async () => {
+    const name = await askInput({ title: "Rename", value: base, okLabel: "Rename" });
+    if (!name || name === base) return;
+    const dir = rel(abs).split("/").slice(0, -1).join("/");
+    const to = dir ? dir + "/" + name : name;
+    await fsOp("/fs/rename", { from: rel(abs), to });
+    await renameTabs(abs, to);
+  };
+  const label = rowEl
+    ? Array.from(rowEl.children).find(el => el.tagName === "SPAN" && !el.classList.contains("tri") && !el.classList.contains("gitbadge"))
+    : null;
+  if (!label) { await commitModal(); return; }
+  const input = document.createElement("input");
+  input.className = "kinput";
+  input.value = base;
+  input.style.cssText = "height:22px;flex:1;min-width:0;";
+  input.setAttribute("aria-label", "Rename file");
+  label.replaceWith(input);
+  input.focus();
+  const dot = base.lastIndexOf(".");
+  input.setSelectionRange(0, dot > 0 ? dot : base.length);
+  let done = false;
+  const commit = async save => {
+    if (done) return;
+    done = true;
+    const name = input.value.trim();
+    input.replaceWith(label);
+    if (!save || !name || name === base) return;
+    const dir = rel(abs).split("/").slice(0, -1).join("/");
+    const to = dir ? dir + "/" + name : name;
+    await fsOp("/fs/rename", { from: rel(abs), to });
+    await renameTabs(abs, to);
+  };
+  input.onkeydown = e => {
+    e.stopPropagation();
+    if (e.key === "Enter") commit(true);
+    else if (e.key === "Escape") commit(false);
+  };
+  input.onblur = () => commit(true);
 }
 function wireTreeKeys() {
   const box = document.getElementById("leftbody");
@@ -1749,7 +2158,7 @@ function wireTreeKeys() {
       }
     } else if (e.key === "F2") {
       const r = rows[cur];
-      if (r && r.dataset.path) { e.preventDefault(); inlineRename(r.dataset.path); }
+      if (r && r.dataset.path) { e.preventDefault(); inlineRename(r.dataset.path, r); }
     } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
       const now = Date.now();
       if (now - treeFindT > 800) treeFindBuf = "";
@@ -1761,7 +2170,7 @@ function wireTreeKeys() {
   });
   box.addEventListener("dblclick", e => {
     const r = e.target.closest(".trow");
-    if (r && r.dataset.path) inlineRename(r.dataset.path);
+    if (r && r.dataset.path) openFile(r.dataset.path, 0, false).catch(err => msg(String(err), true));
   });
 }
 function buildTree(paths) {
@@ -1834,7 +2243,7 @@ function renderTree(box, node, depth, base) {
       const badge = gitBadge(n.__full);
       if (badge) row.appendChild(badge);
       if (n.__full === (A() || {}).path) row.classList.add("sel");
-      row.onclick = () => openFile(n.__full, 0).catch(e => msg(String(e), true));
+      row.onclick = () => openFile(n.__full, 0, true).catch(e => msg(String(e), true));
       row.oncontextmenu = e => {
         e.preventDefault();
         e.stopPropagation();
@@ -1886,7 +2295,7 @@ function runSearch() {
         const d = document.createElement("div");
         d.className = "hit";
         d.textContent = rel(h.path) + ":" + h.line + ": " + h.preview;
-        d.onclick = () => openFile(h.path, h.line);
+        d.onclick = () => openFile(h.path, h.line, true);
         body.appendChild(d);
       });
       setDot(true);
@@ -3388,13 +3797,13 @@ function palFilter(q) {
     return S.palSearch.map(h => ({
       label: rel(h.path) + ":" + h.line,
       hint: "search",
-      run: () => openFile(h.path, h.line),
+      run: () => openFile(h.path, h.line, true),
     }));
   }
   const files = S.files
     .filter(p => !ql || rel(p).toLowerCase().includes(ql))
     .slice(0, 12)
-    .map(p => ({ label: rel(p), hint: "file", run: () => openFile(p, 0) }));
+    .map(p => ({ label: rel(p), hint: "file", run: () => openFile(p, 0, true) }));
   const cmds = COMMANDS
     .filter(c => !ql || c[0].toLowerCase().includes(ql))
     .map(c => ({ label: c[0], hint: c[2], run: c[1] }));
@@ -3441,6 +3850,141 @@ function palOpen(withFinder) {
 function palClose() {
   document.getElementById("palwrap").classList.remove("open");
   if (ED) ED.focus();
+}
+
+/* ============ find / replace (floating glass card) ============ */
+const FIND = { open: false, matches: [], cur: -1, matchCase: false };
+function openFind() {
+  const t = A();
+  if (!t || !ED) return;
+  document.getElementById("findcard").classList.add("open");
+  FIND.open = true;
+  const inp = document.getElementById("findneedle");
+  try {
+    const sel = ED.cm
+      ? ED.view.state.sliceDoc(ED.view.state.selection.main.from, ED.view.state.selection.main.to)
+      : "";
+    if (sel && sel.indexOf("\n") < 0 && sel.length <= 120) inp.value = sel;
+  } catch (e) {}
+  inp.focus();
+  inp.select();
+  runFind();
+}
+function closeFind() {
+  document.getElementById("findcard").classList.remove("open");
+  FIND.open = false;
+  FIND.matches = [];
+  FIND.cur = -1;
+  if (S.marks) S.marks.find = [];
+  for (const ed of ED_ALL) {
+    if (ed && ed.remark) { try { ed.remark(); } catch (e) {} }
+  }
+  if (ED) ED.focus();
+}
+function runFind() {
+  const t = A();
+  if (!t || !ED) return;
+  const needle = document.getElementById("findneedle").value;
+  const text = ED.getDoc();
+  FIND.matches = [];
+  FIND.cur = -1;
+  if (needle) {
+    const hay = FIND.matchCase ? text : text.toLowerCase();
+    const nd = FIND.matchCase ? needle : needle.toLowerCase();
+    let i = 0;
+    while (FIND.matches.length < 2000) {
+      i = hay.indexOf(nd, i);
+      if (i < 0) break;
+      FIND.matches.push({ from: i, to: i + nd.length, cur: false });
+      i += Math.max(1, nd.length);
+    }
+    if (FIND.matches.length) FIND.cur = 0;
+  }
+  paintFind();
+}
+function paintFind() {
+  const n = FIND.matches.length;
+  const needle = document.getElementById("findneedle").value;
+  document.getElementById("findcount").textContent = n ? FIND.cur + 1 + "/" + n : needle ? "0" : "";
+  FIND.matches.forEach((m, i) => { m.cur = i === FIND.cur; });
+  const t = A();
+  if (t && ED) {
+    if (!S.marks || S.marks.path !== t.path) {
+      S.marks = { path: t.path, spans: [], hunks: [], untracked: false, diags: [], find: [] };
+    }
+    S.marks.find = FIND.matches;
+    for (const ed of ED_ALL) {
+      if (ed && ed.remark) { try { ed.remark(); } catch (e) {} }
+    }
+    if (FIND.cur >= 0 && ED.sel) {
+      const m = FIND.matches[FIND.cur];
+      try { ED.sel(m.from, m.to - m.from); } catch (e) {}
+    }
+  }
+}
+function findStep(d) {
+  if (!FIND.matches.length) return;
+  FIND.cur = (FIND.cur + d + FIND.matches.length) % FIND.matches.length;
+  paintFind();
+}
+function findReplaceOne() {
+  const t = A();
+  if (!t || !ED || FIND.cur < 0 || !FIND.matches[FIND.cur]) return;
+  const m = FIND.matches[FIND.cur];
+  const rep = document.getElementById("findrepl").value;
+  if (ED.cm) {
+    ED.view.dispatch({ changes: { from: m.from, to: m.to, insert: rep } });
+  } else {
+    const v = ED.getDoc();
+    ED.setDoc(v.slice(0, m.from) + rep + v.slice(m.to));
+  }
+  markDirty(true);
+  scheduleMarks();
+  runFind();
+}
+function findReplaceAll() {
+  const t = A();
+  if (!t || !ED || !FIND.matches.length) return;
+  const rep = document.getElementById("findrepl").value;
+  const text = ED.getDoc();
+  let out = "", last = 0;
+  for (const m of FIND.matches) {
+    out += text.slice(last, m.from) + rep;
+    last = m.to;
+  }
+  out += text.slice(last);
+  ED.setDoc(out);
+  markDirty(true);
+  scheduleMarks();
+  runFind();
+}
+function wireFind() {
+  const needle = document.getElementById("findneedle");
+  needle.addEventListener("input", runFind);
+  needle.addEventListener("keydown", e => {
+    e.stopPropagation();
+    if (e.key === "Enter") { e.preventDefault(); findStep(e.shiftKey ? -1 : 1); }
+    else if (e.key === "Escape") { e.preventDefault(); closeFind(); }
+  });
+  document.getElementById("findrepl").addEventListener("keydown", e => {
+    e.stopPropagation();
+    if (e.key === "Enter") { e.preventDefault(); findReplaceOne(); }
+    else if (e.key === "Escape") { e.preventDefault(); closeFind(); }
+  });
+  document.getElementById("findclose").onclick = closeFind;
+  document.getElementById("findnext").onclick = () => findStep(1);
+  document.getElementById("findprev").onclick = () => findStep(-1);
+  document.getElementById("findrep").onclick = findReplaceOne;
+  document.getElementById("findall").onclick = findReplaceAll;
+  const tg = document.getElementById("findcase");
+  const flip = () => {
+    FIND.matchCase = !FIND.matchCase;
+    tg.classList.toggle("on", FIND.matchCase);
+    tg.setAttribute("aria-checked", FIND.matchCase ? "true" : "false");
+    runFind();
+  };
+  tg.onclick = flip;
+  tg.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); flip(); } };
 }
 
 /* ============ status/misc ============ */
@@ -3643,14 +4187,19 @@ document.addEventListener("keydown", e => {
   if (mod && e.key.toLowerCase() === "p") { e.preventDefault(); palOpen(e.shiftKey); }
   else if (mod && e.key.toLowerCase() === "k") { e.preventDefault(); palOpen(false); }
   else if (mod && e.key.toLowerCase() === "b") { e.preventDefault(); toggleDock("left"); }
-  else if (mod && e.key.toLowerCase() === "s") {
+  else if (mod && e.key.toLowerCase() === "f") {
+    e.preventDefault();
+    if (FIND.open) closeFind();
+    else openFind();
+  } else if (mod && e.key.toLowerCase() === "s") {
     if (document.activeElement && document.activeElement.id !== "editorwrap" && !document.activeElement.classList.contains("cm-content")) {
       e.preventDefault();
       saveActive();
     }
   } else if (mod && e.key === "\\") { e.preventDefault(); toggleSplit(); }
   else if (e.key === "Escape") {
-    if (document.getElementById("palwrap").classList.contains("open")) palClose();
+    if (FIND.open) closeFind();
+    else if (document.getElementById("palwrap").classList.contains("open")) palClose();
     else if (document.getElementById("settingswrap").classList.contains("open")) toggleSettings(false);
     else hideSuggest();
   }
@@ -3669,7 +4218,7 @@ async function toggleSplit() {
     col1.classList.remove("hidden");
     ensureGroup(1);
     if (!ED2 && ED_ALL[0] && ED_ALL[0].cm) {
-      ED2 = await makeEditor(document.getElementById("editorwrap1"));
+      ED2 = await makeEditor(document.getElementById("editorwrap1"), 1);
       ED_ALL[1] = ED2;
     }
     focusGroup(1);
@@ -3707,6 +4256,7 @@ function focusGroup(i) {
   document.getElementById("t-settings").onclick = () => toggleSettings();
   document.getElementById("settings-close").onclick = () => toggleSettings(false);
   wireShell();
+  wireFind();
   initSplitters();
   health();
   await loadFiles();

@@ -132,7 +132,22 @@ fn colored_spans_ts(line: &str, line_no: u64, spans: &[keplr_lang::TsSpan], max:
             keplr_lang::TokenKind::Number => {
                 out.push_str(&format!("\x1b[33m{piece}\x1b[0m"));
             }
-            keplr_lang::TokenKind::Other => {
+            keplr_lang::TokenKind::Type => {
+                out.push_str(&format!("\x1b[36m{piece}\x1b[0m"));
+            }
+            keplr_lang::TokenKind::Function => {
+                out.push_str(&format!("\x1b[32m{piece}\x1b[0m"));
+            }
+            keplr_lang::TokenKind::Macro => {
+                out.push_str(&format!("\x1b[33m{piece}\x1b[0m"));
+            }
+            keplr_lang::TokenKind::Attribute => {
+                out.push_str(&format!("\x1b[35m{piece}\x1b[0m"));
+            }
+            keplr_lang::TokenKind::Constant => {
+                out.push_str(&format!("\x1b[95m{piece}\x1b[0m"));
+            }
+            keplr_lang::TokenKind::Parameter | keplr_lang::TokenKind::Punctuation | keplr_lang::TokenKind::Other => {
                 out.push_str(piece);
             }
         }
@@ -218,7 +233,22 @@ fn colored_spans(lang: keplr_lang::LangKind, line: &str, max: usize) -> String {
             keplr_lang::TokenKind::Number => {
                 out.push_str(&format!("\x1b[33m{piece}\x1b[0m"));
             }
-            keplr_lang::TokenKind::Other => {
+            keplr_lang::TokenKind::Type => {
+                out.push_str(&format!("\x1b[36m{piece}\x1b[0m"));
+            }
+            keplr_lang::TokenKind::Function => {
+                out.push_str(&format!("\x1b[32m{piece}\x1b[0m"));
+            }
+            keplr_lang::TokenKind::Macro => {
+                out.push_str(&format!("\x1b[33m{piece}\x1b[0m"));
+            }
+            keplr_lang::TokenKind::Attribute => {
+                out.push_str(&format!("\x1b[35m{piece}\x1b[0m"));
+            }
+            keplr_lang::TokenKind::Constant => {
+                out.push_str(&format!("\x1b[95m{piece}\x1b[0m"));
+            }
+            keplr_lang::TokenKind::Parameter | keplr_lang::TokenKind::Punctuation | keplr_lang::TokenKind::Other => {
                 out.push_str(piece);
             }
         }

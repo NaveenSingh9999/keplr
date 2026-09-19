@@ -121,6 +121,68 @@ pub fn diff_stat(workdir: &Path) -> anyhow::Result<String> {
     git(workdir, &["diff", "--stat"])
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Hunk {
+    /// 1-based start line in the working-tree file.
+    pub start: u64,
+    /// Number of working-tree lines covered (0 = pure deletion at `start`).
+    pub len: u64,
+    pub kind: String,
+}
+
+/// Zero-context hunks for gutter bars. Returns (hunks, untracked).
+pub fn file_hunks(workdir: &Path, rel: &str) -> anyhow::Result<(Vec<Hunk>, bool)> {
+    if rel.contains("..") {
+        anyhow::bail!("invalid path");
+    }
+    let tracked = git(workdir, &["ls-files", "--error-unmatch", "--", rel]).is_ok();
+    if !tracked {
+        return Ok((Vec::new(), true));
+    }
+    let out = git(workdir, &["diff", "-U0", "--", rel])?;
+    let mut hunks = Vec::new();
+    for line in out.lines() {
+        if !line.starts_with("@@") {
+            continue;
+        }
+        // Header: @@ -old[,len] +new[,len] @@
+        let mut parts = line.split_whitespace();
+        parts.next();
+        let (mut old_len, mut new_start, mut new_len) = (1u64, 1u64, 1u64);
+        if let Some(o) = parts.next() {
+            let o = o.strip_prefix('-').unwrap_or(o);
+            let mut it = o.split(',');
+            it.next();
+            if let Some(l) = it.next() {
+                old_len = l.parse().unwrap_or(1);
+            }
+        }
+        if let Some(n) = parts.next() {
+            let n = n.strip_prefix('+').unwrap_or(n);
+            let mut it = n.split(',');
+            if let Some(s) = it.next() {
+                new_start = s.parse().unwrap_or(1);
+            }
+            if let Some(l) = it.next() {
+                new_len = l.parse().unwrap_or(1);
+            }
+        }
+        let kind = if new_len == 0 {
+            "del"
+        } else if old_len == 0 {
+            "add"
+        } else {
+            "mod"
+        };
+        hunks.push(Hunk {
+            start: new_start.max(1),
+            len: new_len,
+            kind: kind.to_string(),
+        });
+    }
+    Ok((hunks, false))
+}
+
 pub fn commit(workdir: &Path, message: &str) -> anyhow::Result<String> {
     git(workdir, &["add", "-A"])?;
     git(workdir, &["commit", "-m", message])

@@ -112,6 +112,13 @@ pub enum TokenKind {
     Str,
     Comment,
     Number,
+    Type,
+    Function,
+    Macro,
+    Attribute,
+    Constant,
+    Parameter,
+    Punctuation,
     Other,
 }
 
@@ -1012,8 +1019,13 @@ fn ts_kind(name: &str) -> Option<TokenKind> {
         "string" => Some(TokenKind::Str),
         "comment" => Some(TokenKind::Comment),
         "number" | "float" | "integer" => Some(TokenKind::Number),
-        "function" | "method" | "constructor" => Some(TokenKind::Keyword),
-        "type" | "class" | "interface" | "enum" => Some(TokenKind::Keyword),
+        "function" | "method" | "constructor" => Some(TokenKind::Function),
+        "type" | "class" | "interface" | "enum" | "struct" | "union" => Some(TokenKind::Type),
+        "macro" => Some(TokenKind::Macro),
+        "attribute" | "annotation" | "decorator" => Some(TokenKind::Attribute),
+        "constant" | "const" => Some(TokenKind::Constant),
+        "parameter" | "argument" => Some(TokenKind::Parameter),
+        "punctuation" | "operator" | "delimiter" | "bracket" => Some(TokenKind::Punctuation),
         _ => None,
     }
 }

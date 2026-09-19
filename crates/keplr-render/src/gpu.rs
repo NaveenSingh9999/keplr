@@ -800,11 +800,18 @@ pub fn upload_atlas(
 
 fn token_rgb(kind: keplr_lang::TokenKind) -> [f32; 3] {
     match kind {
-        keplr_lang::TokenKind::Keyword => [0.35, 0.65, 1.0],
-        keplr_lang::TokenKind::Str => [0.45, 0.85, 0.55],
-        keplr_lang::TokenKind::Comment => [0.55, 0.55, 0.6],
-        keplr_lang::TokenKind::Number => [0.95, 0.75, 0.35],
-        keplr_lang::TokenKind::Other => [0.9, 0.93, 0.95],
+        keplr_lang::TokenKind::Keyword => [0.99, 0.37, 0.64],
+        keplr_lang::TokenKind::Str => [0.99, 0.42, 0.36],
+        keplr_lang::TokenKind::Comment => [0.42, 0.47, 0.53],
+        keplr_lang::TokenKind::Number => [0.82, 0.75, 0.41],
+        keplr_lang::TokenKind::Type => [0.36, 0.85, 1.0],
+        keplr_lang::TokenKind::Function => [0.40, 0.72, 0.64],
+        keplr_lang::TokenKind::Macro => [0.99, 0.56, 0.25],
+        keplr_lang::TokenKind::Attribute => [0.99, 0.56, 0.25],
+        keplr_lang::TokenKind::Constant => [0.63, 0.40, 0.90],
+        keplr_lang::TokenKind::Parameter => [0.96, 0.96, 0.97],
+        keplr_lang::TokenKind::Punctuation => [0.55, 0.55, 0.58],
+        keplr_lang::TokenKind::Other => [0.96, 0.96, 0.97],
     }
 }
 
