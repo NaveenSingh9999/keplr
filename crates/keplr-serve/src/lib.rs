@@ -371,7 +371,18 @@ async fn diagnostics(
     let diags = if lang == keplr_lang::LangKind::Laml {
         keplr_lang::laml_diagnostics(&full)
     } else {
-        Vec::new()
+        match lang {
+            keplr_lang::LangKind::Rust
+            | keplr_lang::LangKind::Python
+            | keplr_lang::LangKind::JavaScript
+            | keplr_lang::LangKind::TypeScript
+            | keplr_lang::LangKind::Tsx
+            | keplr_lang::LangKind::Go => {
+                let text = std::fs::read_to_string(&full).unwrap_or_default();
+                keplr_lang::syntax_errors(lang, &full, &text)
+            }
+            _ => Vec::new(),
+        }
     };
     Json(serde_json::json!({
         "file": rel,

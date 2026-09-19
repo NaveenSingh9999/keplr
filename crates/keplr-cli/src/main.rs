@@ -96,6 +96,9 @@ enum Cmd {
     Diagnostics {
         file: PathBuf,
     },
+    Parse {
+        file: PathBuf,
+    },
     LspInstall {
         name: String,
         #[arg(long)]
@@ -479,7 +482,18 @@ async fn main() -> anyhow::Result<()> {
             let diagnostics = if lang == keplr_lang::LangKind::Laml {
                 keplr_lang::laml_diagnostics(&file)
             } else {
-                Vec::new()
+                match lang {
+                    keplr_lang::LangKind::Rust
+                    | keplr_lang::LangKind::Python
+                    | keplr_lang::LangKind::JavaScript
+                    | keplr_lang::LangKind::TypeScript
+                    | keplr_lang::LangKind::Tsx
+                    | keplr_lang::LangKind::Go => {
+                        let text = std::fs::read_to_string(&file).unwrap_or_default();
+                        keplr_lang::syntax_errors(lang, &file, &text)
+                    }
+                    _ => Vec::new(),
+                }
             };
             println!(
                 "{}",
@@ -490,6 +504,14 @@ async fn main() -> anyhow::Result<()> {
                     "servers": keplr_lang::lsp_servers(lang),
                 }))?
             );
+        }
+        Cmd::Parse { file } => {
+            let lang = keplr_lang::LangKind::from_path(&file);
+            let text = std::fs::read_to_string(&file).unwrap_or_default();
+            match keplr_lang::parse_sexp(lang, &text) {
+                Some(sexp) => println!("{sexp}"),
+                None => println!("no grammar for {lang:?}"),
+            }
         }
         Cmd::LspInstall { name, dir } => {
             if name == "rust-analyzer" {
