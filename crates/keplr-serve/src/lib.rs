@@ -388,13 +388,28 @@ async fn tasks_run(
 
 async fn index_status(State(state): State<AppState>) -> Json<serde_json::Value> {
     let ws = keplr_core::Workspace::new(state.root.clone());
-    let index = keplr_core::Index::load(&ws);
+    let (index, st) = keplr_core::Index::load_status(&ws);
     let path = ws.root.join(".keplr/index.json");
+    let state_name = match st {
+        keplr_core::IndexState::Fresh => "fresh",
+        keplr_core::IndexState::Missing => "missing",
+        keplr_core::IndexState::Corrupt => "corrupt",
+    };
     Json(serde_json::json!({
         "files": index.len(),
         "stored": path.exists(),
+        "state": state_name,
         "path": path.display().to_string(),
     }))
+}
+
+async fn index_rebuild(State(state): State<AppState>) -> Json<serde_json::Value> {
+    let ws = keplr_core::Workspace::new(state.root.clone());
+    let index = keplr_core::Index::build(&ws);
+    match index.save(&ws) {
+        Ok(()) => Json(serde_json::json!({"ok": true, "files": index.len()})),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": format!("{e:#}")})),
+    }
 }
 
 async fn symbols(
@@ -1334,6 +1349,7 @@ pub async fn serve_full(
         .route("/tasks/run", post(tasks_run))
         .route("/scene", get(scene))
         .route("/index/status", get(index_status))
+        .route("/index/rebuild", post(index_rebuild))
         .route("/diagnostics", get(diagnostics))
         .route("/diagnostics/content", post(diagnostics_content))
         .route("/highlight", get(highlight))

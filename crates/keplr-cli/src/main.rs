@@ -350,8 +350,16 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         Cmd::Index { refresh } => {
-            let mut index = keplr_core::Index::load(&ws);
-            if refresh && !index.is_empty() {
+            let (mut index, state) = keplr_core::Index::load_status(&ws);
+            if state == keplr_core::IndexState::Corrupt {
+                index = keplr_core::Index::build(&ws);
+                index.save(&ws)?;
+                println!(
+                    "index files={} state=rebuilt-corrupt path={}",
+                    index.len(),
+                    ws.root.join(".keplr/index.json").display()
+                );
+            } else if refresh && !index.is_empty() {
                 let changed = index.refresh(&ws);
                 index.save(&ws)?;
                 println!(

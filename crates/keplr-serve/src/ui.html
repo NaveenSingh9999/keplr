@@ -2441,14 +2441,31 @@ function msg(t, isErr) {
 function setCursor(line, col) {
   document.getElementById("scursor").textContent = line + ":" + col;
 }
+let indexRebuilt = false;
 function health() {
   get("/health").then(h => {
     wsRoot = h.root || "";
     document.getElementById("root").textContent = wsRoot;
     document.getElementById("sbranch").textContent = "branch: " + (h.branch || "?");
     return get("/index/status").catch(() => null);
-  }).then(s => {
-    if (s) document.getElementById("sfiles").textContent = "files: " + s.files;
+  }).then(async s => {
+    if (s) {
+      let label = "files: " + s.files;
+      if (s.state && s.state !== "fresh") {
+        label += " (index " + s.state + ")";
+        if (!indexRebuilt) {
+          indexRebuilt = true;
+          try {
+            const r = await post("/index/rebuild", {});
+            if (r.ok) {
+              label = "files: " + r.files + " (rebuilt)";
+              msg("index was " + s.state + " — rebuilt");
+            }
+          } catch (e) {}
+        }
+      }
+      document.getElementById("sfiles").textContent = label;
+    }
     setDot(true);
     refreshGitCounts();
   }).catch(e => { setDot(false); msg(String(e), true); });

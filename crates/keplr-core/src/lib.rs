@@ -138,6 +138,13 @@ fn index_path(root: &Path) -> PathBuf {
     root.join(".keplr/index.json")
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IndexState {
+    Fresh,
+    Missing,
+    Corrupt,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct Index {
     entries: BTreeMap<PathBuf, FileEntry>,
@@ -176,18 +183,33 @@ impl Index {
 
     #[cfg(not(target_arch = "wasm32"))]
     pub fn load(ws: &Workspace) -> Self {
-        std::fs::read_to_string(index_path(&ws.root))
-            .ok()
-            .and_then(|t| serde_json::from_str::<Vec<FileEntry>>(&t).ok())
-            .map(|vec| Self {
-                entries: vec.into_iter().map(|e| (e.path.clone(), e)).collect(),
-            })
-            .unwrap_or_default()
+        Self::load_status(ws).0
     }
 
     #[cfg(target_arch = "wasm32")]
     pub fn load(_ws: &Workspace) -> Self {
         Self::default()
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn load_status(ws: &Workspace) -> (Self, IndexState) {
+        match std::fs::read_to_string(index_path(&ws.root)) {
+            Err(_) => (Self::default(), IndexState::Missing),
+            Ok(t) => match serde_json::from_str::<Vec<FileEntry>>(&t) {
+                Ok(vec) => (
+                    Self {
+                        entries: vec.into_iter().map(|e| (e.path.clone(), e)).collect(),
+                    },
+                    IndexState::Fresh,
+                ),
+                Err(_) => (Self::default(), IndexState::Corrupt),
+            },
+        }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn load_status(_ws: &Workspace) -> (Self, IndexState) {
+        (Self::default(), IndexState::Missing)
     }
 
     #[cfg(not(target_arch = "wasm32"))]
