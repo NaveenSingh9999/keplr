@@ -1022,11 +1022,12 @@ fn ts_kind(name: &str) -> Option<TokenKind> {
 fn highlights_query(lang: LangKind) -> Option<&'static str> {
     match lang {
         LangKind::Rust => Some(tree_sitter_rust::HIGHLIGHTS_QUERY),
-        LangKind::JavaScript => Some(tree_sitter_javascript::HIGHLIGHTS_QUERY),
+        // 0.25 renamed the const to the singular HIGHLIGHT_QUERY.
+        LangKind::JavaScript => Some(tree_sitter_javascript::HIGHLIGHT_QUERY),
         LangKind::Python => Some(tree_sitter_python::HIGHLIGHTS_QUERY),
         LangKind::Go => Some(tree_sitter_go::HIGHLIGHTS_QUERY),
-        LangKind::TypeScript => Some(tree_sitter_typescript::HIGHLIGHTS_QUERY_TYPESCRIPT),
-        LangKind::Tsx => Some(tree_sitter_typescript::HIGHLIGHTS_QUERY_TSX),
+        // 0.23 ships one highlights.scm shared by both grammars.
+        LangKind::TypeScript | LangKind::Tsx => Some(tree_sitter_typescript::HIGHLIGHTS_QUERY),
         _ => None,
     }
 }
@@ -1056,10 +1057,12 @@ pub fn ts_highlight(lang: LangKind, text: &str) -> Vec<TsSpan> {
     let mut cursor = tree_sitter::QueryCursor::new();
     let names = query.capture_names();
     let mut out: Vec<TsSpan> = Vec::new();
-    for m in cursor.matches(&query, tree.root_node(), text.as_bytes()) {
-        for cap in m.captures {
-            let raw = &names[cap.index as usize];
-            let name: &str = raw.as_ref();
+    // tree-sitter 0.27: QueryMatches is a streaming iterator, not std Iterator.
+    use tree_sitter::StreamingIterator as _;
+    let mut matches = cursor.matches(&query, tree.root_node(), text.as_bytes());
+    while let Some(m) = matches.next() {
+        for cap in m.captures() {
+            let name: &str = names[cap.index as usize];
             let Some(kind) = ts_kind(name) else {
                 continue;
             };

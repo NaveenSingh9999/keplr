@@ -126,6 +126,20 @@ pub fn commit(workdir: &Path, message: &str) -> anyhow::Result<String> {
     git(workdir, &["commit", "-m", message])
 }
 
+pub fn push(workdir: &Path, remote: Option<&str>, set_upstream: bool) -> anyhow::Result<String> {
+    let remote = remote.filter(|r| !r.trim().is_empty()).unwrap_or("origin");
+    if set_upstream {
+        let branch = current_branch(workdir)?;
+        git(workdir, &["push", "--set-upstream", remote, &branch])
+    } else {
+        git(workdir, &["push", remote])
+    }
+}
+
+pub fn current_branch(workdir: &Path) -> anyhow::Result<String> {
+    Ok(git(workdir, &["branch", "--show-current"])?.trim().to_string())
+}
+
 pub fn stage(workdir: &Path, path: &str) -> anyhow::Result<String> {
     git(workdir, &["add", "--", path])
 }

@@ -108,7 +108,7 @@ fn colored_spans_ts(line: &str, line_no: u64, spans: &[keplr_lang::TsSpan], max:
     if relevant.is_empty() {
         return text;
     }
-    relevant.sort_by_key(|s| (s.col, std::u64::MAX - s.len));
+    relevant.sort_by_key(|s| (s.col, u64::MAX - s.len));
     let mut out = String::new();
     let mut pos = 0usize;
     for s in relevant {

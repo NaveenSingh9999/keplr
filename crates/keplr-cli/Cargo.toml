@@ -10,7 +10,9 @@ path = "src/main.rs"
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true
+serde.workspace = true
 serde_json.workspace = true
+libc = "0.2"
 keplr-core = { path = "../keplr-core" }
 keplr-build = { path = "../keplr-build" }
 keplr-lang = { path = "../keplr-lang" }

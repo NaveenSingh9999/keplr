@@ -164,4 +164,21 @@ curl '127.0.0.1:7137/highlight?path=src/main.rs&full=1' | head -c 300
 curl -X POST 127.0.0.1:7137/index/rebuild
 ```
 
+## Use (lifecycle, production)
+
+```bash
+cargo run -p keplr-cli -- --root . start --name dev          # background serve on :7137
+cargo run -p keplr-cli -- list                               # running instances
+cargo run -p keplr-cli -- stop --name dev                    # or --all
+cargo run -p keplr-cli -- install --version latest           # needs GITHUB_TOKEN for this private repo
+```
+
+The web UI adds one-click Push in the source panel, parallel terminal tabs (`+` in the
+terminal panel, each an independent shell), and a serial monitor bottom tab
+(port + baud + send; Unix only — `/dev/ttyUSB*`, `/dev/ttyACM*`, `/dev/cu.*`).
+
+Windows/macOS: same CLI (`cargo install -p keplr-cli`); lifecycle commands work with
+native process handling. The managed binary lands in `~/.keplr/bin` — on Windows add
+`%USERPROFILE%\.keplr\bin` to PATH yourself. Serial monitor is Unix-only.
+
 CI runs `cargo test --workspace --all-targets`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo build --workspace` on every push.

@@ -5,6 +5,8 @@ use std::{
 };
 
 mod tui;
+mod pm;
+mod self_update;
 
 #[derive(Parser)]
 #[command(name = "keplr", version, about = "Keplr personal IDE")]
@@ -27,6 +29,12 @@ enum GitCmd {
     Commit {
         #[arg(short, long)]
         message: String,
+    },
+    Push {
+        #[arg(long)]
+        remote: Option<String>,
+        #[arg(long)]
+        set_upstream: bool,
     },
 }
 
@@ -146,6 +154,44 @@ enum Cmd {
         bind: String,
         #[arg(long)]
         allow_open_lan: bool,
+    },
+    Start {
+        #[arg(long)]
+        name: Option<String>,
+        #[arg(long)]
+        port: Option<u16>,
+        #[arg(long, default_value = "")]
+        token: String,
+        #[arg(long, default_value = "127.0.0.1")]
+        bind: String,
+        #[arg(long)]
+        allow_open_lan: bool,
+    },
+    Stop {
+        #[arg(long)]
+        name: Option<String>,
+        #[arg(long)]
+        all: bool,
+    },
+    List,
+    Status {
+        #[arg(long)]
+        name: Option<String>,
+    },
+    Install {
+        #[arg(long, default_value = "latest")]
+        version: String,
+    },
+    Update {
+        #[arg(long, default_value = "latest")]
+        version: String,
+    },
+    Downgrade {
+        version: String,
+    },
+    Uninstall {
+        #[arg(long)]
+        yes: bool,
     },
     Token {
         #[arg(long)]
@@ -731,6 +777,9 @@ async fn main() -> anyhow::Result<()> {
             GitCmd::Commit { message } => {
                 print!("{}", keplr_core::git::commit(&cli.root, &message)?);
             }
+            GitCmd::Push { remote, set_upstream } => {
+                print!("{}", keplr_core::git::push(&cli.root, remote.as_deref(), set_upstream)?);
+            }
         },
         Cmd::Lfs { cmd } => match cmd {
             LfsCmd::Pull { include } => {
@@ -766,6 +815,53 @@ async fn main() -> anyhow::Result<()> {
                 eprintln!("keplr: token gate enabled");
             }
             keplr_serve::serve_full(cli.root, port, resolved, &bind, allow_open_lan).await?;
+        }
+        Cmd::Start {
+            name,
+            port,
+            token,
+            bind,
+            allow_open_lan,
+        } => {
+            let root = cli.root.clone();
+            let name = name.unwrap_or_else(|| pm::default_name(&root));
+            let spec = pm::StartSpec {
+                name,
+                port,
+                root,
+                token,
+                bind,
+                allow_open_lan,
+            };
+            let exe = std::env::current_exe()?;
+            pm::start(&spec, &exe)?;
+        }
+        Cmd::Stop { name, all } => {
+            if all {
+                pm::stop_all()?;
+            } else if let Some(n) = name {
+                pm::stop(&n)?;
+            } else {
+                pm::stop_single()?;
+            }
+        }
+        Cmd::List => {
+            pm::list()?;
+        }
+        Cmd::Status { name } => {
+            pm::status(name.as_deref())?;
+        }
+        Cmd::Install { version } => {
+            self_update::install(&version)?;
+        }
+        Cmd::Update { version } => {
+            self_update::update(&version)?;
+        }
+        Cmd::Downgrade { version } => {
+            self_update::downgrade(&version)?;
+        }
+        Cmd::Uninstall { yes } => {
+            self_update::uninstall(yes)?;
         }
         Cmd::Token { save, rotate } => {
             let token = keplr_serve::new_token();

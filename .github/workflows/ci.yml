@@ -70,3 +70,21 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo run -q -p keplr-cli -- --root /tmp/benchroot bench --files 200 --lines 20 --json
+
+  macos-check:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test -p keplr-cli --all-targets
+      - run: cargo clippy -p keplr-cli --all-targets -- -D warnings
+
+  windows-check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --workspace --all-targets
+      - run: cargo test -p keplr-cli --bin keplr

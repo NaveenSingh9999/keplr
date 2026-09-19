@@ -186,7 +186,7 @@
   #bbody .prob { cursor: pointer; padding: 2px 0; }
   #bbody .prob:hover { color: var(--accent); }
   #bbody .logline { padding: 1px 0; color: var(--dim); }
-  #termcanvas { display: block; width: 100%; height: 100%; outline: none; cursor: text; }
+  #termholder canvas { display: block; outline: none; cursor: text; }
   /* ---- statusbar ---- */
   #statusbar {
     display: flex; gap: 14px; padding: 4px 12px; flex: none;
@@ -423,6 +423,7 @@
     <button data-btab="tasks">tasks</button>
     <button data-btab="console">console</button>
     <button data-btab="terminal">terminal</button>
+    <button data-btab="serial">serial</button>
   </div>
   <div style="padding:0 12px;"><input id="needle" placeholder="search content…" autocomplete="off" spellcheck="false" style="width:100%;margin:6px 0;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font:inherit;"></div>
   <div id="bbody"></div>
@@ -1342,7 +1343,12 @@ function renderConsole() {
 }
 
 /* ============ terminal (canvas, alacritty_terminal grid) ============ */
-const TERM = { canvas: null, ctx: null, socket: null, grid: null, cursor: [0, 0], show: true, ready: false, cellW: 8, cellH: 16, font: "" };
+const TERM = { sessions: [], active: -1, n: 0, strip: null, holder: null, cellW: 8, cellH: 16, font: "" };
+
+function termActive() {
+  if (TERM.active < 0 || TERM.active >= TERM.sessions.length) return null;
+  return TERM.sessions[TERM.active];
+}
 
 function termFont(px) {
   return px + 'px "SF Mono","JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace';
@@ -1357,13 +1363,14 @@ function termMeasure() {
   TERM.font = termFont(px);
 }
 window.__termRefresh = function () {
-  if (!TERM.canvas) return;
+  const s = termActive();
+  if (!s || !s.canvas) return;
   termMeasure();
-  if (TERM.socket && TERM.socket.readyState === 1) {
+  if (s.socket && s.socket.readyState === 1) {
     const d = termDims();
-    TERM.socket.send("resize:" + d.cols + "x" + d.rows);
+    s.socket.send("resize:" + d.cols + "x" + d.rows);
   }
-  if (TERM.grid) termDraw();
+  if (s.grid && TERM.sessions[TERM.active] === s) termDraw();
 };
 
 function termDims() {
@@ -1379,16 +1386,18 @@ function termDims() {
 }
 
 function termDraw() {
-  const g = TERM.grid;
-  if (!TERM.ctx || !g) return;
-  const ctx = TERM.ctx;
+  const s = termActive();
+  if (!s || !s.ctx || !s.grid) return;
+  const g = s.grid;
+  const ctx = s.ctx;
+  const cv = s.canvas;
   const dpr = window.devicePixelRatio || 1;
   const W = g.cols * TERM.cellW, H = g.rows * TERM.cellH;
-  if (TERM.canvas.width !== Math.round(W * dpr) || TERM.canvas.height !== Math.round(H * dpr)) {
-    TERM.canvas.width = Math.round(W * dpr);
-    TERM.canvas.height = Math.round(H * dpr);
-    TERM.canvas.style.width = W + "px";
-    TERM.canvas.style.height = H + "px";
+  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) {
+    cv.width = Math.round(W * dpr);
+    cv.height = Math.round(H * dpr);
+    cv.style.width = W + "px";
+    cv.style.height = H + "px";
   }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = "#161b22";
@@ -1430,7 +1439,8 @@ function termDraw() {
 }
 
 function termSend(data) {
-  if (TERM.socket && TERM.socket.readyState === 1) TERM.socket.send(data);
+  const s = termActive();
+  if (s && s.socket && s.socket.readyState === 1) s.socket.send(data);
 }
 
 function termKey(e) {
@@ -1469,35 +1479,88 @@ function termKey(e) {
 function showTerminal() {
   const body = document.getElementById("bbody");
   body.innerHTML = "";
-  let cv = document.getElementById("termcanvas");
-  if (!cv) {
-    cv = document.createElement("canvas");
-    cv.id = "termcanvas";
-    cv.tabIndex = 0;
-  }
-  body.appendChild(cv);
-  TERM.canvas = cv;
-  TERM.ctx = cv.getContext("2d");
+  const strip = document.createElement("div");
+  strip.id = "termstrip";
+  strip.style.cssText = "display:flex;gap:4px;align-items:center;padding:2px 4px;flex:none;overflow-x:auto;";
+  body.appendChild(strip);
+  const holder = document.createElement("div");
+  holder.id = "termholder";
+  holder.style.cssText = "flex:1;min-height:0;overflow:auto;position:relative;";
+  body.appendChild(holder);
+  TERM.strip = strip;
+  TERM.holder = holder;
   termMeasure();
-  cv.onkeydown = termKey;
-  cv.onpaste = e => {
-    e.preventDefault();
-    const t = (e.clipboardData || window.clipboardData).getData("text");
-    if (t) termSend(new TextEncoder().encode(t));
-  };
-  cv.onclick = () => cv.focus();
-  if (TERM.ready && TERM.socket && TERM.socket.readyState <= 1) {
-    fitTerminal();
-    cv.focus();
-    return;
+  for (const s of TERM.sessions) {
+    s.canvas.style.display = "none";
+    holder.appendChild(s.canvas);
   }
+  renderTermTabs();
+  if (TERM.active < 0 || !TERM.sessions[TERM.active]) {
+    if (TERM.sessions.length) activateTerm(0);
+    else newTerm();
+  } else {
+    activateTerm(TERM.active);
+  }
+}
+
+function renderTermTabs() {
+  const strip = TERM.strip;
+  if (!strip) return;
+  strip.innerHTML = "";
+  TERM.sessions.forEach((s, i) => {
+    const d = document.createElement("div");
+    d.className = "tab" + (i === TERM.active ? " sel" : "");
+    const nm = document.createElement("span");
+    nm.textContent = s.name + (s.ready ? "" : " (dead)");
+    const x = document.createElement("span");
+    x.className = "x";
+    x.textContent = "×";
+    x.onclick = ev => { ev.stopPropagation(); closeTerm(i); };
+    d.appendChild(nm);
+    d.appendChild(x);
+    d.onclick = () => activateTerm(i);
+    strip.appendChild(d);
+  });
+  const add = document.createElement("button");
+  add.className = "mini";
+  add.textContent = "+";
+  add.title = "new terminal (independent shell)";
+  add.onclick = () => newTerm();
+  strip.appendChild(add);
+}
+
+function activateTerm(i) {
+  if (i < 0 || i >= TERM.sessions.length) return;
+  TERM.active = i;
+  for (let k = 0; k < TERM.sessions.length; k++) {
+    TERM.sessions[k].canvas.style.display = k === i ? "" : "none";
+  }
+  renderTermTabs();
+  if (TERM.sessions[i].grid) termDraw();
+  fitTerminal();
+  TERM.sessions[i].canvas.focus();
+}
+
+function closeTerm(i) {
+  const s = TERM.sessions[i];
+  if (!s) return;
+  try { if (s.socket) s.socket.close(); } catch (e) {}
+  if (s.canvas && s.canvas.parentNode) s.canvas.parentNode.removeChild(s.canvas);
+  TERM.sessions.splice(i, 1);
+  if (TERM.active >= TERM.sessions.length) TERM.active = TERM.sessions.length - 1;
+  if (!TERM.sessions.length) { TERM.active = -1; newTerm(); return; }
+  activateTerm(Math.max(0, TERM.active));
+}
+
+function newTerm() {
   connectTerminal();
 }
 
 function fitTerminal() {
-  if (!TERM.canvas || !TERM.socket || TERM.socket.readyState !== 1) return;
+  const s = termActive();
+  if (!s || !s.canvas || !s.socket || s.socket.readyState !== 1) return;
   const d = termDims();
-  TERM.socket.send("resize:" + d.cols + "x" + d.rows);
+  s.socket.send("resize:" + d.cols + "x" + d.rows);
 }
 
 function connectTerminal() {
@@ -1505,31 +1568,199 @@ function connectTerminal() {
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
   let wsUrl = proto + "//" + location.host + "/terms/ws?cols=" + d.cols + "&rows=" + d.rows;
   if (token) wsUrl += "&token=" + encodeURIComponent(token);
+  TERM.n += 1;
+  const cv = document.createElement("canvas");
+  cv.tabIndex = 0;
+  cv.onkeydown = termKey;
+  cv.onpaste = e => {
+    e.preventDefault();
+    const t = (e.clipboardData || window.clipboardData).getData("text");
+    if (t) termSend(new TextEncoder().encode(t));
+  };
+  cv.onclick = () => cv.focus();
+  const s = {
+    id: "t" + Date.now() + "_" + TERM.n,
+    name: "term " + TERM.n,
+    socket: null, grid: null, canvas: cv, ctx: cv.getContext("2d"), ready: false
+  };
+  TERM.sessions.push(s);
+  if (TERM.holder) { cv.style.display = "none"; TERM.holder.appendChild(cv); }
   let sock;
   try {
     sock = new WebSocket(wsUrl);
   } catch (e) {
-    TERM.canvas.outerHTML = '<div class="logline err">terminal: cannot open socket</div>';
+    renderTermTabs();
+    msg("terminal: cannot open socket", true);
     return;
   }
   sock.binaryType = "arraybuffer";
-  TERM.socket = sock;
-  sock.onopen = () => { TERM.ready = true; TERM.canvas.focus(); };
+  s.socket = sock;
+  TERM.active = TERM.sessions.length - 1;
+  renderTermTabs();
+  activateTerm(TERM.active);
+  sock.onopen = () => { s.ready = true; renderTermTabs(); cv.focus(); };
   sock.onmessage = ev => {
     try {
       const frame = JSON.parse(ev.data);
-      TERM.grid = frame;
-      termDraw();
+      s.grid = frame;
+      if (TERM.sessions[TERM.active] === s) termDraw();
     } catch (e) {}
   };
   const dead = () => {
-    TERM.ready = false;
-    log("console", "terminal disconnected — reselect terminal to reconnect");
-    msg("terminal disconnected", true);
+    s.ready = false;
+    renderTermTabs();
+    if (TERM.sessions[TERM.active] === s) {
+      log("console", s.name + " disconnected — open a new one with +");
+      msg("terminal disconnected", true);
+    }
   };
   sock.onclose = dead;
   sock.onerror = dead;
   window.onresize = () => { if (S.bottomTab === "terminal") fitTerminal(); };
+}
+
+/* ============ serial monitor ============ */
+const SER = { socket: null, connected: false };
+function showSerial() {
+  const body = document.getElementById("bbody");
+  body.innerHTML = "";
+  const wrap = document.createElement("div");
+  wrap.style.cssText = "display:flex;flex-direction:column;height:100%;gap:6px;padding:6px;";
+  const row = document.createElement("div");
+  row.style.cssText = "display:flex;gap:6px;align-items:center;flex:none;flex-wrap:wrap;";
+  const portSel = document.createElement("select");
+  const baudSel = document.createElement("select");
+  [9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600].forEach(b => {
+    const o = document.createElement("option");
+    o.value = String(b);
+    o.textContent = String(b);
+    if (b === 115200) o.selected = true;
+    baudSel.appendChild(o);
+  });
+  const refBtn = document.createElement("button");
+  refBtn.className = "mini";
+  refBtn.textContent = "refresh";
+  refBtn.onclick = () => loadPorts();
+  const connBtn = document.createElement("button");
+  connBtn.className = "mini";
+  connBtn.textContent = "Connect";
+  const nl = document.createElement("label");
+  const nlBox = document.createElement("input");
+  nlBox.type = "checkbox";
+  nlBox.checked = true;
+  nl.appendChild(nlBox);
+  nl.appendChild(document.createTextNode(" +newline"));
+  const out = document.createElement("pre");
+  out.style.cssText = "flex:1;min-height:60px;overflow:auto;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px;margin:0;font-family:var(--mono);font-size:12px;white-space:pre-wrap;";
+  const sendRow = document.createElement("div");
+  sendRow.style.cssText = "display:flex;gap:6px;flex:none;";
+  const inp = document.createElement("input");
+  inp.placeholder = "type to send… (Enter)";
+  inp.style.cssText = "flex:1;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font:inherit;";
+  const sendBtn = document.createElement("button");
+  sendBtn.className = "mini";
+  sendBtn.textContent = "Send";
+  function slog(t, err) {
+    const d = document.createElement("div");
+    if (err) d.style.color = "var(--error)";
+    d.textContent = t;
+    out.appendChild(d);
+    while (out.children.length > 500) out.removeChild(out.firstChild);
+    out.scrollTop = out.scrollHeight;
+  }
+  function slogRaw(t) {
+    const d = document.createElement("span");
+    d.textContent = t;
+    out.appendChild(d);
+    while (out.children.length > 500) out.removeChild(out.firstChild);
+    out.scrollTop = out.scrollHeight;
+  }
+  async function loadPorts() {
+    try {
+      const j = await get("/serial/ports");
+      if (j.error) { slog("ports: " + j.error, true); return; }
+      portSel.innerHTML = "";
+      (j.ports || []).forEach(p => {
+        const o = document.createElement("option");
+        o.value = p;
+        o.textContent = p;
+        portSel.appendChild(o);
+      });
+      if (!j.ports || !j.ports.length) slog("no serial ports found (need dialout permission?)");
+    } catch (e) { slog(String(e), true); }
+  }
+  function setConn(on) {
+    SER.connected = on;
+    connBtn.textContent = on ? "Disconnect" : "Connect";
+  }
+  connBtn.onclick = () => {
+    if (SER.connected) {
+      try { SER.socket.send("close"); } catch (e) {}
+      try { SER.socket.close(); } catch (e) {}
+      setConn(false);
+      slog("disconnected");
+      return;
+    }
+    const port = portSel.value, baud = baudSel.value;
+    if (!port) { slog("pick a port first", true); return; }
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    let url = proto + "//" + location.host + "/serial/ws?port=" + encodeURIComponent(port) + "&baud=" + encodeURIComponent(baud);
+    if (token) url += "&token=" + encodeURIComponent(token);
+    let sock;
+    try { sock = new WebSocket(url); }
+    catch (e) { slog("cannot open socket", true); return; }
+    sock.binaryType = "arraybuffer";
+    SER.socket = sock;
+    connBtn.textContent = "…";
+    sock.onmessage = ev => {
+      if (typeof ev.data === "string") {
+        try {
+          const j = JSON.parse(ev.data);
+          if (j.error) { slog(j.error, true); try { sock.close(); } catch (e2) {} return; }
+          if (j.open) { setConn(true); slog("connected: " + j.open); return; }
+        } catch (e) {}
+        slog(ev.data);
+        return;
+      }
+      slogRaw(new TextDecoder().decode(new Uint8Array(ev.data)));
+    };
+    const dead = () => {
+      if (SER.socket === sock) {
+        SER.socket = null;
+        setConn(false);
+        slog("disconnected");
+      }
+    };
+    sock.onclose = dead;
+    sock.onerror = dead;
+  };
+  function doSend() {
+    if (!inp.value || !SER.connected || !SER.socket) return;
+    try {
+      SER.socket.send(new TextEncoder().encode(inp.value + (nlBox.checked ? "\n" : "")));
+    } catch (e) { slog(String(e), true); }
+    inp.value = "";
+  }
+  sendBtn.onclick = doSend;
+  inp.onkeydown = e => { if (e.key === "Enter") doSend(); };
+  row.appendChild(portSel);
+  row.appendChild(baudSel);
+  row.appendChild(refBtn);
+  row.appendChild(connBtn);
+  row.appendChild(nl);
+  sendRow.appendChild(inp);
+  sendRow.appendChild(sendBtn);
+  wrap.appendChild(row);
+  wrap.appendChild(out);
+  wrap.appendChild(sendRow);
+  body.appendChild(wrap);
+  loadPorts();
+  if (SER.socket && SER.socket.readyState === 1) {
+    setConn(true);
+    slog("reattached (history clears on tab switch)");
+  } else {
+    setConn(false);
+  }
 }
 
 function setBottomTab(t, silent) {
@@ -1543,6 +1774,7 @@ function setBottomTab(t, silent) {
   else if (t === "tasks") showTasks();
   else if (t === "search") runSearch();
   else if (t === "terminal") showTerminal();
+  else if (t === "serial") showSerial();
   else renderConsole();
 }
 
@@ -1937,6 +2169,24 @@ async function loadScm() {
   commitBtn.onclick = doCommit;
   wrap.appendChild(msg2);
   wrap.appendChild(commitBtn);
+  const pushBtn = document.createElement("button");
+  pushBtn.className = "commitbtn";
+  pushBtn.textContent = "Push";
+  pushBtn.title = "git push origin (one click)";
+  pushBtn.onclick = async () => {
+    pushBtn.disabled = true;
+    pushBtn.textContent = "Pushing…";
+    try {
+      const j = await post("/git/push", {});
+      if (!j.ok) throw new Error(j.error || "push failed");
+      log("console", "pushed" + (j.output ? ": " + String(j.output).trim().split("\n").pop() : ""));
+      msg("pushed");
+      await reloadScm();
+    } catch (e) { msg(String(e), true); }
+    pushBtn.disabled = false;
+    pushBtn.textContent = "Push";
+  };
+  wrap.appendChild(pushBtn);
   const branchRow = document.createElement("div");
   branchRow.style.cssText = "display:flex;gap:6px;align-items:center;";
   const sel = document.createElement("select");

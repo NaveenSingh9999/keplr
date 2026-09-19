@@ -509,7 +509,7 @@ async fn highlight(
     };
     let lang = keplr_lang::LangKind::from_path(&full);
     if params.get("full").map(|v| v == "1").unwrap_or(false) {
-        let text = keplr_core::buffer::Buffer::load(&full)
+        let text = keplr_core::buffer::Buffer::load(full.clone())
             .map(|b| b.rope.to_string())
             .unwrap_or_default();
         return Json(serde_json::json!({
@@ -749,6 +749,14 @@ struct GitStashReq {
 }
 
 #[derive(serde::Deserialize)]
+struct GitPushReq {
+    #[serde(default)]
+    remote: Option<String>,
+    #[serde(default)]
+    set_upstream: bool,
+}
+
+#[derive(serde::Deserialize)]
 struct LfsIncludeReq {
     #[serde(default)]
     include: Option<String>,
@@ -844,6 +852,16 @@ async fn git_stash(
         keplr_core::git::stash_push(&state.root, &req.message)
     };
     match done {
+        Ok(out) => Json(serde_json::json!({"ok": true, "output": out})),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": format!("{e:#}")})),
+    }
+}
+
+async fn git_push(
+    State(state): State<AppState>,
+    Json(req): Json<GitPushReq>,
+) -> Json<serde_json::Value> {
+    match keplr_core::git::push(&state.root, req.remote.as_deref(), req.set_upstream) {
         Ok(out) => Json(serde_json::json!({"ok": true, "output": out})),
         Err(e) => Json(serde_json::json!({"ok": false, "error": format!("{e:#}")})),
     }
@@ -1123,6 +1141,182 @@ async fn push_frame(
     Ok(())
 }
 
+/* ============ serial monitor ============ */
+
+/// Escape arbitrary text for embedding in a tiny JSON string value.
+fn json_escape(s: &str) -> String {
+    s.replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .chars()
+        .filter(|c| !c.is_control())
+        .collect()
+}
+
+async fn serial_ports() -> Json<serde_json::Value> {
+    #[cfg(unix)]
+    {
+        let mut ports: Vec<String> = Vec::new();
+        if let Ok(rd) = std::fs::read_dir("/dev") {
+            for e in rd.flatten() {
+                let name = e.file_name().to_string_lossy().to_string();
+                if name.starts_with("ttyUSB")
+                    || name.starts_with("ttyACM")
+                    || name.starts_with("ttyS")
+                    || name.starts_with("cu.")
+                    || name.starts_with("tty.usb")
+                    || name.starts_with("rfcomm")
+                {
+                    ports.push(format!("/dev/{name}"));
+                }
+            }
+        }
+        ports.sort();
+        Json(serde_json::json!({ "ports": ports }))
+    }
+    #[cfg(not(unix))]
+    {
+        Json(serde_json::json!({ "error": "serial monitor is not supported on this platform" }))
+    }
+}
+
+#[cfg(unix)]
+fn open_serial(path: &str, baud: u32) -> anyhow::Result<std::fs::File> {
+    use std::os::fd::{FromRawFd, OwnedFd};
+    // Only device nodes: never let a ?port= path reach arbitrary files.
+    if !path.starts_with("/dev/") || path.contains("..") {
+        anyhow::bail!("refusing suspicious port path");
+    }
+    let speed: libc::speed_t = match baud {
+        9600 => libc::B9600,
+        19200 => libc::B19200,
+        38400 => libc::B38400,
+        57600 => libc::B57600,
+        115200 => libc::B115200,
+        230400 => libc::B230400,
+        #[cfg(target_os = "linux")]
+        460800 => libc::B460800,
+        #[cfg(target_os = "linux")]
+        921600 => libc::B921600,
+        _ => anyhow::bail!("unsupported baud {baud} (use 9600/19200/38400/57600/115200/230400)"),
+    };
+    let c = std::ffi::CString::new(path)?;
+    let fd = unsafe { libc::open(c.as_ptr(), libc::O_RDWR | libc::O_NOCTTY) };
+    if fd < 0 {
+        anyhow::bail!("open {path}: {}", std::io::Error::last_os_error());
+    }
+    let mut tio: libc::termios = unsafe { std::mem::zeroed() };
+    if unsafe { libc::tcgetattr(fd, &mut tio) } != 0 {
+        unsafe { libc::close(fd) };
+        anyhow::bail!("tcgetattr: {}", std::io::Error::last_os_error());
+    }
+    unsafe { libc::cfmakeraw(&mut tio) };
+    if unsafe { libc::cfsetspeed(&mut tio, speed) } != 0 {
+        unsafe { libc::close(fd) };
+        anyhow::bail!("cfsetspeed: {}", std::io::Error::last_os_error());
+    }
+    tio.c_cc[libc::VMIN] = 0;
+    tio.c_cc[libc::VTIME] = 10; // 1s read timeout so the reader thread can exit
+    if unsafe { libc::tcsetattr(fd, libc::TCSANOW, &tio) } != 0 {
+        unsafe { libc::close(fd) };
+        anyhow::bail!("tcsetattr: {}", std::io::Error::last_os_error());
+    }
+    // SAFETY: fd is a valid descriptor opened above and owned from here on.
+    Ok(unsafe { std::fs::File::from(OwnedFd::from_raw_fd(fd)) })
+}
+
+async fn serial_ws(
+    State(_state): State<AppState>,
+    Query(params): Query<HashMap<String, String>>,
+    ws: axum::extract::ws::WebSocketUpgrade,
+) -> impl axum::response::IntoResponse {
+    let port = params.get("port").cloned().unwrap_or_default();
+    let baud: u32 = params.get("baud").and_then(|v| v.parse().ok()).unwrap_or(115200);
+    ws.on_upgrade(move |socket| serial_pump(socket, port, baud))
+}
+
+async fn serial_pump(mut socket: axum::extract::ws::WebSocket, port: String, baud: u32) {
+    use axum::extract::ws::Message;
+    use std::io::{Read, Write};
+    #[cfg(unix)]
+    {
+        let mut file = match open_serial(&port, baud) {
+            Ok(f) => f,
+            Err(e) => {
+                let _ = socket
+                    .send(Message::Text(format!("{{\"error\":\"{}\"}}", json_escape(&format!("{e:#}")))))
+                    .await;
+                return;
+            }
+        };
+        let mut reader = match file.try_clone() {
+            Ok(r) => r,
+            Err(e) => {
+                let _ = socket
+                    .send(Message::Text(format!("{{\"error\":\"clone: {e}\"}}")))
+                    .await;
+                return;
+            }
+        };
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Vec<u8>>();
+        std::thread::spawn(move || {
+            let mut buf = [0u8; 4096];
+            loop {
+                match reader.read(&mut buf) {
+                    Ok(0) => continue, // VTIME timeout — re-poll channel liveness
+                    Ok(n) => {
+                        if tx.send(buf[..n].to_vec()).is_err() {
+                            break;
+                        }
+                    }
+                    Err(_) => break,
+                }
+            }
+        });
+        let _ = socket
+            .send(Message::Text(format!("{{\"open\":\"{port} @ {baud}\"}}")))
+            .await;
+        loop {
+            tokio::select! {
+                out = rx.recv() => {
+                    match out {
+                        Some(bytes) => {
+                            if socket.send(Message::Binary(bytes)).await.is_err() {
+                                break;
+                            }
+                        }
+                        None => break,
+                    }
+                }
+                msg = socket.recv() => {
+                    match msg {
+                        Some(Ok(Message::Binary(b))) => {
+                            if file.write_all(&b).is_err() {
+                                break;
+                            }
+                            let _ = file.flush();
+                        }
+                        Some(Ok(Message::Text(t))) => {
+                            if t.as_str() == "close" {
+                                break;
+                            }
+                        }
+                        _ => break,
+                    }
+                }
+            }
+        }
+        // dropping `file` closes the fd
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = socket
+            .send(Message::Text(
+                "{\"error\":\"serial monitor is not supported on this platform\"}".to_string(),
+            ))
+            .await;
+    }
+}
+
 async fn term_ws(
     State(state): State<AppState>,
     Query(params): Query<HashMap<String, String>>,
@@ -1398,6 +1592,7 @@ pub async fn serve_full(
         .route("/git/commit", post(git_commit))
         .route("/git/switch", post(git_switch))
         .route("/git/stash", post(git_stash))
+        .route("/git/push", post(git_push))
         .route("/fs/create", post(fs_create))
         .route("/fs/rename", post(fs_rename))
         .route("/fs/delete", post(fs_delete))
@@ -1418,6 +1613,8 @@ pub async fn serve_full(
         .route("/sync/channel", get(sync_channel))
         .route("/sync/status", get(sync_status))
         .route("/terms/ws", get(term_ws))
+        .route("/serial/ports", get(serial_ports))
+        .route("/serial/ws", get(serial_ws))
         .route("/web/*path", get(web_file))
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
