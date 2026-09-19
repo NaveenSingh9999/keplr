@@ -92,6 +92,193 @@ fn f32_to_bytes(v: &[f32]) -> Vec<u8> {
     out
 }
 
+fn create_layout_pipeline(
+    device: &wgpu::Device,
+    format: wgpu::TextureFormat,
+) -> wgpu::RenderPipeline {
+    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("keplr"),
+        source: wgpu::ShaderSource::Wgsl(SHADER.into()),
+    });
+    let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: None,
+        bind_group_layouts: &[],
+        push_constant_ranges: &[],
+    });
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: None,
+        layout: Some(&layout),
+        vertex: wgpu::VertexState {
+            module: &shader,
+            entry_point: "vs",
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+            buffers: &[wgpu::VertexBufferLayout {
+                array_stride: 24,
+                step_mode: wgpu::VertexStepMode::Vertex,
+                attributes: &[
+                    wgpu::VertexAttribute {
+                        format: wgpu::VertexFormat::Float32x2,
+                        offset: 0,
+                        shader_location: 0,
+                    },
+                    wgpu::VertexAttribute {
+                        format: wgpu::VertexFormat::Float32x4,
+                        offset: 8,
+                        shader_location: 1,
+                    },
+                ],
+            }],
+        },
+        fragment: Some(wgpu::FragmentState {
+            module: &shader,
+            entry_point: "fs",
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+            targets: &[Some(wgpu::ColorTargetState {
+                format,
+                blend: Some(wgpu::BlendState::REPLACE),
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+        }),
+        primitive: wgpu::PrimitiveState::default(),
+        depth_stencil: None,
+        multisample: wgpu::MultisampleState::default(),
+        multiview: None,
+        cache: None,
+    })
+}
+
+pub fn snapshot_scene_png(scene_json: &str, width: u32, height: u32) -> anyhow::Result<Vec<u8>> {
+    use image::{ImageBuffer, Rgba};
+    let scene: Scene =
+        serde_json::from_str(scene_json).map_err(|e| anyhow::anyhow!("bad scene: {e}"))?;
+    let (w, h) = (width.clamp(64, 4096), height.clamp(64, 4096));
+    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::default());
+    let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+        power_preference: wgpu::PowerPreference::LowPower,
+        force_fallback_adapter: true,
+        compatible_surface: None,
+    }))
+    .ok_or_else(|| anyhow::anyhow!("no GPU adapter (not even fallback)"))?;
+    let (device, queue) = pollster::block_on(adapter.request_device(
+        &wgpu::DeviceDescriptor {
+            label: None,
+            required_features: wgpu::Features::empty(),
+            required_limits: wgpu::Limits::default(),
+            memory_hints: wgpu::MemoryHints::default(),
+        },
+        None,
+    ))
+    .map_err(|e| anyhow::anyhow!("no GPU device: {e:?}"))?;
+    let format = wgpu::TextureFormat::Rgba8Unorm;
+    let pipeline = create_layout_pipeline(&device, format);
+    let quads = layout_quads(&scene, w, h);
+    let vbytes = f32_to_bytes(&quads);
+    let vbuf = device.create_buffer(&wgpu::BufferDescriptor {
+        label: None,
+        size: vbytes.len().max(16) as u64,
+        usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+    queue.write_buffer(&vbuf, 0, &vbytes);
+    let tex = device.create_texture(&wgpu::TextureDescriptor {
+        label: None,
+        size: wgpu::Extent3d {
+            width: w,
+            height: h,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+        view_formats: &[],
+    });
+    let view = tex.create_view(&wgpu::TextureViewDescriptor::default());
+    let theme = Theme::zed_dark();
+    let bg = parse_hex(&theme.bg);
+    let mut encoder =
+        device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+    {
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: None,
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: &view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color {
+                        r: bg[0] as f64,
+                        g: bg[1] as f64,
+                        b: bg[2] as f64,
+                        a: 1.0,
+                    }),
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        });
+        pass.set_pipeline(&pipeline);
+        pass.set_vertex_buffer(0, vbuf.slice(..));
+        pass.draw(0..quads.len() as u32 / 6, 0..1);
+    }
+    let pitch = (w * 4 + 255) / 256 * 256;
+    let buf = device.create_buffer(&wgpu::BufferDescriptor {
+        label: None,
+        size: (pitch * h) as u64,
+        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+        mapped_at_creation: false,
+    });
+    encoder.copy_texture_to_buffer(
+        wgpu::ImageCopyTexture {
+            texture: &tex,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
+        wgpu::ImageCopyBuffer {
+            buffer: &buf,
+            layout: wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: Some(pitch),
+                rows_per_image: Some(h),
+            },
+        },
+        wgpu::Extent3d {
+            width: w,
+            height: h,
+            depth_or_array_layers: 1,
+        },
+    );
+    queue.submit([encoder.finish()]);
+    let slice = buf.slice(..);
+    let (tx, rx) = std::sync::mpsc::channel();
+    slice.map_async(wgpu::MapMode::Read, move |v| {
+        let _ = tx.send(v);
+    });
+    device.poll(wgpu::Maintain::Wait);
+    rx.recv()
+        .map_err(|_| anyhow::anyhow!("map cancelled"))?
+        .map_err(|e| anyhow::anyhow!("map failed: {e:?}"))?;
+    let mut px = Vec::with_capacity((w * h * 4) as usize);
+    {
+        let data = slice.get_mapped_range();
+        for y in 0..h as usize {
+            let off = y * pitch as usize;
+            px.extend_from_slice(&data[off..off + (w * 4) as usize]);
+        }
+    }
+    buf.unmap();
+    let img: ImageBuffer<Rgba<u8>, Vec<u8>> =
+        ImageBuffer::from_raw(w, h, px).ok_or_else(|| anyhow::anyhow!("bad pixels"))?;
+    let mut png = Vec::new();
+    image::codecs::png::PngEncoder::new(&mut png)
+        .encode(img.as_raw(), w, h, image::ExtendedColorType::Rgba8)
+        .map_err(|e| anyhow::anyhow!("png encode: {e}"))?;
+    Ok(png)
+}
+
 struct Gpu {
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
@@ -150,55 +337,7 @@ impl Gpu {
             view_formats: vec![],
         };
         surface.configure(&device, &config);
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("keplr"),
-            source: wgpu::ShaderSource::Wgsl(SHADER.into()),
-        });
-        let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: None,
-            bind_group_layouts: &[],
-            push_constant_ranges: &[],
-        });
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: None,
-            layout: Some(&layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: "vs",
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-                buffers: &[wgpu::VertexBufferLayout {
-                    array_stride: 24,
-                    step_mode: wgpu::VertexStepMode::Vertex,
-                    attributes: &[
-                        wgpu::VertexAttribute {
-                            format: wgpu::VertexFormat::Float32x2,
-                            offset: 0,
-                            shader_location: 0,
-                        },
-                        wgpu::VertexAttribute {
-                            format: wgpu::VertexFormat::Float32x4,
-                            offset: 8,
-                            shader_location: 1,
-                        },
-                    ],
-                }],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: "fs",
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview: None,
-            cache: None,
-        });
+        let pipeline = create_layout_pipeline(&device, format);
         let vbuf = device.create_buffer(&wgpu::BufferDescriptor {
             label: None,
             size: 65536,

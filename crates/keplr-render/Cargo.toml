@@ -13,6 +13,7 @@ winit = { workspace = true, optional = true }
 wgpu = { workspace = true, optional = true, features = ["wgsl"] }
 pollster = { workspace = true, optional = true }
 ab_glyph = { workspace = true, optional = true }
+image = { workspace = true, optional = true }
 
 [features]
-gpu = ["dep:winit", "dep:wgpu", "dep:pollster", "dep:ab_glyph"]
+gpu = ["dep:winit", "dep:wgpu", "dep:pollster", "dep:ab_glyph", "dep:image"]

@@ -30,6 +30,7 @@ tree-sitter-go = "0.25"
 tree-sitter-typescript = "0.23"
 wasm-bindgen = "0.2"
 web-sys = "0.3"
+image = { version = "0.25", default-features = false, features = ["png"] }
 tokio-tungstenite = "0.26"
 futures-util = "0.3"
 http = "1"

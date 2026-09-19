@@ -189,6 +189,17 @@ enum Cmd {
         #[arg(long, default_value = "")]
         query: String,
     },
+    #[cfg(feature = "desktop")]
+    Snapshot {
+        #[arg(long)]
+        open: Option<PathBuf>,
+        #[arg(long, default_value_t = 1280)]
+        width: u32,
+        #[arg(long, default_value_t = 800)]
+        height: u32,
+        #[arg(long, default_value = "shot.png")]
+        out: PathBuf,
+    },
 }
 
 async fn sync_session(
@@ -820,6 +831,31 @@ async fn main() -> anyhow::Result<()> {
                     );
                 }
             }
+        }
+        #[cfg(feature = "desktop")]
+        Cmd::Snapshot {
+            open,
+            width,
+            height,
+            out,
+        } => {
+            let spec = keplr_render::SceneSpec {
+                root: &cli.root,
+                open_file: open.as_deref(),
+                query: "",
+                palette_query: None,
+                palette_mode: "files",
+                search_query: None,
+                left_tab: "project",
+                right_tab: "symbols",
+                bottom_tab: "terminal",
+                width: 100,
+            };
+            let scene = keplr_render::build_scene(&spec);
+            let json = serde_json::to_string(&scene)?;
+            let png = keplr_render::gpu::snapshot_scene_png(&json, width, height)?;
+            std::fs::write(&out, &png)?;
+            println!("wrote {} ({} bytes)", out.display(), png.len());
         }
     }
     Ok(())

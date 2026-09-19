@@ -30,6 +30,13 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo check -p keplr-render --features gpu
       - run: cargo check -p keplr-cli --features desktop
+      - run: cargo build -p keplr-cli --features desktop
+      - run: ./target/debug/keplr --root . snapshot --open Cargo.toml --width 800 --height 600 --out /tmp/shot.png || echo "no GPU on runner"
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('/tmp/shot.png') != ''
+        with:
+          name: render-snapshot
+          path: /tmp/shot.png
 
   wasm-check:
     runs-on: ubuntu-latest
