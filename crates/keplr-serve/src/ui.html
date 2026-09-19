@@ -114,7 +114,11 @@
   .tkids.closed { display: none; }
   .tri { color: var(--dim); font-size: 10px; width: 12px; flex: none; text-align: center; }
   /* ---- center ---- */
-  #center { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg); }
+  #center { flex: 1; display: flex; min-width: 0; background: var(--bg); }
+  .col { flex: 1; display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--border); }
+  .col:last-child { border-right: none; }
+  .col.hidden { display: none; }
+  .col.focus { border-color: var(--accent); }
   #tabsbar {
     display: flex; align-items: stretch; gap: 2px;
     background: var(--surface); border-bottom: 1px solid var(--border);
@@ -394,10 +398,18 @@
     <div class="dockbody" id="leftbody"></div>
   </div>
   <div id="center">
-    <div id="tabsbar"></div>
-    <div id="crumbs"><b>(no file)</b></div>
-    <div id="editorwrap"><textarea id="fallback" spellcheck="false"></textarea></div>
-    <div id="previewwrap"></div>
+    <div class="col" id="col0">
+      <div id="tabsbar"></div>
+      <div id="crumbs"><b>(no file)</b></div>
+      <div id="editorwrap"><textarea id="fallback" spellcheck="false"></textarea></div>
+      <div id="previewwrap"></div>
+    </div>
+    <div class="col hidden" id="col1">
+      <div id="tabsbar1"></div>
+      <div id="crumbs1"><b>(no file)</b></div>
+      <div id="editorwrap1"></div>
+      <div id="previewwrap1"></div>
+    </div>
   </div>
   <div class="dock hidden" id="right">
     <div class="docktabs"><button class="sel">symbols</button></div>
@@ -497,8 +509,8 @@ const FOLDER_OPEN = `<svg width="14" height="14" viewBox="0 0 16 16"><path d="M1
 
 /* ============ state ============ */
 const S = {
-  tabs: [],            // {path, lang, text, saved, sel}
-  active: -1,
+  groups: [{tabs: [], active: -1}],
+  focus: 0,
   files: [],           // rel paths
   leftTab: "project",
   bottomTab: "search",
@@ -508,6 +520,8 @@ const S = {
   log: [],
   docks: { left: true, right: false, bottom: false },
 };
+function G() { return S.groups[S.focus]; }
+function A() { const g = G(); return g.tabs[g.active] || null; }
 function saveLayout() {
   try { localStorage.setItem("keplr-layout", JSON.stringify(S.docks)); } catch (e) {}
 }
@@ -532,7 +546,9 @@ function langOf(path) {
 }
 
 /* ============ editor (CodeMirror, textarea fallback) ============ */
-let ED = null; // adapter or null
+let ED = null; // adapter or null (focused group's)
+let ED2 = null; // second group's editor (lazily created)
+const ED_ALL = [null, null];
 function langExt(label, mods) {
   switch (label) {
     case "rust": return mods.rust ? mods.rust() : [];
@@ -551,114 +567,112 @@ function langExt(label, mods) {
     default: return [];
   }
 }
-async function bootEditor() {
-  const wrap = document.getElementById("editorwrap");
-  try {
-    const cm = await import("codemirror");
-    const state = await import("@codemirror/state");
-    const view = await import("@codemirror/view");
-    const theme = await import("@codemirror/theme-one-dark");
-    const mods = {};
-    const loads = {
-      rust: "@codemirror/lang-rust", python: "@codemirror/lang-python",
-      javascript: "@codemirror/lang-javascript", cpp: "@codemirror/lang-cpp",
-      go: "@codemirror/lang-go", html: "@codemirror/lang-html",
-      css: "@codemirror/lang-css", json: "@codemirror/lang-json",
-      markdown: "@codemirror/lang-markdown", sql: "@codemirror/lang-sql",
-      php: "@codemirror/lang-php", java: "@codemirror/lang-java",
-      vim: "@codemirror/vim"
-    };
-    for (const k of Object.keys(loads)) {
-      try { mods[k.replace("javascript", "javascript")] = await import(loads[k]); }
-      catch (e) { /* language stays plain on CDN failure */ }
+let _cmMods = null;
+async function ensureCmMods() {
+  if (_cmMods) return _cmMods;
+  const mods = {};
+  const loads = {
+    rust: "@codemirror/lang-rust", python: "@codemirror/lang-python",
+    javascript: "@codemirror/lang-javascript", cpp: "@codemirror/lang-cpp",
+    go: "@codemirror/lang-go", html: "@codemirror/lang-html",
+    css: "@codemirror/lang-css", json: "@codemirror/lang-json",
+    markdown: "@codemirror/lang-markdown", sql: "@codemirror/lang-sql",
+    php: "@codemirror/lang-php", java: "@codemirror/lang-java",
+    vim: "@codemirror/vim"
+  };
+  for (const k of Object.keys(loads)) {
+    try { mods[k.replace("javascript", "javascript")] = await import(loads[k]); }
+    catch (e) { /* language stays plain on CDN failure */ }
+  }
+  try { mods.lang = await import("@codemirror/language"); } catch (e) {}
+  _cmMods = mods;
+  return mods;
+}
+async function makeEditor(parentEl) {
+  const mods = await ensureCmMods();
+  const cm = await import("codemirror");
+  const state = await import("@codemirror/state");
+  const view = await import("@codemirror/view");
+  const theme = await import("@codemirror/theme-one-dark");
+  const langConf = new state.Compartment();
+  const tabConf = new state.Compartment();
+  const wrapConf = new state.Compartment();
+  const themeConf = new state.Compartment();
+  const wsConf = new state.Compartment();
+  const vimConf = new state.Compartment();
+  const indentUnit = (mods.lang && mods.lang.indentUnit) || null;
+  const hlWS = view.highlightWhitespace || null;
+  const onChange = view.EditorView.updateListener.of(v => {
+    if (v.docChanged) {
+      markDirty(true);
+      scheduleSuggest();
+      scheduleLiveDiag();
+      scheduleAutosave();
     }
-    try { mods.lang = await import("@codemirror/language"); } catch (e) {}
-    const langConf = new state.Compartment();
-    const tabConf = new state.Compartment();
-    const wrapConf = new state.Compartment();
-    const themeConf = new state.Compartment();
-    const wsConf = new state.Compartment();
-    const vimConf = new state.Compartment();
-    const indentUnit = (mods.lang && mods.lang.indentUnit) || null;
-    const hlWS = view.highlightWhitespace || null;
-    const onChange = view.EditorView.updateListener.of(v => {
-      if (v.docChanged) {
-        markDirty(true);
-        scheduleSuggest();
-        scheduleLiveDiag();
-        scheduleAutosave();
-      }
-      const s = v.state.selection.main;
-      const line = v.state.doc.lineAt(s.head);
-      setCursor(line.number, s.head - line.from + 1);
-    });
-    const saveKey = { key: "Mod-s", preventDefault: true, run: () => { saveActive(); return true; } };
-    const suggestKeys = [
-      { key: "Tab", run: () => acceptSuggest() },
-      { key: "Enter", run: () => acceptSuggest() },
-      { key: "Escape", run: () => hideSuggest() },
-      { key: "ArrowDown", run: () => suggestMove(1) },
-      { key: "ArrowUp", run: () => suggestMove(-1) },
-    ];
-    const ed = new cm.EditorView({
-      doc: "",
-      extensions: [
-        view.keymap.of(suggestKeys),
-        cm.basicSetup, theme.oneDark,
-        langConf.of([]), tabConf.of([]), wrapConf.of([]), themeConf.of([]), wsConf.of([]), vimConf.of([]),
-        view.keymap.of([saveKey]), onChange
-      ],
-      parent: wrap
-    });
-    ED = {
-      cm: true, view: ed, langConf, tabConf, wrapConf, themeConf, wsConf, vimConf, mods, state,
-      async setLang(label) {
-        const ext = langExt(label, mods);
-        ed.dispatch({ effects: langConf.reconfigure(ext) });
-      },
-      setDoc(text) { ed.dispatch({ changes: { from: 0, to: ed.state.doc.length, insert: text } }); },
-      getDoc() { return ed.state.doc.toString(); },
-      goto(line) {
-        try {
-          const l = ed.state.doc.line(Math.max(1, Math.min(line, ed.state.doc.lines)));
-          ed.dispatch({ selection: { anchor: l.from }, effects: view.EditorView.scrollIntoView(l.from, { y: "center" }) });
-          ed.focus();
-        } catch (e) {}
-      },
-      focus() { ed.focus(); },
-      applySettings() {
-        const s = S.settings;
-        try {
-          ed.dispatch({ effects: tabConf.reconfigure(indentUnit ? indentUnit.of(" ".repeat(s.tabSize)) : []) });
-        } catch (e) {}
-        try {
-          ed.dispatch({ effects: vimConf.reconfigure((s.vimMode && mods.vim && mods.vim.vim) ? mods.vim.vim() : []) });
-        } catch (e) {}
-        try {
-          ed.dispatch({ effects: wrapConf.reconfigure(s.wordWrap ? view.EditorView.lineWrapping : []) });
-        } catch (e) {}
-        try {
-          ed.dispatch({ effects: themeConf.reconfigure(view.EditorView.theme({
-            "&": { fontSize: s.fontSize + "px", fontFamily: s.fontFamily },
-            ".cm-content": { "font-feature-settings": s.ligatures ? '"liga" 1' : '"liga" 0' }
-          })) });
-        } catch (e) {}
-        try {
-          ed.dispatch({ effects: wsConf.reconfigure((s.renderWhitespace && hlWS) ? hlWS() : []) });
-        } catch (e) {}
-        document.body.classList.toggle("noblink", !s.cursorBlink);
-      }
-    };
+    const s = v.state.selection.main;
+    const line = v.state.doc.lineAt(s.head);
+    setCursor(line.number, s.head - line.from + 1);
+  });
+  const saveKey = { key: "Mod-s", preventDefault: true, run: () => { saveActive(); return true; } };
+  const suggestKeys = [
+    { key: "Tab", run: () => acceptSuggest() },
+    { key: "Enter", run: () => acceptSuggest() },
+    { key: "Escape", run: () => hideSuggest() },
+    { key: "ArrowDown", run: () => suggestMove(1) },
+    { key: "ArrowUp", run: () => suggestMove(-1) },
+  ];
+  const ed = new cm.EditorView({
+    doc: "",
+    extensions: [
+      view.keymap.of(suggestKeys),
+      cm.basicSetup, theme.oneDark,
+      langConf.of([]), tabConf.of([]), wrapConf.of([]), themeConf.of([]), wsConf.of([]), vimConf.of([]),
+      view.keymap.of([saveKey]), onChange
+    ],
+    parent: parentEl
+  });
+  return {
+    cm: true, view: ed, langConf, tabConf, wrapConf, themeConf, wsConf, vimConf, mods, state,
+    async setLang(label) {
+      const ext = langExt(label, mods);
+      ed.dispatch({ effects: langConf.reconfigure(ext) });
+    },
+    setDoc(text) { ed.dispatch({ changes: { from: 0, to: ed.state.doc.length, insert: text } }); },
+    getDoc() { return ed.state.doc.toString(); },
+    goto(line) {
+      try {
+        const l = ed.state.doc.line(Math.max(1, Math.min(line, ed.state.doc.lines)));
+        ed.dispatch({ selection: { anchor: l.from }, effects: view.EditorView.scrollIntoView(l.from, { y: "center" }) });
+        ed.focus();
+      } catch (e) {}
+    },
+    focus() { ed.focus(); },
+    applySettings() {
+      const s = S.settings;
+      try { ed.dispatch({ effects: tabConf.reconfigure(indentUnit ? indentUnit.of(" ".repeat(s.tabSize)) : []) }); } catch (e) {}
+      try { ed.dispatch({ effects: vimConf.reconfigure((s.vimMode && mods.vim && mods.vim.vim) ? mods.vim.vim() : []) }); } catch (e) {}
+      try { ed.dispatch({ effects: wrapConf.reconfigure(s.wordWrap ? view.EditorView.lineWrapping : []) }); } catch (e) {}
+      try {
+        ed.dispatch({ effects: themeConf.reconfigure(view.EditorView.theme({
+          "&": { fontSize: s.fontSize + "px", fontFamily: s.fontFamily },
+          ".cm-content": { "font-feature-settings": s.ligatures ? '"liga" 1' : '"liga" 0' }
+        })) });
+      } catch (e) {}
+      try { ed.dispatch({ effects: wsConf.reconfigure((s.renderWhitespace && hlWS) ? hlWS() : []) }); } catch (e) {}
+      document.body.classList.toggle("noblink", !s.cursorBlink);
+    }
+  };
+}
+async function bootEditor() {
+  try {
+    ED = await makeEditor(document.getElementById("editorwrap"));
+    ED_ALL[0] = ED;
     attachWheel();
     log("console", "editor: CodeMirror 6");
   } catch (e) {
     const ta = document.getElementById("fallback");
     ta.style.display = "block";
-    ta.addEventListener("input", () => {
-      markDirty(true);
-      scheduleLiveDiag();
-      scheduleAutosave();
-    });
+    ta.addEventListener("input", () => { markDirty(true); scheduleLiveDiag(); scheduleAutosave(); });
     ta.addEventListener("keydown", ev => {
       if ((ev.ctrlKey || ev.metaKey) && ev.key === "s") { ev.preventDefault(); saveActive(); }
       else if (ev.key === "Tab") {
@@ -669,38 +683,31 @@ async function bootEditor() {
         markDirty(true);
       }
     });
-    ED = {
-      cm: false,
-      async setLang() {},
-      setDoc(t) { ta.value = t; },
-      getDoc() { return ta.value; },
-      goto(line) {
-        const lines = ta.value.split("\n");
-        let pos = 0;
+    ED = { cm: false, async setLang() {}, setDoc(t) { ta.value = t; }, getDoc() { return ta.value; },
+      goto(line) { const lines = ta.value.split("\n"); let pos = 0;
         for (let i = 0; i < Math.min(line - 1, lines.length); i++) pos += lines[i].length + 1;
-        ta.focus();
-        ta.selectionStart = ta.selectionEnd = pos;
-        setCursor(line, 1);
-      },
+        ta.focus(); ta.selectionStart = ta.selectionEnd = pos; setCursor(line, 1); },
       focus() { ta.focus(); }
     };
+    ED_ALL[0] = ED;
     log("console", "editor: offline fallback (CDN unreachable)");
   }
 }
 
 /* ============ tabs ============ */
 function markDirty(d) {
-  const t = S.tabs[S.active];
+  const t = A();
   if (!t) return;
   t.dirty = d;
   renderTabs();
 }
 function renderTabs() {
+  const g = G();
   const bar = document.getElementById("tabsbar");
   bar.innerHTML = "";
-  S.tabs.forEach((t, i) => {
+  g.tabs.forEach((t, i) => {
     const d = document.createElement("div");
-    d.className = "tab" + (i === S.active ? " sel" : "");
+    d.className = "tab" + (i === g.active ? " sel" : "");
     const nm = document.createElement("span");
     nm.textContent = rel(t.path).split("/").pop() + (t.dirty ? " ●" : "");
     if (t.dirty) nm.classList.add("dirty");
@@ -718,24 +725,26 @@ function renderTabs() {
       const items = [
         { label: "Close", run: () => closeTab(i) },
         { label: "Close Others", run: () => {
-          for (let j = S.tabs.length - 1; j >= 0; j--) {
+          for (let j = g.tabs.length - 1; j >= 0; j--) {
             if (j !== i) closeTab(j);
           }
         }},
         { label: "Close All", run: () => {
-          for (let j = S.tabs.length - 1; j >= 0; j--) closeTab(j);
+          for (let j = g.tabs.length - 1; j >= 0; j--) closeTab(j);
         }},
         { sep: true },
         { label: "Copy Path", run: () => copyText(t.path) },
         { label: "Copy Relative Path", run: () => copyText(rel(t.path)) },
         { label: "Reveal in Tree", run: () => revealInTree(t.path) },
+        { sep: true },
+        { label: "Open to the Side", run: () => openToSide(t) },
       ];
       showMenu(ev.clientX, ev.clientY, items);
     };
     bar.appendChild(d);
   });
   const crumbs = document.getElementById("crumbs");
-  const t = S.tabs[S.active];
+  const t = A();
   if (!t) { crumbs.innerHTML = "<b>(no file)</b>"; return; }
   const parts = rel(t.path).split("/");
   crumbs.innerHTML = parts.map((p, i) =>
@@ -752,7 +761,7 @@ function renderTabs() {
   document.getElementById("slang").textContent = t.lang;
 }
 function snapshotTab() {
-  const t = S.tabs[S.active];
+  const t = A();
   if (!t || !ED) return;
   if (t.view && t.view !== "edit") return;
   t.text = ED.getDoc();
@@ -764,11 +773,12 @@ function snapshotTab() {
   } catch (e) {}
 }
 function activateTab(i) {
-  if (i < 0 || i >= S.tabs.length) return;
+  const g = G();
+  if (i < 0 || i >= g.tabs.length) return;
   hideSuggest();
   snapshotTab();
-  S.active = i;
-  const t = S.tabs[i];
+  g.active = i;
+  const t = g.tabs[i];
   const kind = previewKind(t.path);
   if (kind === "pdf" || kind === "img") {
     showEditorPane(false);
@@ -798,49 +808,64 @@ function activateTab(i) {
   if (!kind || kind === "md") ED.focus();
 }
 function closeTab(i) {
-  const t = S.tabs[i];
+  const g = G();
+  const t = g.tabs[i];
   if (t && t.dirty && !confirm("Close without saving " + rel(t.path) + "?")) return;
-  S.tabs.splice(i, 1);
-  if (S.active >= S.tabs.length) S.active = S.tabs.length - 1;
-  if (S.tabs.length === 0) {
+  g.tabs.splice(i, 1);
+  if (g.active >= g.tabs.length) g.active = g.tabs.length - 1;
+  if (g.tabs.length === 0) {
     if (ED) ED.setDoc("");
     renderTabs();
     renderProblems();
     document.getElementById("symbols").innerHTML = "";
     return;
   }
-  const j = S.active;
-  S.active = -1;
-  activateTab(Math.min(j, S.tabs.length - 1));
+  const j = g.active;
+  g.active = -1;
+  activateTab(Math.min(j, g.tabs.length - 1));
+}
+function openToSide(tab) {
+  const gi = S.focus === 0 && ED2 ? 1 : 0;
+  ensureGroup(gi);
+  S.focus = gi;
+  ED = ED_ALL[gi] || ED;
+  const g = S.groups[gi];
+  g.tabs.push({ ...tab, dirty: false, text: tab.text || "", saved: tab.saved || tab.text || "" });
+  g.active = g.tabs.length - 1;
+  activateTab(g.active);
+}
+function ensureGroup(i) {
+  while (S.groups.length <= i) S.groups.push({ tabs: [], active: -1 });
 }
 async function openFile(path, line) {
-  const found = S.tabs.findIndex(t => t.path === path);
+  const g = G();
+  const found = g.tabs.findIndex(t => t.path === path);
   if (found >= 0) {
     activateTab(found);
   } else {
     const kind = previewKind(path);
     if (kind === "pdf" || kind === "img") {
       const lang = langOf(path);
-      S.tabs.push({ path, lang, text: "", saved: "", sel: 0, dirty: false, view: "viewer" });
-      S.active = -1;
-      activateTab(S.tabs.length - 1);
+      g.tabs.push({ path, lang, text: "", saved: "", sel: 0, dirty: false, view: "viewer" });
+      g.active = -1;
+      activateTab(g.tabs.length - 1);
     } else {
       const j = await get("/open?path=" + encodeURIComponent(path));
       if (j.error) throw new Error(j.error);
       const lang = langOf(path);
       const text = j.text || "";
       if (!kind && text.length > 2000000) {
-        S.tabs.push({ path, lang, text, saved: text, sel: 0, dirty: false, view: "large" });
+        g.tabs.push({ path, lang, text, saved: text, sel: 0, dirty: false, view: "large" });
       } else {
         const view = kind === "md" ? "preview" : "edit";
-        S.tabs.push({ path, lang, text, saved: text, sel: 0, dirty: false, view });
+        g.tabs.push({ path, lang, text, saved: text, sel: 0, dirty: false, view });
       }
-      S.active = -1;
-      activateTab(S.tabs.length - 1);
+      g.active = -1;
+      activateTab(g.tabs.length - 1);
     }
   }
   if (line) {
-    const t = S.tabs[S.active];
+    const t = A();
     if (t && t.view && t.view !== "edit") {
       if (previewKind(t.path) === "md") {
         t.view = "edit";
@@ -865,7 +890,7 @@ function gotoLine(line) {
   if (ED) ED.goto(line || 1);
 }
 async function saveActive() {
-  const t = S.tabs[S.active];
+  const t = A();
   if (!t || !ED) return;
   hideSuggest();
   if (t.view && t.view !== "edit") {
@@ -1073,7 +1098,7 @@ function renderPreview(tab) {
     btn.onclick = () => {
       tab.view = "edit";
       showEditorPane(true);
-      activateTab(S.tabs.indexOf(tab));
+      activateTab(G().tabs.indexOf(tab));
       log("console", "large file opened anyway: " + rel(tab.path));
     };
     box.appendChild(btn);
@@ -1088,7 +1113,7 @@ function showEditorPane(editing) {
   if (btn) btn.classList.toggle("on", !editing);
 }
 function togglePreview() {
-  const t = S.tabs[S.active];
+  const t = A();
   if (!t || previewKind(t.path) !== "md") return;
   t.view = t.view === "preview" ? "edit" : "preview";
   if (t.view === "preview") {
@@ -1156,7 +1181,7 @@ function renderTree(box, node, depth, base) {
       row.innerHTML = '<span class="tri"></span>' + fileIconFor(n.__full || name) + "<span></span>";
       row.lastChild.textContent = name;
       row.dataset.path = n.__full;
-      if (n.__full === (S.tabs[S.active] || {}).path) row.classList.add("sel");
+      if (n.__full === (A() || {}).path) row.classList.add("sel");
       row.onclick = () => openFile(n.__full, 0).catch(e => msg(String(e), true));
       row.oncontextmenu = e => {
         e.preventDefault();
@@ -1227,7 +1252,7 @@ function renderProblems() {
   if (S.bottomTab !== "problems") return;
   const body = document.getElementById("bbody");
   body.innerHTML = "";
-  const t = S.tabs[S.active];
+  const t = A();
   const list = t && t.lang === "laml" ? S.problems : [];
   if (!list.length) {
     body.innerHTML = '<div class="logline">(no problems)</div>';
@@ -1708,24 +1733,27 @@ function askConfirm(opts) {
 /* ============ fs ops from the tree ============ */
 function trackTabForFs(oldAbs, makeNew) {
   // returns {closed: [...]} — caller refreshes tree first
-  for (let i = S.tabs.length - 1; i >= 0; i--) {
-    const t = S.tabs[i];
-    if (t.path !== oldAbs && !t.path.startsWith(oldAbs + "/")) continue;
-    if (makeNew === null) {
-      S.tabs.splice(i, 1);
-      if (S.active >= S.tabs.length) S.active = S.tabs.length - 1;
-    } else {
-      t.path = makeNew(t.path);
-      t.label = null;
+  for (const g of S.groups) {
+    for (let i = g.tabs.length - 1; i >= 0; i--) {
+      const t = g.tabs[i];
+      if (t.path !== oldAbs && !t.path.startsWith(oldAbs + "/")) continue;
+      if (makeNew === null) {
+        g.tabs.splice(i, 1);
+        if (g.active >= g.tabs.length) g.active = g.tabs.length - 1;
+      } else {
+        t.path = makeNew(t.path);
+        t.label = null;
+      }
     }
   }
-  if (S.tabs.length === 0) {
-    S.active = -1;
+  const g = G();
+  if (g.tabs.length === 0) {
+    g.active = -1;
     if (ED) ED.setDoc("");
     renderTabs();
   } else {
-    if (S.active < 0) S.active = 0;
-    activateTab(S.active);
+    if (g.active < 0) g.active = 0;
+    activateTab(g.active);
   }
 }
 async function fsOp(op, body, after) {
@@ -1800,13 +1828,16 @@ function fileMenu(x, y, absPath, isDir) {
 async function renameTabs(oldAbs, newRel) {
   // server paths are absolute; rebuild tab path from the new relative path
   const ws = wsRoot ? wsRoot + "/" : "";
-  for (const t of S.tabs) {
-    if (t.path === oldAbs || t.path.startsWith(oldAbs + "/")) {
-      const suffix = t.path.slice(oldAbs.length);
-      t.path = ws + newRel + suffix;
+  for (const g of S.groups) {
+    for (const t of g.tabs) {
+      if (t.path === oldAbs || t.path.startsWith(oldAbs + "/")) {
+        const suffix = t.path.slice(oldAbs.length);
+        t.path = ws + newRel + suffix;
+      }
     }
   }
-  if (S.active >= 0) activateTab(S.active);
+  const g = G();
+  if (g.active >= 0) activateTab(g.active);
   else renderTabs();
 }
 let REVEAL = null;
@@ -2248,7 +2279,7 @@ function paintSuggest() {
   box.classList.add("open");
 }
 function currentWord() {
-  const t = S.tabs[S.active];
+  const t = A();
   if (!t || !ED) return { lang: "text", word: "", pos: 0 };
   const doc = ED.getDoc();
   let pos = 0;
@@ -2269,7 +2300,7 @@ function scheduleSuggest() {
   SG.timer = setTimeout(refreshSuggest, 180);
 }
 async function refreshSuggest() {
-  const t = S.tabs[S.active];
+  const t = A();
   if (!t || t.view === "preview") { hideSuggest(); return; }
   const { lang, word } = currentWord();
   if (word.length < 2) { hideSuggest(); return; }
@@ -2290,7 +2321,7 @@ async function refreshSuggest() {
 }
 async function acceptSuggest() {
   if (!SG.open || !SG.items.length || !ED) return false;
-  const t = S.tabs[S.active];
+  const t = A();
   if (!t) { hideSuggest(); return true; }
   const item = SG.items[SG.sel] || SG.items[0];
   hideSuggest();
@@ -2324,7 +2355,7 @@ function scheduleLiveDiag() {
   liveTimer = setTimeout(refreshLiveDiag, 800);
 }
 async function refreshLiveDiag() {
-  const t = S.tabs[S.active];
+  const t = A();
   if (!t || (t.view && t.view !== "edit") || !ED) return;
   if (!["rust", "python", "javascript", "typescript", "tsx", "go"].includes(t.lang)) return;
   try {
@@ -2339,7 +2370,7 @@ function scheduleAutosave() {
   clearTimeout(saveTimer);
   const delay = Math.min(10000, Math.max(500, S.settings.autoSaveDelay || 1000));
   saveTimer = setTimeout(async () => {
-    const t = S.tabs[S.active];
+  const t = A();
     if (t && t.dirty && (!t.view || t.view === "edit")) {
       await saveActive();
     }
@@ -2368,6 +2399,9 @@ const COMMANDS = [
   ["show terminal", () => setBottomTab("terminal"), "view"],
   ["save file", () => saveActive(), "file"],
   ["close tab", () => closeActive(), "file"],
+  ["split right", () => toggleSplit(), "view"],
+  ["focus left pane", () => focusGroup(0), "view"],
+  ["focus right pane", () => focusGroup(1), "view"],
 ];
 function runAllTasks() {
   setBottomTab("tasks");
@@ -2385,7 +2419,7 @@ function runAllTasks() {
   }).catch(e => msg(String(e), true));
 }
 function closeActive() {
-  if (S.active >= 0) closeTab(S.active);
+  if (G().active >= 0) closeTab(G().active);
 }
 function palFilter(q) {
   q = q.toLowerCase();
@@ -2519,12 +2553,42 @@ document.addEventListener("keydown", e => {
       e.preventDefault();
       saveActive();
     }
-  } else if (e.key === "Escape") {
+  } else if (mod && e.key === "\\") { e.preventDefault(); toggleSplit(); }
+  else if (e.key === "Escape") {
     if (document.getElementById("palwrap").classList.contains("open")) palClose();
     else if (document.getElementById("settingswrap").classList.contains("open")) toggleSettings(false);
     else hideSuggest();
   }
 });
+
+/* ============ splits ============ */
+async function toggleSplit() {
+  const col1 = document.getElementById("col1");
+  const split = !col1.classList.contains("hidden");
+  if (split) {
+    col1.classList.add("hidden");
+    S.focus = 0;
+    ED = ED_ALL[0];
+    renderTabs();
+  } else {
+    col1.classList.remove("hidden");
+    ensureGroup(1);
+    if (!ED2 && ED_ALL[0] && ED_ALL[0].cm) {
+      ED2 = await makeEditor(document.getElementById("editorwrap1"));
+      ED_ALL[1] = ED2;
+    }
+    focusGroup(1);
+  }
+}
+function focusGroup(i) {
+  S.focus = i;
+  ED = ED_ALL[i] || ED_ALL[0];
+  document.getElementById("col0").classList.toggle("focus", i === 0);
+  document.getElementById("col1").classList.toggle("focus", i === 1);
+  renderTabs();
+  const t = A();
+  if (t) activateTab(G().active);
+}
 
 /* ============ boot ============ */
 (async function boot() {
@@ -2539,6 +2603,8 @@ document.addEventListener("keydown", e => {
   }
   await bootEditor();
   applySettings();
+  document.getElementById("col0").addEventListener("mousedown", () => { if (S.focus !== 0) focusGroup(0); });
+  document.getElementById("col1").addEventListener("mousedown", () => { if (S.focus !== 1) focusGroup(1); });
   document.getElementById("t-settings").onclick = () => toggleSettings();
   document.getElementById("settings-close").onclick = () => toggleSettings(false);
   health();
