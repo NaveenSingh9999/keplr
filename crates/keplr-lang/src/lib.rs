@@ -917,3 +917,69 @@ pub fn expand_snippet(lang: LangKind, prefix: &str) -> Option<(String, Option<us
         .find(|s| s.prefix == prefix)
         .map(|s| expand_markers(&s.body))
 }
+
+fn ts_language(lang: LangKind) -> Option<tree_sitter::Language> {
+    match lang {
+        LangKind::Rust => Some(tree_sitter_rust::LANGUAGE.into()),
+        LangKind::JavaScript => Some(tree_sitter_javascript::LANGUAGE.into()),
+        LangKind::Python => Some(tree_sitter_python::LANGUAGE.into()),
+        LangKind::Go => Some(tree_sitter_go::LANGUAGE.into()),
+        LangKind::TypeScript => Some(tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into()),
+        LangKind::Tsx => Some(tree_sitter_typescript::LANGUAGE_TSX.into()),
+        _ => None,
+    }
+}
+
+pub fn parse_sexp(lang: LangKind, text: &str) -> Option<String> {
+    let language = ts_language(lang)?;
+    let mut parser = tree_sitter::Parser::new();
+    parser.set_language(&language).ok()?;
+    parser.parse(text, None).map(|t| t.root_node().to_sexp())
+}
+
+pub fn syntax_errors(lang: LangKind, path: &Path, text: &str) -> Vec<Diagnostic> {
+    let label = path.display().to_string();
+    let language = match ts_language(lang) {
+        Some(l) => l,
+        None => return Vec::new(),
+    };
+    let mut parser = tree_sitter::Parser::new();
+    if parser.set_language(&language).is_err() {
+        return Vec::new();
+    }
+    let tree = match parser.parse(text, None) {
+        Some(t) => t,
+        None => return Vec::new(),
+    };
+    let mut out = Vec::new();
+    let mut stack = vec![tree.root_node()];
+    while let Some(node) = stack.pop() {
+        if out.len() >= 50 {
+            break;
+        }
+        if node.is_error() || node.is_missing() {
+            let pos = node.start_position();
+            let what = if node.is_missing() {
+                format!("missing {}", node.kind())
+            } else {
+                format!("syntax error near `{}`", node.kind())
+            };
+            out.push(Diagnostic {
+                path: label.clone(),
+                line: (pos.row + 1) as u64,
+                col: (pos.column + 1) as u64,
+                message: what,
+                severity: String::from("error"),
+            });
+        }
+        let mut i = node.child_count();
+        while i > 0 {
+            i -= 1;
+            if let Some(c) = node.child(i) {
+                stack.push(c);
+            }
+        }
+    }
+    out.sort_by(|a, b| (a.line, a.col).cmp(&(b.line, b.col)));
+    out
+}
