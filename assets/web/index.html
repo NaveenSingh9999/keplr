@@ -18,12 +18,30 @@
   try {
     const mod = await import("./keplr_web.js");
     await mod.default();
-    const scene = await (await fetch("/scene?width=120")).json();
     const canvas = document.getElementById("app");
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    mod.render_scene("app", JSON.stringify(scene));
-    err("keplr canvas " + mod.version() + " — static snapshot (live loop is the next layer)");
+    let frames = 0;
+    let last = performance.now();
+    async function tick() {
+      try {
+        const scene = await (await fetch("/scene?width=120")).json();
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        mod.render_scene("app", JSON.stringify(scene));
+        frames++;
+        const now = performance.now();
+        if (now - last >= 2000) {
+          err("keplr canvas " + mod.version() + " — " + Math.round(frames * 1000 / (now - last)) + "fps live");
+          document.getElementById("err").textContent =
+            document.getElementById("err").textContent.split("\n").slice(-3).join("\n");
+          frames = 0;
+          last = now;
+        }
+      } catch (e) {
+        err("scene poll failed: " + e);
+      }
+      setTimeout(tick, 2000);
+    }
+    tick();
   } catch (e) {
     err("canvas failed: " + e + "\nbuild: cargo build -p keplr-web --target wasm32-unknown-unknown --release && wasm-bindgen --target web --out-dir <root>/.keplr/web");
   }
