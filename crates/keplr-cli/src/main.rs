@@ -236,6 +236,7 @@ async fn sync_session(
         .as_ref()
         .and_then(|f| std::fs::metadata(f).ok())
         .and_then(|m| m.modified().ok());
+    let mut last_conflict = String::new();
     let mut tick = tokio::time::interval(std::time::Duration::from_millis(500));
     tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     // File bridge semantics: the session doc accumulates op history while
@@ -248,9 +249,36 @@ async fn sync_session(
                     Some(Ok(tokio_tungstenite::tungstenite::Message::Binary(bytes))) => {
                         doc.apply_update(&bytes)?;
                         if let Some(f) = file {
-                            std::fs::write(f, doc.content())?;
-                            last_write = std::fs::metadata(f).ok().and_then(|m| m.modified().ok());
-                            println!("sync: received {} bytes, wrote {}", bytes.len(), f.display());
+                            let incoming = doc.content();
+                            let current = std::fs::read_to_string(f).unwrap_or_default();
+                            let touched = std::fs::metadata(f)
+                                .ok()
+                                .and_then(|m| m.modified().ok())
+                                .map(|t| Some(t) != last_write)
+                                .unwrap_or(false);
+                            if touched && current != incoming {
+                                use std::collections::hash_map::DefaultHasher;
+                                use std::hash::{Hash, Hasher};
+                                let mut h = DefaultHasher::new();
+                                incoming.hash(&mut h);
+                                let key = format!("{:x}", h.finish());
+                                if key != last_conflict {
+                                    let ts = std::time::SystemTime::now()
+                                        .duration_since(std::time::UNIX_EPOCH)
+                                        .map(|d| d.as_secs())
+                                        .unwrap_or(0);
+                                    let theirs = format!("{}.theirs.{ts}", f.display());
+                                    std::fs::write(&theirs, &incoming)?;
+                                    eprintln!("sync: CONFLICT — local edits kept in {}, theirs in {theirs}", f.display());
+                                    last_conflict = key;
+                                }
+                                last_write = std::fs::metadata(f).ok().and_then(|m| m.modified().ok());
+                            } else {
+                                std::fs::write(f, &incoming)?;
+                                last_write = std::fs::metadata(f).ok().and_then(|m| m.modified().ok());
+                                last_conflict.clear();
+                                println!("sync: received {} bytes, wrote {}", bytes.len(), f.display());
+                            }
                         } else {
                             println!("sync: received {} bytes", bytes.len());
                         }
