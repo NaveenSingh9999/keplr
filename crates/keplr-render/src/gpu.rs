@@ -324,6 +324,7 @@ struct App {
     dirty: bool,
     frames: u32,
     since: Instant,
+    text_cache: std::collections::HashMap<u64, (Vec<f32>, Option<[f32; 4]>)>,
 }
 
 impl App {
@@ -402,15 +403,38 @@ impl ApplicationHandler for App {
                     (self.gpu.as_mut(), self.window.as_ref())
                 {
                     if let Some(scene) = &self.scene {
-                        let quads = layout_quads(scene, gpu.size.0, gpu.size.1);
+                        let mut quads = layout_quads(scene, gpu.size.0, gpu.size.1);
+                        let key = text_cache_key(scene, gpu.size.0, gpu.size.1);
+                        if self.text_cache.len() > 32 {
+                            self.text_cache.clear();
+                        }
+                        let (text_verts, cursor_rect) = match self.text_cache.get(&key) {
+                            Some((v, r)) => (v.clone(), *r),
+                            None => {
+                                let shaped = match &gpu.text_atlas {
+                                    Some(atlas) => {
+                                        scene_text_quads(atlas, scene, gpu.size.0, gpu.size.1)
+                                    }
+                                    None => (Vec::new(), None),
+                                };
+                                self.text_cache.insert(key, shaped.clone());
+                                shaped
+                            }
+                        };
+                        if let Some([x, y, w, h]) = cursor_rect {
+                            let accent = parse_hex(&Theme::zed_dark().accent);
+                            quads.extend(cursor_px_to_ndc(
+                                x,
+                                y,
+                                w,
+                                h,
+                                gpu.size.0,
+                                gpu.size.1,
+                                accent,
+                            ));
+                        }
                         let n = quads.len() / 6;
                         gpu.upload(&quads);
-                        let text_verts = match &gpu.text_atlas {
-                            Some(atlas) => {
-                                scene_text_quads(atlas, scene, gpu.size.0, gpu.size.1)
-                            }
-                            None => Vec::new(),
-                        };
                         let bg = parse_hex(&Theme::zed_dark().bg);
                         let clear = wgpu::Color {
                             r: bg[0] as f64,
@@ -482,6 +506,7 @@ pub fn run_desktop(
         dirty: true,
         frames: 0,
         since: Instant::now(),
+        text_cache: std::collections::HashMap::new(),
     };
     event_loop
         .run_app(&mut app)
@@ -752,25 +777,94 @@ pub fn scene_text_quads(
     scene: &Scene,
     w_px: u32,
     h_px: u32,
-) -> Vec<f32> {
+) -> (Vec<f32>, Option<[f32; 4]>) {
     let lang = lang_of(&scene.center.lang);
     let mut v = Vec::new();
-    let x0 = w_px as f32 * 0.22 + 12.0;
+    let gutter = 52.0f32;
+    let x0 = w_px as f32 * 0.22 + 12.0 + gutter;
+    let wrap_x = w_px as f32 * 0.82 - 12.0;
     let mut y = 44.0f32;
-    for line in scene.center.lines.iter().take(25) {
-        let spans = keplr_lang::highlight(lang, line);
+    let mut cursor_rect = None;
+    for (i, line) in scene.center.lines.iter().take(25).enumerate() {
+        let n = scene.center.viewport_top + i;
+        let num = format!("{n:>4} ");
         v.extend(layout_colored_line(
             atlas,
-            line,
-            &spans,
-            x0,
+            &num,
+            &[],
+            x0 - gutter,
             y,
             w_px as f32,
             h_px as f32,
         ));
-        y += 18.0;
+        let spans = keplr_lang::highlight(lang, line);
+        let mut row = String::new();
+        let mut row_w = 0.0f32;
+        let mut rows: Vec<String> = Vec::new();
+        for c in line.chars() {
+            let adv = atlas
+                .glyphs
+                .get(&(c, 16u32))
+                .map(|g| g.advance)
+                .unwrap_or(8.0);
+            if row_w + adv > (wrap_x - x0).max(40.0) && !row.is_empty() {
+                rows.push(std::mem::take(&mut row));
+                row_w = 0.0;
+            }
+            row.push(c);
+            row_w += adv;
+        }
+        rows.push(row);
+        for (ri, sub) in rows.iter().enumerate() {
+            // NOTE: spans are line-relative; wrapped continuation rows render plain.
+            // Full per-row re-highlighting is the documented next refinement.
+            let spans = if ri == 0 { spans.clone() } else { Vec::new() };
+            v.extend(layout_colored_line(
+                atlas,
+                sub,
+                &spans,
+                x0,
+                y,
+                w_px as f32,
+                h_px as f32,
+            ));
+            if n == scene.center.cursor.0 && ri == 0 {
+                cursor_rect = Some([x0, y, 9.0, 17.0]);
+            }
+            y += 18.0;
+        }
     }
+    (v, cursor_rect)
+}
+
+fn cursor_px_to_ndc(
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    vw: u32,
+    vh: u32,
+    c: [f32; 3],
+) -> Vec<f32> {
+    let mut v = Vec::new();
+    let nx = |px: f32| px / vw as f32 * 2.0 - 1.0;
+    let ny = |py: f32| 1.0 - py / vh as f32 * 2.0;
+    push_quad(&mut v, nx(x), ny(y), nx(x + w) - nx(x), ny(y + h) - ny(y), c);
     v
+}
+
+fn text_cache_key(scene: &Scene, w: u32, h: u32) -> u64 {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut s = DefaultHasher::new();
+    scene.center.viewport_top.hash(&mut s);
+    scene.center.cursor.hash(&mut s);
+    w.hash(&mut s);
+    h.hash(&mut s);
+    for line in scene.center.lines.iter().take(25) {
+        line.hash(&mut s);
+    }
+    s.finish()
 }
 
 #[allow(clippy::type_complexity)]
