@@ -125,3 +125,52 @@ pub fn commit(workdir: &Path, message: &str) -> anyhow::Result<String> {
     git(workdir, &["add", "-A"])?;
     git(workdir, &["commit", "-m", message])
 }
+
+pub fn stage(workdir: &Path, path: &str) -> anyhow::Result<String> {
+    git(workdir, &["add", "--", path])
+}
+
+pub fn unstage(workdir: &Path, path: &str) -> anyhow::Result<String> {
+    git(workdir, &["restore", "--staged", "--", path])
+}
+
+pub fn discard(workdir: &Path, path: &str) -> anyhow::Result<String> {
+    let entries = status(workdir)?;
+    let entry = entries
+        .iter()
+        .find(|e| e.path == path)
+        .ok_or_else(|| anyhow::anyhow!("no changes for `{path}`"))?;
+    if entry.unstaged == '?' || entry.staged == '?' {
+        let full = workdir.join(path);
+        if full.is_dir() {
+            std::fs::remove_dir_all(&full)?;
+        } else {
+            std::fs::remove_file(&full)?;
+        }
+        return Ok(String::from("removed untracked"));
+    }
+    git(workdir, &["restore", "--", path])
+}
+
+pub fn switch_branch(workdir: &Path, branch: &str, create: bool) -> anyhow::Result<String> {
+    if branch.trim().is_empty() || branch.contains(char::is_whitespace) || branch.contains("..") {
+        anyhow::bail!("bad branch name `{branch}`");
+    }
+    if create {
+        git(workdir, &["switch", "-c", branch])
+    } else {
+        git(workdir, &["switch", branch])
+    }
+}
+
+pub fn stash_push(workdir: &Path, message: &str) -> anyhow::Result<String> {
+    if message.trim().is_empty() {
+        git(workdir, &["stash", "push"])
+    } else {
+        git(workdir, &["stash", "push", "-m", message])
+    }
+}
+
+pub fn stash_pop(workdir: &Path) -> anyhow::Result<String> {
+    git(workdir, &["stash", "pop"])
+}

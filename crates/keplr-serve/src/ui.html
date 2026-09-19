@@ -19,6 +19,20 @@
     --mono: "SF Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   }
   * { box-sizing: border-box; }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #2a3340 transparent;
+  }
+  *::-webkit-scrollbar { width: 10px; height: 10px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb {
+    background: #2a3340;
+    border-radius: 8px;
+    border: 2px solid #0e1116;
+    min-height: 30px;
+  }
+  *::-webkit-scrollbar-thumb:hover { background: #58a6ff; border-color: transparent; }
+  *::-webkit-scrollbar-corner { background: transparent; }
   html, body { height: 100%; }
   body {
     margin: 0;
@@ -165,6 +179,94 @@
   #palist div { padding: 6px 10px; border-radius: 4px; cursor: pointer; }
   #palist div.sel { background: var(--border); color: var(--accent); }
   #palist .cmd { color: var(--dim); font-size: 12px; margin-left: 8px; }
+  /* ---- context menu ---- */
+  #ctxmenu {
+    display: none; position: fixed; z-index: 20; min-width: 220px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 4px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.55);
+  }
+  #ctxmenu.open { display: block; }
+  #ctxmenu .mi {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 10px; border-radius: 4px; cursor: pointer;
+  }
+  #ctxmenu .mi:hover { background: var(--border); }
+  #ctxmenu .mi.danger { color: var(--error); }
+  #ctxmenu .mi.danger:hover { background: #3d1d1d; }
+  #ctxmenu .mi .k { margin-left: auto; color: var(--dim); font-size: 11px; }
+  #ctxmenu .sep { height: 1px; background: var(--border); margin: 4px 6px; }
+  /* ---- modal ---- */
+  #modalwrap {
+    display: none; position: fixed; inset: 0; z-index: 30;
+    background: rgba(0,0,0,.5);
+    align-items: flex-start; justify-content: center; padding-top: 18vh;
+  }
+  #modalwrap.open { display: flex; }
+  #modal {
+    width: min(420px, 90vw); background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 8px; padding: 14px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.55);
+  }
+  #modal h3 { margin: 0 0 10px; font-size: 13px; font-weight: normal; }
+  #modal input, #modal textarea {
+    width: 100%; background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 7px 10px; font: inherit; outline: none;
+  }
+  #modal input:focus, #modal textarea:focus { border-color: var(--accent); }
+  #modal .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+  #modal button {
+    background: var(--border); color: var(--text); border: none;
+    border-radius: 6px; font: inherit; padding: 5px 14px; cursor: pointer;
+  }
+  #modal button.primary { background: var(--accent); color: #04101f; font-weight: bold; }
+  #modal button.danger { background: var(--error); color: #fff; font-weight: bold; }
+  /* ---- source control ---- */
+  #scm { display: flex; flex-direction: column; height: 100%; gap: 8px; }
+  #scm textarea {
+    width: 100%; background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 7px 10px; font: inherit; outline: none; resize: vertical; min-height: 56px;
+  }
+  #scm textarea:focus { border-color: var(--accent); }
+  #scm .commitbtn {
+    background: var(--accent); color: #04101f; border: none; font-weight: bold;
+    border-radius: 6px; font: inherit; padding: 6px; cursor: pointer;
+  }
+  #scm .commitbtn:disabled { opacity: .45; cursor: default; }
+  #scm h4 { margin: 6px 0 2px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); font-weight: normal; display: flex; align-items: center; gap: 6px; }
+  #scm h4 .n { background: var(--border); border-radius: 8px; padding: 0 7px; font-size: 11px; }
+  #scm h4 button { margin-left: auto; }
+  #scm .mini {
+    background: none; border: none; color: var(--dim);
+    font: inherit; font-size: 11px; cursor: pointer; padding: 1px 6px; border-radius: 4px;
+  }
+  #scm .mini:hover { color: var(--text); background: var(--border); }
+  #scm .filerow {
+    display: flex; align-items: center; gap: 6px;
+    padding: 3px 6px; border-radius: 4px; cursor: pointer;
+  }
+  #scm .filerow:hover { background: var(--border); }
+  #scm .filerow .badge {
+    font-size: 11px; width: 14px; flex: none; text-align: center; font-weight: bold;
+  }
+  #scm .filerow .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #scm .filerow .act { display: none; gap: 2px; }
+  #scm .filerow:hover .act { display: flex; }
+  #scm .filerow .act button {
+    background: none; border: none; color: var(--dim);
+    font: inherit; cursor: pointer; padding: 0 5px; border-radius: 4px; font-size: 13px;
+  }
+  #scm .filerow .act button:hover { color: var(--text); background: var(--surface2); }
+  #scm select {
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 4px 6px; font: inherit; max-width: 100%;
+  }
+  :focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+  button { transition: background-color .12s, color .12s; }
+  .trow, .tab, #files div { transition: background-color .12s; }
 </style>
 <script type="importmap">
 {"imports": {
@@ -190,6 +292,7 @@
     <div class="docktabs">
       <button data-ltab="project" class="sel">project</button>
       <button data-ltab="search">search</button>
+      <button data-ltab="source">source</button>
     </div>
     <div class="dockbody" id="leftbody"></div>
   </div>
@@ -215,9 +318,11 @@
   <div id="bbody"></div>
 </div>
 <div id="statusbar">
-  <span id="sbranch">branch: …</span><span id="serrors">errors: 0</span>
+  <span id="sbranch">branch: …</span><span id="sgit"></span><span id="serrors">errors: 0</span>
   <span class="right"><span id="slang">–</span><span id="scursor">–</span><span id="sfiles">files: …</span></span>
 </div>
+<div id="ctxmenu"></div>
+<div id="modalwrap"><div id="modal"></div></div>
 <div id="palwrap"><input id="palinput" placeholder="type a command or filename…" autocomplete="off" spellcheck="false"><div id="palist"></div></div>
 <script type="module">
 import { EditorView, basicSetup } from "codemirror";
@@ -440,6 +545,26 @@ function renderTabs() {
     d.appendChild(x);
     d.onclick = () => activateTab(i);
     d.title = rel(t.path);
+    d.oncontextmenu = ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const items = [
+        { label: "Close", run: () => closeTab(i) },
+        { label: "Close Others", run: () => {
+          for (let j = S.tabs.length - 1; j >= 0; j--) {
+            if (j !== i) closeTab(j);
+          }
+        }},
+        { label: "Close All", run: () => {
+          for (let j = S.tabs.length - 1; j >= 0; j--) closeTab(j);
+        }},
+        { sep: true },
+        { label: "Copy Path", run: () => copyText(t.path) },
+        { label: "Copy Relative Path", run: () => copyText(rel(t.path)) },
+        { label: "Reveal in Tree", run: () => revealInTree(t.path) },
+      ];
+      showMenu(ev.clientX, ev.clientY, items);
+    };
     bar.appendChild(d);
   });
   const crumbs = document.getElementById("crumbs");
@@ -559,30 +684,41 @@ function buildTree(paths) {
   });
   return root;
 }
-function renderTree(box, node, depth) {
+function renderTree(box, node, depth, base) {
+  base = base || "";
   const names = Object.keys(node).sort((a, b) => {
     const da = node[a].__kids ? 0 : 1, db = node[b].__kids ? 0 : 1;
     return da - db || (a < b ? -1 : 1);
   });
   names.forEach(name => {
     const n = node[name];
+    const full = base ? base + "/" + name : name;
     const row = document.createElement("div");
     row.className = "trow";
     row.style.paddingLeft = (6 + depth * 14) + "px";
     if (n.__kids) {
+      const isAncestor = REVEAL && (REVEAL === full || REVEAL.startsWith(full + "/"));
       row.innerHTML = '<span class="tri">▸</span>' + FOLDER_CLOSED + "<span></span>";
       row.lastChild.textContent = name;
+      row.dataset.dir = full;
       const kids = document.createElement("div");
-      kids.className = "tkids closed";
-      let open = false;
+      kids.className = "tkids" + (isAncestor ? "" : " closed");
+      let open = !!isAncestor;
+      const setTri = () => { row.querySelector(".tri").textContent = open ? "▾" : "▸"; };
+      setTri();
       row.onclick = () => {
         open = !open;
         kids.classList.toggle("closed", !open);
-        row.querySelector(".tri").textContent = open ? "▾" : "▸";
+        setTri();
+      };
+      row.oncontextmenu = e => {
+        e.preventDefault();
+        e.stopPropagation();
+        fileMenu(e.clientX, e.clientY, wsRoot ? wsRoot + "/" + full : full, true);
       };
       box.appendChild(row);
       box.appendChild(kids);
-      renderTree(kids, n.__kids, depth + 1);
+      renderTree(kids, n.__kids, depth + 1, full);
     } else {
       const lang = langOf(n.__full || name);
       row.innerHTML = '<span class="tri"></span>' + fileIcon(lang) + "<span></span>";
@@ -590,7 +726,16 @@ function renderTree(box, node, depth) {
       row.dataset.path = n.__full;
       if (n.__full === (S.tabs[S.active] || {}).path) row.classList.add("sel");
       row.onclick = () => openFile(n.__full, 0).catch(e => msg(String(e), true));
+      row.oncontextmenu = e => {
+        e.preventDefault();
+        e.stopPropagation();
+        fileMenu(e.clientX, e.clientY, n.__full, false);
+      };
       box.appendChild(row);
+      if (REVEAL && n.__full === REVEAL) {
+        row.classList.add("sel");
+        row.scrollIntoView({ block: "center" });
+      }
     }
   });
 }
@@ -601,11 +746,19 @@ function loadFiles() {
       S.files = (list || []).map(f => f.path);
       const box = document.getElementById("leftbody");
       box.innerHTML = "";
-      renderTree(box, buildTree(S.files), 0);
+      renderTree(box, buildTree(S.files), 0, "");
+      REVEAL = null;
       document.getElementById("sfiles").textContent = "files: " + S.files.length;
       setDot(true);
     })
     .catch(e => { setDot(false); msg(String(e), true); });
+  const box = document.getElementById("leftbody");
+  box.oncontextmenu = e => {
+    if (e.target === box) {
+      e.preventDefault();
+      fileMenu(e.clientX, e.clientY, wsRoot, true);
+    }
+  };
 }
 
 /* ============ search / problems / symbols / tasks / console ============ */
@@ -940,6 +1093,7 @@ function setLeftTab(t) {
   });
   const body = document.getElementById("leftbody");
   if (t === "project") loadFiles();
+  else if (t === "source") loadScm();
   else {
     body.innerHTML = "";
     const input = document.createElement("input");
@@ -956,6 +1110,476 @@ function setLeftTab(t) {
   }
 }
 
+/* ============ clipboard ============ */
+function copyText(t) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(t).catch(() => fallbackCopy(t));
+  } else fallbackCopy(t);
+}
+function fallbackCopy(t) {
+  const ta = document.createElement("textarea");
+  ta.value = t;
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand("copy"); } catch (e) {}
+  ta.remove();
+}
+function parentDir(p) {
+  const r = rel(p);
+  const i = r.lastIndexOf("/");
+  return i < 0 ? "" : r.slice(0, i);
+}
+
+/* ============ context menu ============ */
+function hideMenu() {
+  document.getElementById("ctxmenu").classList.remove("open");
+}
+function showMenu(x, y, items) {
+  const m = document.getElementById("ctxmenu");
+  m.innerHTML = "";
+  items.forEach(it => {
+    if (it.sep) {
+      const s = document.createElement("div");
+      s.className = "sep";
+      m.appendChild(s);
+      return;
+    }
+    const d = document.createElement("div");
+    d.className = "mi" + (it.danger ? " danger" : "");
+    const lab = document.createElement("span");
+    lab.textContent = it.label;
+    d.appendChild(lab);
+    if (it.shortcut) {
+      const k = document.createElement("span");
+      k.className = "k";
+      k.textContent = it.shortcut;
+      d.appendChild(k);
+    }
+    d.onclick = () => { hideMenu(); it.run(); };
+    m.appendChild(d);
+  });
+  m.classList.add("open");
+  const w = m.offsetWidth, h = m.offsetHeight;
+  m.style.left = Math.max(8, Math.min(x, window.innerWidth - w - 8)) + "px";
+  m.style.top = Math.max(8, Math.min(y, window.innerHeight - h - 8)) + "px";
+}
+document.addEventListener("click", e => {
+  if (!e.target.closest("#ctxmenu")) hideMenu();
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") hideMenu();
+});
+window.addEventListener("resize", hideMenu);
+window.addEventListener("blur", hideMenu);
+
+/* ============ modal ============ */
+function askInput(opts) {
+  return new Promise(resolve => {
+    const wrap = document.getElementById("modalwrap");
+    const modal = document.getElementById("modal");
+    modal.innerHTML = "";
+    const h = document.createElement("h3");
+    h.textContent = opts.title;
+    const input = document.createElement("input");
+    input.placeholder = opts.placeholder || "";
+    input.value = opts.value || "";
+    input.spellcheck = false;
+    input.autocomplete = "off";
+    const row = document.createElement("div");
+    row.className = "row";
+    const cancel = document.createElement("button");
+    cancel.textContent = "Cancel";
+    const ok = document.createElement("button");
+    ok.textContent = opts.okLabel || "Create";
+    if (opts.danger) ok.classList.add("danger");
+    else ok.classList.add("primary");
+    const close = v => {
+      wrap.classList.remove("open");
+      wrap.onclick = null;
+      resolve(v);
+    };
+    ok.onclick = () => {
+      const v = input.value.trim();
+      close(v ? v : null);
+    };
+    cancel.onclick = () => close(null);
+    input.onkeydown = e => {
+      if (e.key === "Enter") { e.preventDefault(); ok.onclick(); }
+      else if (e.key === "Escape") close(null);
+      e.stopPropagation();
+    };
+    wrap.onclick = () => close(null);
+    modal.onclick = e => e.stopPropagation();
+    row.appendChild(cancel);
+    row.appendChild(ok);
+    modal.appendChild(h);
+    modal.appendChild(input);
+    modal.appendChild(row);
+    wrap.classList.add("open");
+    input.focus();
+    input.select();
+  });
+}
+function askConfirm(opts) {
+  return new Promise(resolve => {
+    const wrap = document.getElementById("modalwrap");
+    const modal = document.getElementById("modal");
+    modal.innerHTML = "";
+    const h = document.createElement("h3");
+    h.textContent = opts.title;
+    const p = document.createElement("div");
+    p.style.cssText = "color:var(--dim);font-size:12px;margin-bottom:4px;word-break:break-all;";
+    p.textContent = opts.body || "";
+    const row = document.createElement("div");
+    row.className = "row";
+    const cancel = document.createElement("button");
+    cancel.textContent = "Cancel";
+    const ok = document.createElement("button");
+    ok.textContent = opts.okLabel || "Delete";
+    ok.classList.add("danger");
+    const close = v => {
+      wrap.classList.remove("open");
+      wrap.onclick = null;
+      resolve(v);
+    };
+    ok.onclick = () => close(true);
+    cancel.onclick = () => close(false);
+    modal.onkeydown = e => {
+      if (e.key === "Enter") { e.preventDefault(); close(true); }
+      else if (e.key === "Escape") close(false);
+      e.stopPropagation();
+    };
+    modal.tabIndex = 0;
+    wrap.onclick = () => close(false);
+    modal.onclick = e => e.stopPropagation();
+    row.appendChild(cancel);
+    row.appendChild(ok);
+    modal.appendChild(h);
+    modal.appendChild(p);
+    modal.appendChild(row);
+    wrap.classList.add("open");
+    modal.focus();
+  });
+}
+
+/* ============ fs ops from the tree ============ */
+function trackTabForFs(oldAbs, makeNew) {
+  // returns {closed: [...]} — caller refreshes tree first
+  for (let i = S.tabs.length - 1; i >= 0; i--) {
+    const t = S.tabs[i];
+    if (t.path !== oldAbs && !t.path.startsWith(oldAbs + "/")) continue;
+    if (makeNew === null) {
+      S.tabs.splice(i, 1);
+      if (S.active >= S.tabs.length) S.active = S.tabs.length - 1;
+    } else {
+      t.path = makeNew(t.path);
+      t.label = null;
+    }
+  }
+  if (S.tabs.length === 0) {
+    S.active = -1;
+    if (ED) ED.setDoc("");
+    renderTabs();
+  } else {
+    if (S.active < 0) S.active = 0;
+    activateTab(S.active);
+  }
+}
+async function fsOp(op, body, after) {
+  try {
+    const j = await post(op, body);
+    if (!j.ok) throw new Error(j.error || "failed");
+    if (after) await after(j);
+    await loadFiles();
+    refreshGitCounts();
+  } catch (e) { msg(String(e), true); }
+}
+function fileMenu(x, y, absPath, isDir) {
+  const r = rel(absPath);
+  const isRoot = !r;
+  const items = [];
+  const dir = isDir ? r : parentDir(absPath);
+  items.push({ label: "New File", run: async () => {
+    const name = await askInput({ title: "New file" + (dir ? " in " + dir : ""), placeholder: "name.ext" });
+    if (name) fsOp("/fs/create", { path: dir ? dir + "/" + name : name, dir: false });
+  }});
+  items.push({ label: "New Folder", run: async () => {
+    const name = await askInput({ title: "New folder" + (dir ? " in " + dir : ""), placeholder: "name" });
+    if (name) fsOp("/fs/create", { path: dir ? dir + "/" + name : name, dir: true });
+  }});
+  if (isRoot) {
+    items.push({ sep: true });
+    items.push({ label: "Refresh", run: () => loadFiles() });
+    items.push({ label: "Copy Root Path", run: () => copyText(absPath) });
+    showMenu(x, y, items);
+    return;
+  }
+  items.push({ sep: true });
+  if (!isDir) {
+    items.push({ label: "Rename", run: async () => {
+      const base = r.split("/").pop();
+      const name = await askInput({ title: "Rename", value: base, okLabel: "Rename" });
+      if (name && name !== base) {
+        const to = dir ? dir + "/" + name : name;
+        await fsOp("/fs/rename", { from: r, to });
+        await renameTabs(absPath, to);
+      }
+    }});
+    items.push({ label: "Duplicate", run: () => fsOp("/fs/duplicate", { path: r }) });
+  } else {
+    items.push({ label: "Rename", run: async () => {
+      const base = r.split("/").pop() || r;
+      const name = await askInput({ title: "Rename folder", value: base, okLabel: "Rename" });
+      if (name && name !== base) {
+        const to = parentDir(absPath) ? parentDir(absPath) + "/" + name : name;
+        await fsOp("/fs/rename", { from: r, to });
+        await renameTabs(absPath, to);
+      }
+    }});
+  }
+  items.push({ label: "Delete", danger: true, run: async () => {
+    const ok = await askConfirm({ title: "Delete " + (isDir ? "folder" : "file") + "?", body: r + (isDir ? " and everything inside it" : "") });
+    if (ok) {
+      await fsOp("/fs/delete", { path: r });
+      trackTabForFs(absPath, null);
+    }
+  }});
+  items.push({ sep: true });
+  items.push({ label: "Copy Path", run: () => copyText(absPath) });
+  items.push({ label: "Copy Relative Path", run: () => copyText(r) });
+  if (!isDir) {
+    items.push({ label: "Reveal in Tree", run: () => revealInTree(absPath) });
+  } else {
+    items.push({ label: "Refresh", run: () => loadFiles() });
+  }
+  showMenu(x, y, items);
+}
+async function renameTabs(oldAbs, newRel) {
+  // server paths are absolute; rebuild tab path from the new relative path
+  const ws = wsRoot ? wsRoot + "/" : "";
+  for (const t of S.tabs) {
+    if (t.path === oldAbs || t.path.startsWith(oldAbs + "/")) {
+      const suffix = t.path.slice(oldAbs.length);
+      t.path = ws + newRel + suffix;
+    }
+  }
+  if (S.active >= 0) activateTab(S.active);
+  else renderTabs();
+}
+let REVEAL = null;
+function revealInTree(absPath) {
+  REVEAL = absPath;
+  if (!S.docks.left) toggleDock("left", true);
+  setLeftTabSilent("project");
+  loadFiles();
+}
+function setLeftTabSilent(t) {
+  S.leftTab = t;
+  document.querySelectorAll("#left .docktabs button").forEach(b => {
+    b.classList.toggle("sel", b.dataset.ltab === t);
+  });
+}
+
+function setLeftTabSilent(t) {
+  S.leftTab = t;
+  document.querySelectorAll("#left .docktabs button").forEach(b => {
+    b.classList.toggle("sel", b.dataset.ltab === t);
+  });
+}
+
+/* ============ source control (vscode-style) ============ */
+async function refreshGitCounts() {
+  try {
+    const list = await get("/git/status");
+    const entries = list.entries || [];
+    let staged = 0, unstaged = 0;
+    entries.forEach(e => {
+      if (e.staged && e.staged !== " " && e.staged !== "?") staged++;
+      if (e.unstaged && e.unstaged !== " ") unstaged++;
+    });
+    document.getElementById("sgit").textContent =
+      entries.length ? ("git +" + staged + " ~" + unstaged) : "git clean";
+  } catch (e) {
+    document.getElementById("sgit").textContent = "";
+  }
+}
+function scmFileRow(body, entry, staged, onAction) {
+  const d = document.createElement("div");
+  d.className = "filerow";
+  const badge = document.createElement("span");
+  badge.className = "badge";
+  const mark = staged ? entry.staged : entry.unstaged;
+  badge.textContent = mark === " " ? "M" : mark;
+  badge.style.color = mark === "?" ? "var(--ok)" : mark === "D" ? "var(--error)" : "var(--warn)";
+  const nm = document.createElement("span");
+  nm.className = "nm";
+  nm.textContent = entry.path;
+  nm.title = entry.path;
+  const act = document.createElement("span");
+  act.className = "act";
+  onAction.forEach(a => {
+    const b = document.createElement("button");
+    b.textContent = a[0];
+    b.title = a[1];
+    b.onclick = ev => { ev.stopPropagation(); a[2](); };
+    act.appendChild(b);
+  });
+  d.appendChild(badge);
+  d.appendChild(nm);
+  d.appendChild(act);
+  d.onclick = () => openFile(entry.path, 0).catch(e => msg(String(e), true));
+  body.appendChild(d);
+}
+async function loadScm() {
+  const body = document.getElementById("leftbody");
+  body.innerHTML = "";
+  const wrap = document.createElement("div");
+  wrap.id = "scm";
+  const msg2 = document.createElement("textarea");
+  msg2.placeholder = "Message (Ctrl+Enter to commit)";
+  const commitBtn = document.createElement("button");
+  commitBtn.className = "commitbtn";
+  commitBtn.textContent = "Commit";
+  commitBtn.disabled = true;
+  msg2.addEventListener("input", () => { commitBtn.disabled = !msg2.value.trim(); });
+  msg2.addEventListener("keydown", e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && msg2.value.trim()) {
+      e.preventDefault();
+      doCommit();
+    }
+  });
+  async function doCommit() {
+    const m = msg2.value.trim();
+    if (!m) return;
+    try {
+      const j = await post("/git/commit", { message: m });
+      if (!j.ok) throw new Error(j.error || "commit failed");
+      msg2.value = "";
+      commitBtn.disabled = true;
+      log("console", "committed: " + m.split("\n")[0]);
+      await reloadScm();
+    } catch (e) { msg(String(e), true); }
+  }
+  commitBtn.onclick = doCommit;
+  wrap.appendChild(msg2);
+  wrap.appendChild(commitBtn);
+  const branchRow = document.createElement("div");
+  branchRow.style.cssText = "display:flex;gap:6px;align-items:center;";
+  const sel = document.createElement("select");
+  const newBtn = document.createElement("button");
+  newBtn.className = "mini";
+  newBtn.textContent = "+ branch";
+  newBtn.onclick = async () => {
+    const name = await askInput({ title: "New branch", placeholder: "feature/name", okLabel: "Create" });
+    if (!name) return;
+    try {
+      const j = await post("/git/switch", { branch: name, create: true });
+      if (!j.ok) throw new Error(j.error || "failed");
+      await reloadScm();
+    } catch (e) { msg(String(e), true); }
+  };
+  branchRow.appendChild(sel);
+  branchRow.appendChild(newBtn);
+  wrap.appendChild(branchRow);
+  const stashRow = document.createElement("div");
+  stashRow.style.cssText = "display:flex;gap:6px;";
+  const stashBtn = document.createElement("button");
+  stashBtn.className = "mini";
+  stashBtn.textContent = "stash changes";
+  stashBtn.onclick = async () => {
+    const m = await askInput({ title: "Stash message (optional)", placeholder: "wip", okLabel: "Stash" });
+    if (m === null) return;
+    try {
+      const j = await post("/git/stash", { message: m || "" });
+      if (!j.ok) throw new Error(j.error || "failed");
+      await reloadScm();
+    } catch (e) { msg(String(e), true); }
+  };
+  const popBtn = document.createElement("button");
+  popBtn.className = "mini";
+  popBtn.textContent = "pop stash";
+  popBtn.onclick = async () => {
+    try {
+      const j = await post("/git/stash", { pop: true });
+      if (!j.ok) throw new Error(j.error || "failed");
+      await reloadScm();
+    } catch (e) { msg(String(e), true); }
+  };
+  stashRow.appendChild(stashBtn);
+  stashRow.appendChild(popBtn);
+  wrap.appendChild(stashRow);
+  body.appendChild(wrap);
+  async function reloadScm() {
+    try {
+      const [st, br] = await Promise.all([get("/git/status"), get("/git/branches")]);
+      const entries = st.entries || [];
+      sel.innerHTML = "";
+      (br.entries || []).forEach(b => {
+        const o = document.createElement("option");
+        o.value = b.name;
+        o.textContent = (b.current ? "● " : "") + b.name;
+        if (b.current) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.onchange = async () => {
+        try {
+          const j = await post("/git/switch", { branch: sel.value });
+          if (!j.ok) throw new Error(j.error || "failed");
+          await reloadScm();
+        } catch (e) { msg(String(e), true); }
+      };
+      wrap.querySelectorAll(".staged-sec,.changes-sec").forEach(el => el.remove());
+      const staged = entries.filter(e => e.staged && e.staged !== " " && e.staged !== "?");
+      const changes = entries.filter(e => e.unstaged && e.unstaged !== " ");
+      const mkSec = (title, list, stagedFlag) => {
+        const sec = document.createElement("div");
+        sec.className = stagedFlag ? "staged-sec" : "changes-sec";
+        const h = document.createElement("h4");
+        const span = document.createElement("span");
+        span.textContent = title + " ";
+        const n = document.createElement("span");
+        n.className = "n";
+        n.textContent = list.length;
+        h.appendChild(span);
+        h.appendChild(n);
+        sec.appendChild(h);
+        if (!list.length) {
+          const em = document.createElement("div");
+          em.className = "logline";
+          em.textContent = stagedFlag ? "(nothing staged)" : "(working tree clean)";
+          sec.appendChild(em);
+        }
+        list.forEach(e => {
+          scmFileRow(sec, e, stagedFlag, stagedFlag
+            ? [["−", "unstage", async () => {
+                const j = await post("/git/unstage", { path: e.path });
+                if (!j.ok) throw new Error(j.error || "failed");
+                await reloadScm();
+              }]]
+            : [["+", "stage", async () => {
+                const j = await post("/git/stage", { path: e.path });
+                if (!j.ok) throw new Error(j.error || "failed");
+                await reloadScm();
+              }], ["⟲", "discard changes", async () => {
+                const ok = await askConfirm({ title: "Discard changes?", body: e.path, okLabel: "Discard" });
+                if (!ok) return;
+                const j = await post("/git/discard", { path: e.path });
+                if (!j.ok) throw new Error(j.error || "failed");
+                await reloadScm();
+                loadFiles();
+              }]]);
+        });
+        wrap.appendChild(sec);
+      };
+      mkSec("staged", staged, true);
+      mkSec("changes", changes, false);
+      refreshGitCounts();
+      health();
+    } catch (e) { msg(String(e), true); }
+  }
+  await reloadScm();
+}
+
 /* ============ palette ============ */
 const COMMANDS = [
   ["open file…", () => setLeftTab("project") || true, "finder"],
@@ -965,6 +1589,15 @@ const COMMANDS = [
   ["run all tasks", () => runAllTasks(), "task"],
   ["show problems", () => setBottomTab("problems"), "view"],
   ["show tasks", () => setBottomTab("tasks"), "view"],
+  ["show source control", () => { if (!S.docks.left) toggleDock("left", true); setLeftTab("source"); }, "view"],
+  ["new file", async () => {
+    const name = await askInput({ title: "New file", placeholder: "name.ext" });
+    if (name) fsOp("/fs/create", { path: name, dir: false });
+  }, "file"],
+  ["new folder", async () => {
+    const name = await askInput({ title: "New folder", placeholder: "name" });
+    if (name) fsOp("/fs/create", { path: name, dir: true });
+  }, "file"],
   ["show terminal", () => setBottomTab("terminal"), "view"],
   ["save file", () => saveActive(), "file"],
   ["close tab", () => closeActive(), "file"],
@@ -1050,6 +1683,7 @@ function health() {
   }).then(s => {
     if (s) document.getElementById("sfiles").textContent = "files: " + s.files;
     setDot(true);
+    refreshGitCounts();
   }).catch(e => { setDot(false); msg(String(e), true); });
 }
 

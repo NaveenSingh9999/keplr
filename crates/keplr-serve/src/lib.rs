@@ -452,6 +452,241 @@ async fn git_diff(State(state): State<AppState>) -> Json<serde_json::Value> {
     }
 }
 
+fn safe_rel(root: &Path, rel: &str) -> anyhow::Result<PathBuf> {
+    use std::path::Component;
+    let p = Path::new(rel);
+    if p.is_absolute() {
+        anyhow::bail!("absolute paths not allowed");
+    }
+    let mut out = root.to_path_buf();
+    for comp in p.components() {
+        match comp {
+            Component::Normal(s) => out.push(s),
+            Component::CurDir => {}
+            _ => anyhow::bail!("invalid path `{rel}`"),
+        }
+    }
+    Ok(out)
+}
+
+#[derive(serde::Deserialize)]
+struct FsPathReq {
+    path: String,
+}
+
+#[derive(serde::Deserialize)]
+struct FsCreateReq {
+    path: String,
+    #[serde(default)]
+    dir: bool,
+}
+
+#[derive(serde::Deserialize)]
+struct FsRenameReq {
+    from: String,
+    to: String,
+}
+
+async fn fs_create(
+    State(state): State<AppState>,
+    Json(req): Json<FsCreateReq>,
+) -> Json<serde_json::Value> {
+    let full = match safe_rel(&state.root, &req.path) {
+        Ok(p) => p,
+        Err(e) => return Json(serde_json::json!({"ok": false, "error": format!("{e:#}")})),
+    };
+    let done = if req.dir {
+        std::fs::create_dir_all(&full).map_err(|e| anyhow::anyhow!("{e}"))
+    } else {
+        (|| {
+            if let Some(parent) = full.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&full)?;
+            Ok::<(), anyhow::Error>(())
+        })()
+    };
+    match done {
+        Ok(()) => Json(serde_json::json!({"ok": true, "path": full.display().to_string()})),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": format!("{e:#}")})),
+    }
+}
+
+async fn fs_rename(
+    State(state): State<AppState>,
+    Json(req): Json<FsRenameReq>,
+) -> Json<serde_json::Value> {
+    let from = match safe_rel(&state.root, &req.from) {
+        Ok(p) => p,
+        Err(e) => return Json(serde_json::json!({"ok": false, "error": format!("{e:#}")})),
+    };
+    let to = match safe_rel(&state.root, &req.to) {
+        Ok(p) => p,
+        Err(e) => return Json(serde_json::json!({"ok": false, "error": format!("{e:#}")})),
+    };
+    if let Some(parent) = to.parent() {
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            return Json(serde_json::json!({"ok": false, "error": format!("{e}")}));
+        }
+    }
+    match std::fs::rename(&from, &to) {
+        Ok(()) => Json(serde_json::json!({"ok": true})),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": format!("{e}")})),
+    }
+}
+
+async fn fs_delete(
+    State(state): State<AppState>,
+    Json(req): Json<FsPathReq>,
+) -> Json<serde_json::Value> {
+    let full = match safe_rel(&state.root, &req.path) {
+        Ok(p) => p,
+        Err(e) => return Json(serde_json::json!({"ok": false, "error": format!("{e:#}")})),
+    };
+    let done = if full.is_dir() {
+        std::fs::remove_dir_all(&full).map_err(|e| anyhow::anyhow!("{e}"))
+    } else {
+        std::fs::remove_file(&full).map_err(|e| anyhow::anyhow!("{e}"))
+    };
+    match done {
+        Ok(()) => Json(serde_json::json!({"ok": true})),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": format!("{e:#}")})),
+    }
+}
+
+async fn fs_duplicate(
+    State(state): State<AppState>,
+    Json(req): Json<FsPathReq>,
+) -> Json<serde_json::Value> {
+    let full = match safe_rel(&state.root, &req.path) {
+        Ok(p) => p,
+        Err(e) => return Json(serde_json::json!({"ok": false, "error": format!("{e:#}")})),
+    };
+    if !full.is_file() {
+        return Json(serde_json::json!({"ok": false, "error": "only files can be duplicated"}));
+    }
+    let stem = full
+        .file_stem()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| String::from("copy"));
+    let ext = full
+        .extension()
+        .map(|e| format!(".{}", e.to_string_lossy()))
+        .unwrap_or_default();
+    let parent = full.parent().unwrap_or(&state.root);
+    let mut n = 1u32;
+    let dest = loop {
+        let cand = parent.join(format!("{stem} copy{n}{ext}"));
+        if !cand.exists() {
+            break cand;
+        }
+        n += 1;
+        if n > 999 {
+            return Json(serde_json::json!({"ok": false, "error": "too many copies"}));
+        }
+    };
+    match std::fs::copy(&full, &dest) {
+        Ok(_) => Json(serde_json::json!({"ok": true, "path": dest.display().to_string()})),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": format!("{e}")})),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct GitPathReq {
+    path: String,
+}
+
+#[derive(serde::Deserialize)]
+struct GitCommitReq {
+    message: String,
+}
+
+#[derive(serde::Deserialize)]
+struct GitSwitchReq {
+    branch: String,
+    #[serde(default)]
+    create: bool,
+}
+
+#[derive(serde::Deserialize)]
+struct GitStashReq {
+    #[serde(default)]
+    message: String,
+    #[serde(default)]
+    pop: bool,
+}
+
+async fn git_stage(
+    State(state): State<AppState>,
+    Json(req): Json<GitPathReq>,
+) -> Json<serde_json::Value> {
+    match keplr_core::git::stage(&state.root, &req.path) {
+        Ok(out) => Json(serde_json::json!({"ok": true, "output": out})),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": format!("{e:#}")})),
+    }
+}
+
+async fn git_unstage(
+    State(state): State<AppState>,
+    Json(req): Json<GitPathReq>,
+) -> Json<serde_json::Value> {
+    match keplr_core::git::unstage(&state.root, &req.path) {
+        Ok(out) => Json(serde_json::json!({"ok": true, "output": out})),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": format!("{e:#}")})),
+    }
+}
+
+async fn git_discard(
+    State(state): State<AppState>,
+    Json(req): Json<GitPathReq>,
+) -> Json<serde_json::Value> {
+    match keplr_core::git::discard(&state.root, &req.path) {
+        Ok(out) => Json(serde_json::json!({"ok": true, "output": out})),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": format!("{e:#}")})),
+    }
+}
+
+async fn git_commit(
+    State(state): State<AppState>,
+    Json(req): Json<GitCommitReq>,
+) -> Json<serde_json::Value> {
+    if req.message.trim().is_empty() {
+        return Json(serde_json::json!({"ok": false, "error": "empty message"}));
+    }
+    match keplr_core::git::commit(&state.root, req.message.trim()) {
+        Ok(out) => Json(serde_json::json!({"ok": true, "output": out})),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": format!("{e:#}")})),
+    }
+}
+
+async fn git_switch(
+    State(state): State<AppState>,
+    Json(req): Json<GitSwitchReq>,
+) -> Json<serde_json::Value> {
+    match keplr_core::git::switch_branch(&state.root, &req.branch, req.create) {
+        Ok(out) => Json(serde_json::json!({"ok": true, "output": out})),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": format!("{e:#}")})),
+    }
+}
+
+async fn git_stash(
+    State(state): State<AppState>,
+    Json(req): Json<GitStashReq>,
+) -> Json<serde_json::Value> {
+    let done = if req.pop {
+        keplr_core::git::stash_pop(&state.root)
+    } else {
+        keplr_core::git::stash_push(&state.root, &req.message)
+    };
+    match done {
+        Ok(out) => Json(serde_json::json!({"ok": true, "output": out})),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": format!("{e:#}")})),
+    }
+}
+
 async fn lfs_pointer(
     State(state): State<AppState>,
     Query(params): Query<HashMap<String, String>>,
@@ -943,6 +1178,16 @@ pub async fn serve_full(
         .route("/git/log", get(git_log))
         .route("/git/branches", get(git_branches))
         .route("/git/diff", get(git_diff))
+        .route("/git/stage", post(git_stage))
+        .route("/git/unstage", post(git_unstage))
+        .route("/git/discard", post(git_discard))
+        .route("/git/commit", post(git_commit))
+        .route("/git/switch", post(git_switch))
+        .route("/git/stash", post(git_stash))
+        .route("/fs/create", post(fs_create))
+        .route("/fs/rename", post(fs_rename))
+        .route("/fs/delete", post(fs_delete))
+        .route("/fs/duplicate", post(fs_duplicate))
         .route("/lfs/pointer", get(lfs_pointer))
         .route("/sync/merge", post(sync_merge))
         .route(
