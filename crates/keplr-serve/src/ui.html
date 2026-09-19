@@ -731,6 +731,48 @@
   #findcard .tgl { font-size: 12px; color: var(--text2); display: inline-flex; gap: 4px; align-items: center; cursor: pointer; padding: 4px 6px; border-radius: 5px; }
   #findcard .tgl.on { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
   #oruler { position: absolute; top: 0; right: 0; bottom: 0; width: 10px; z-index: 5; pointer-events: none; opacity: .85; }
+
+  /* ============ PHASE 4 bottom panel ============ */
+  #bottomtabs { display: flex; align-items: center; gap: 2px; height: 32px; padding: 0 8px; flex: none; }
+  #bottomtabs button[data-btab] {
+    appearance: none; background: transparent; border: 0; color: var(--text2);
+    display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px;
+    font: 500 var(--fs-ui) var(--font-ui); cursor: pointer; border-radius: var(--r-sm) var(--r-sm) 0 0;
+    border-bottom: 2px solid transparent; transition: color var(--d1) var(--ease), background var(--d1) var(--ease);
+  }
+  #bottomtabs button[data-btab]:hover { color: var(--text); background: var(--raised); }
+  #bottomtabs button[data-btab].sel { color: var(--text); border-bottom-color: var(--accent); }
+  #bottomtabs .cnt {
+    font: 600 10px var(--font-ui); font-variant-numeric: tabular-nums;
+    background: var(--error); color: #fff; border-radius: 999px; padding: 1px 6px; min-width: 18px; text-align: center;
+  }
+  #bottomtabs .cnt.hidden { display: none; }
+  #bottomtabs .spacer { flex: 1 1 0; }
+  #bottom.tall { height: 62vh !important; }
+  .prob, .task, .logline, .hit {
+    display: flex; gap: 8px; align-items: baseline; padding: 5px 12px;
+    font: 400 12.5px var(--font-ui); color: var(--text); border-radius: 6px; margin: 1px 8px;
+    cursor: pointer; transition: background 80ms linear;
+  }
+  .prob:hover, .task:hover, .hit:hover { background: var(--raised); }
+  .prob .k, .hit .loc { color: var(--accent); font-family: var(--font-mono); font-size: 11.5px; flex: none; }
+  .hit .prev { color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .prob.err .k { color: var(--error); }
+  .logline { cursor: default; color: var(--text2); font-family: var(--font-mono); font-size: 12px; }
+  .logline.err { color: var(--error); }
+  .task button { flex: none; }
+  .task pre { flex-basis: 100%; margin: 4px 0 0; }
+  #termstrip { gap: 6px; }
+  #termstrip .tab {
+    height: 26px; padding: 0 6px 0 12px; border: 1px solid var(--sep);
+    border-radius: 999px; font-size: 12px; animation: none;
+  }
+  #termstrip .tab.sel { border-color: color-mix(in srgb, var(--accent) 55%, transparent); color: var(--text); }
+  #termstrip .ghostadd { border-style: dashed; opacity: .55; }
+  #termstrip .ghostadd:hover { opacity: 1; }
+  #termholder { scrollbar-gutter: stable; }
+  #termholder canvas { display: block; }
+  .ser-empty code { user-select: all; }
 </style>
 <script type="importmap">
 {"imports": {
@@ -767,6 +809,7 @@
     <symbol id="i-push" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></g></symbol>
     <symbol id="i-side" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/></g></symbol>
     <symbol id="i-panel" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></g></symbol>
+    <symbol id="i-activity" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></g></symbol>
     <symbol id="i-list" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></g></symbol>
     <!-- File icons: Seti UI pack, the family VS Code ships (MIT) -->
     <symbol id="f-rust" viewBox="0 0 32 32"><path d="M10.5 27h-.2c-.1-.1-.3-.2-.4-.4-.2-.2-.2-.5.1-.8.2-.3.6-.5.9-.7-.8-.7-1.2-1.5-1.4-2.5-.2-.7-.2-1.5-.2-2.3 0-1.2.2-2.3.2-3.5-.3.2-.6.4-1 .5h-.2c-.2-.2-.3-.4-.3-.6 0-.2.2-.4.3-.5.3-.2.6-.3 1-.3.2 0 .2-.1.2-.2-.1-1-.2-2-.2-3-.1-1-.1-2.1.1-3.1.1-.5.1-.5-.3-.6-.5-.3-.8-.9-.7-1.4.2-1.1 1.4-1.6 2.4-1.1.1.1.2.1.3 0 .5-.4 1-.7 1.6-.9 1.7-.6 3.5-.7 5.2-.4.9.1 1.8.4 2.5 1 .2.2.4.2.6.1.8-.4 1.7-.1 2.1.7.4.8.1 1.5-.8 1.9-.1.1-.1.1-.1.2.3 1 .4 2 .4 3.1 0 1.2 0 2.3.1 3.5 0 .2 0 .2.2.3.4 0 .7.2 1 .5.2.2.2.3 0 .6v.1c0 .2-.2.3-.4.3s-.4-.1-.5-.2c-.1 0-.2-.1-.3-.1v.1c0 .6.1 1.2.1 1.9 0 1.1 0 2.1-.2 3.2-.2 1-.6 2-1.3 2.8-.1.1-.1.2 0 .3.3.2.6.5.8.9.1.3 0 .5-.3.7-.2.2-.4.1-.6 0l-.4-.4c-.2-.2-.3-.4-.5-.5-.1-.1-.2-.1-.3 0-1.1.6-2.3.8-3.5.8-1.4.1-2.9-.1-4.2-.7h-.1c-.2.2-.6.3-.8.5-.3-.2-.6 0-.9.2z"/></symbol>
@@ -841,15 +884,17 @@
   </div>
 </div>
 <div id="bottom" class="hidden">
-  <div class="docktabs">
-    <button data-btab="search" class="sel">search</button>
-    <button data-btab="problems">problems</button>
-    <button data-btab="tasks">tasks</button>
-    <button data-btab="console">console</button>
-    <button data-btab="terminal">terminal</button>
-    <button data-btab="serial">serial</button>
+  <div class="docktabs" id="bottomtabs" role="tablist" aria-label="Panel">
+    <button data-btab="search" class="sel" role="tab"><svg class="ic"><use href="#i-search"/></svg>Search</button>
+    <button data-btab="problems" role="tab"><svg class="ic"><use href="#i-xcirc"/></svg>Problems<span class="cnt hidden" id="cnt-problems">0</span></button>
+    <button data-btab="tasks" role="tab"><svg class="ic"><use href="#i-play"/></svg>Tasks</button>
+    <button data-btab="console" role="tab"><svg class="ic"><use href="#i-list"/></svg>Console</button>
+    <button data-btab="terminal" role="tab"><svg class="ic"><use href="#i-terminal"/></svg>Terminal</button>
+    <button data-btab="serial" role="tab"><svg class="ic"><use href="#i-activity"/></svg>Serial</button>
+    <span class="spacer"></span>
+    <button class="kicon" id="bmax" data-tip="Maximize panel"><svg class="ic"><use href="#i-chev-d"/></svg></button>
+    <button class="kicon" id="bclose" data-tip="Close panel"><svg class="ic"><use href="#i-x"/></svg></button>
   </div>
-  <div style="padding:0 12px;"><input id="needle" placeholder="search content…" autocomplete="off" spellcheck="false" style="width:100%;margin:6px 0;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font:inherit;"></div>
   <div id="bbody"></div>
 </div>
 <div id="statusbar">
@@ -1049,6 +1094,7 @@ const S = {
   gitStatus: {},
   cursorLine: 1,
   marks: null,
+  searchQuery: "",
   log: [],
   docks: { left: true, right: false, bottom: false },
   layout: { left: 264, right: 232, bottom: 192 },
@@ -2307,34 +2353,83 @@ function loadFiles() {
 /* ============ search / problems / symbols / tasks / console ============ */
 let searchTimer = 0;
 function runSearch() {
-  const q = document.getElementById("needle").value;
-  const body = document.getElementById("bbody");
+  const inp = document.getElementById("needle");
+  const q = inp ? inp.value : "";
+  S.searchQuery = q;
   if (S.bottomTab !== "search") return;
-  if (!q) { body.innerHTML = ""; return; }
+  const hits = document.getElementById("searchhits");
+  if (!q) { if (hits) hits.innerHTML = ""; return; }
   get("/search?needle=" + encodeURIComponent(q) + "&limit=50")
-    .then(hits => {
-      body.innerHTML = "";
-      (hits || []).forEach(h => {
+    .then(h => {
+      const box = document.getElementById("searchhits") || document.getElementById("bbody");
+      box.innerHTML = "";
+      (h || []).forEach(hit => {
         const d = document.createElement("div");
         d.className = "hit";
-        d.textContent = rel(h.path) + ":" + h.line + ": " + h.preview;
-        d.onclick = () => openFile(h.path, h.line, true);
-        body.appendChild(d);
+        const p = document.createElement("span");
+        p.className = "loc";
+        p.textContent = rel(hit.path) + ":" + hit.line;
+        const v = document.createElement("span");
+        v.className = "prev";
+        v.textContent = hit.preview;
+        d.appendChild(p);
+        d.appendChild(v);
+        d.onclick = () => openFile(hit.path, hit.line, true);
+        box.appendChild(d);
       });
       setDot(true);
     })
     .catch(e => { setDot(false); msg(String(e), true); });
+}
+function renderSearchPanel() {
+  const body = document.getElementById("bbody");
+  body.innerHTML = "";
+  const wrap = document.createElement("div");
+  wrap.style.cssText = "display:flex;flex-direction:column;height:100%;gap:6px;padding:8px 12px;";
+  const inp = document.createElement("input");
+  inp.id = "needle";
+  inp.className = "kinput";
+  inp.placeholder = "Search content… (Enter)";
+  inp.autocomplete = "off";
+  inp.spellcheck = false;
+  inp.value = S.searchQuery || "";
+  inp.setAttribute("aria-label", "Search content");
+  inp.addEventListener("input", () => {
+    S.searchQuery = inp.value;
+    clearTimeout(window.__st);
+    window.__st = setTimeout(runSearch, 180);
+  });
+  inp.addEventListener("keydown", e => {
+    e.stopPropagation();
+    if (e.key === "Enter") { clearTimeout(window.__st); runSearch(); }
+  });
+  const hits = document.createElement("div");
+  hits.id = "searchhits";
+  hits.style.cssText = "flex:1;overflow:auto;min-height:0;";
+  wrap.appendChild(inp);
+  wrap.appendChild(hits);
+  body.appendChild(wrap);
+  inp.focus();
 }
 function loadProblems(path) {
   get("/diagnostics?path=" + encodeURIComponent(path))
     .then(j => {
       S.problems = (j.diagnostics || []).filter(d => d.severity === "error");
       document.getElementById("serrors").textContent = S.problems.length;
+      updateProbBadge();
       renderProblems();
     })
     .catch(() => {});
 }
+function updateProbBadge() {
+  const b = document.getElementById("cnt-problems");
+  if (!b) return;
+  const n = (S.problems || []).length;
+  b.textContent = n > 99 ? "99+" : String(n);
+  b.classList.toggle("hidden", n === 0);
+}
 function renderProblems() {
+  updateProbBadge();
   if (S.bottomTab !== "problems") return;
   const body = document.getElementById("bbody");
   body.innerHTML = "";
@@ -2379,7 +2474,11 @@ function showTasks() {
       const row = document.createElement("div");
       row.className = "task";
       const btn = document.createElement("button");
-      btn.textContent = "run";
+      btn.className = "kbtn kbtn-acc";
+      btn.style.height = "24px";
+      btn.innerHTML = icon("play");
+      btn.title = "Run " + name;
+      btn.setAttribute("aria-label", "Run " + name);
       btn.onclick = () => runTask(name, row);
       const label = document.createElement("span");
       label.textContent = name + "  " + (tasks[name].cmd || "");
@@ -2458,9 +2557,9 @@ window.__termRefresh = function () {
 };
 
 function termDims() {
-  const body = document.getElementById("bbody");
-  const w = Math.max(80, body.clientWidth - 28);
-  const h = Math.max(60, body.clientHeight - 16);
+  const holder = TERM.holder && TERM.holder.isConnected ? TERM.holder : document.getElementById("bbody");
+  const w = Math.max(80, holder.clientWidth - 24);
+  const h = Math.max(60, holder.clientHeight - 24);
   return {
     cols: Math.max(20, Math.floor(w / TERM.cellW)),
     rows: Math.max(5, Math.floor(h / TERM.cellH)),
@@ -2484,7 +2583,7 @@ function termDraw() {
     cv.style.height = H + "px";
   }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = "#161b22";
+  ctx.fillStyle = "#000000";
   ctx.fillRect(0, 0, W, H);
   ctx.font = TERM.font;
   ctx.textBaseline = "top";
@@ -2496,9 +2595,9 @@ function termDraw() {
       if (!cell) continue;
       const x = c * TERM.cellW, y = l * TERM.cellH;
       const ch = cell[0], fg = cell[1], bg = cell[2], fl = cell[3];
-      let fgc = fg || "#e6edf3";
+      let fgc = fg || "#F5F5F7";
       let bgc = bg;
-      if (fl & 4) { const t = fgc; fgc = bgc || "#161b22"; bgc = t === "#e6edf3" ? null : t; }
+      if (fl & 4) { const t = fgc; fgc = bgc || "#000000"; bgc = t === "#F5F5F7" ? null : t; }
       if (bgc) { ctx.fillStyle = bgc; ctx.fillRect(x, y, TERM.cellW, TERM.cellH); }
       if (ch && ch !== " ") {
         ctx.fillStyle = fgc;
@@ -2509,13 +2608,23 @@ function termDraw() {
       }
     }
   }
+  if (s.sel && s.sel.active) {
+    const x0 = Math.min(s.sel.ax, s.sel.fx), x1 = Math.max(s.sel.ax, s.sel.fx);
+    const y0 = Math.min(s.sel.ay, s.sel.fy), y1 = Math.max(s.sel.ay, s.sel.fy);
+    ctx.fillStyle = "rgba(10,132,255,.28)";
+    for (let l = y0; l <= y1 && l < g.rows; l++) {
+      const c0 = l === y0 ? x0 : 0;
+      const c1 = l === y1 ? x1 : g.cols - 1;
+      ctx.fillRect(c0 * TERM.cellW, l * TERM.cellH, (c1 - c0 + 1) * TERM.cellW, TERM.cellH);
+    }
+  }
   if (g.show) {
     const cl = Math.min(g.cursor[0], g.rows - 1), cc = Math.min(g.cursor[1], g.cols - 1);
-    ctx.fillStyle = "#58a6ff";
+    ctx.fillStyle = "#0A84FF";
     ctx.fillRect(cc * TERM.cellW, cl * TERM.cellH, TERM.cellW, TERM.cellH);
     const cell = (g.cells[cl] || [])[cc];
     if (cell && cell[0] && cell[0] !== " ") {
-      ctx.fillStyle = "#161b22";
+      ctx.fillStyle = "#000000";
       ctx.font = TERM.font;
       ctx.fillText(cell[0], cc * TERM.cellW, cl * TERM.cellH + 1);
     }
@@ -2524,7 +2633,28 @@ function termDraw() {
 
 function termSend(data) {
   const s = termActive();
-  if (s && s.socket && s.socket.readyState === 1) s.socket.send(data);
+  if (!s) return;
+  if (s.sel) { s.sel = null; termDraw(); }
+  if (s.socket && s.socket.readyState === 1) s.socket.send(data);
+}
+function termCopySel() {
+  const s = termActive();
+  if (!s || !s.sel || !s.grid) { msg("nothing selected"); return; }
+  const x0 = Math.max(0, Math.min(s.sel.ax, s.sel.fx)), x1 = Math.max(x0, Math.max(s.sel.ax, s.sel.fx));
+  const y0 = Math.max(0, Math.min(s.sel.ay, s.sel.fy)), y1 = Math.max(y0, Math.max(s.sel.ay, s.sel.fy));
+  const out = [];
+  for (let l = y0; l <= y1 && l < s.grid.rows; l++) {
+    const row = s.grid.cells[l] || [];
+    const c0 = l === y0 ? x0 : 0;
+    const c1 = l === y1 ? Math.min(x1, s.grid.cols - 1) : s.grid.cols - 1;
+    let t = "";
+    for (let c = c0; c <= c1; c++) t += (row[c] && row[c][0]) || " ";
+    out.push(t.replace(/\s+$/, ""));
+  }
+  copyText(out.join("\n"));
+  s.sel = null;
+  termDraw();
+  msg("copied " + out.join("\n").length + " chars");
 }
 
 function termKey(e) {
@@ -2569,7 +2699,7 @@ function showTerminal() {
   body.appendChild(strip);
   const holder = document.createElement("div");
   holder.id = "termholder";
-  holder.style.cssText = "flex:1;min-height:0;overflow:auto;position:relative;";
+  holder.style.cssText = "flex:1;min-height:0;overflow:auto;position:relative;padding:12px;";
   body.appendChild(holder);
   TERM.strip = strip;
   TERM.holder = holder;
@@ -2606,11 +2736,19 @@ function renderTermTabs() {
     strip.appendChild(d);
   });
   const add = document.createElement("button");
-  add.className = "mini";
-  add.textContent = "+";
+  add.className = "kicon ghostadd";
+  add.innerHTML = icon("plus");
   add.title = "new terminal (independent shell)";
+  add.setAttribute("aria-label", "New terminal");
   add.onclick = () => newTerm();
   strip.appendChild(add);
+  const cp = document.createElement("button");
+  cp.className = "kicon";
+  cp.innerHTML = icon("copy");
+  cp.title = "copy selection";
+  cp.setAttribute("aria-label", "Copy terminal selection");
+  cp.onclick = () => termCopySel();
+  strip.appendChild(cp);
 }
 
 function activateTerm(i) {
@@ -2661,7 +2799,32 @@ function connectTerminal() {
     const t = (e.clipboardData || window.clipboardData).getData("text");
     if (t) termSend(new TextEncoder().encode(t));
   };
-  cv.onclick = () => cv.focus();
+  cv.onmousedown = e => {
+    cv.focus();
+    const r = cv.getBoundingClientRect();
+    const c0 = Math.floor((e.clientX - r.left) / TERM.cellW);
+    const l0 = Math.floor((e.clientY - r.top) / TERM.cellH);
+    s.sel = { active: false, ax: c0, ay: l0, fx: c0, fy: l0, moved: false };
+    const move = ev => {
+      const c = Math.max(0, Math.floor((ev.clientX - r.left) / TERM.cellW));
+      const l = Math.max(0, Math.floor((ev.clientY - r.top) / TERM.cellH));
+      if (c !== s.sel.fx || l !== s.sel.fy) {
+        s.sel.fx = c;
+        s.sel.fy = l;
+        s.sel.moved = true;
+        s.sel.active = true;
+        if (TERM.sessions[TERM.active] === s) termDraw();
+      }
+    };
+    const up = () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+      if (!s.sel.moved) s.sel = null;
+      else if (TERM.sessions[TERM.active] === s) termDraw();
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  };
   const s = {
     id: "t" + Date.now() + "_" + TERM.n,
     name: "term " + TERM.n,
@@ -2708,75 +2871,215 @@ const SER = { socket: null, connected: false };
 function showSerial() {
   const body = document.getElementById("bbody");
   body.innerHTML = "";
+  try {
+    const saved = JSON.parse(localStorage.getItem("keplr-serial") || "{}");
+    if (saved.port) SER.port = saved.port;
+    if (saved.baud) SER.baud = String(saved.baud);
+    if (typeof saved.nl === "boolean") SER.nl = saved.nl;
+    if (typeof saved.ts === "boolean") SER.ts = saved.ts;
+    if (typeof saved.autoscroll === "boolean") SER.autoscroll = saved.autoscroll;
+  } catch (e) {}
+  if (SER.nl === undefined) SER.nl = true;
+  if (SER.ts === undefined) SER.ts = false;
+  if (SER.autoscroll === undefined) SER.autoscroll = true;
+  const savePrefs = () => {
+    try {
+      localStorage.setItem("keplr-serial", JSON.stringify({ port: SER.port, baud: SER.baud, nl: SER.nl, ts: SER.ts, autoscroll: SER.autoscroll }));
+    } catch (e) {}
+  };
   const wrap = document.createElement("div");
-  wrap.style.cssText = "display:flex;flex-direction:column;height:100%;gap:6px;padding:6px;";
+  wrap.style.cssText = "display:flex;flex-direction:column;height:100%;gap:6px;padding:8px 12px 10px;";
   const row = document.createElement("div");
   row.style.cssText = "display:flex;gap:6px;align-items:center;flex:none;flex-wrap:wrap;";
-  const portSel = document.createElement("select");
-  const baudSel = document.createElement("select");
-  [9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600].forEach(b => {
-    const o = document.createElement("option");
-    o.value = String(b);
-    o.textContent = String(b);
-    if (b === 115200) o.selected = true;
-    baudSel.appendChild(o);
-  });
+  const portBtn = document.createElement("button");
+  portBtn.className = "kbtn";
+  const baudBtn = document.createElement("button");
+  baudBtn.className = "kbtn";
+  const paintPickers = () => {
+    portBtn.innerHTML = "";
+    const pl = document.createElement("span");
+    pl.textContent = SER.port || "port…";
+    pl.style.cssText = "overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;";
+    portBtn.appendChild(pl);
+    const pc = document.createElement("span");
+    pc.innerHTML = icon("chev-d");
+    portBtn.appendChild(pc);
+    baudBtn.textContent = (SER.baud || "115200") + " baud ▾";
+  };
+  paintPickers();
   const refBtn = document.createElement("button");
-  refBtn.className = "mini";
-  refBtn.textContent = "refresh";
-  refBtn.onclick = () => loadPorts();
+  refBtn.className = "kicon";
+  refBtn.innerHTML = icon("refresh");
+  refBtn.title = "Refresh ports";
+  refBtn.setAttribute("aria-label", "Refresh ports");
   const connBtn = document.createElement("button");
-  connBtn.className = "mini";
-  connBtn.textContent = "Connect";
-  const nl = document.createElement("label");
-  const nlBox = document.createElement("input");
-  nlBox.type = "checkbox";
-  nlBox.checked = true;
-  nl.appendChild(nlBox);
-  nl.appendChild(document.createTextNode(" +newline"));
+  connBtn.className = "kbtn kbtn-acc";
+  const dot = document.createElement("span");
+  dot.style.cssText = "width:8px;height:8px;border-radius:50%;background:var(--text3);flex:none;";
+  const clab = document.createElement("span");
+  connBtn.appendChild(dot);
+  connBtn.appendChild(clab);
+  const mkToggle = (label, get, set) => {
+    const b = document.createElement("button");
+    b.className = "kbtn kbtn-ghost" + (get() ? " on" : "");
+    b.style.cssText = "font-size:12px;height:24px;padding:0 8px;";
+    b.textContent = label;
+    b.onclick = () => { set(!get()); b.classList.toggle("on", get()); savePrefs(); };
+    return b;
+  };
+  const tsBtn = mkToggle("+time", () => SER.ts, v => { SER.ts = v; });
+  const scBtn = mkToggle("follow", () => SER.autoscroll, v => { SER.autoscroll = v; });
+  const nlSw = document.createElement("input");
+  nlSw.type = "checkbox";
+  nlSw.className = "kswitch";
+  nlSw.checked = SER.nl !== false;
+  nlSw.title = "Append newline on send";
+  nlSw.onchange = () => { SER.nl = nlSw.checked; savePrefs(); };
+  const nlLab = document.createElement("label");
+  nlLab.style.cssText = "display:inline-flex;gap:6px;align-items:center;font-size:12px;color:var(--text2);";
+  nlLab.appendChild(nlSw);
+  nlLab.appendChild(document.createTextNode("+newline"));
+  const spacer = document.createElement("span");
+  spacer.style.flex = "1";
+  const clearBtn = document.createElement("button");
+  clearBtn.className = "kicon";
+  clearBtn.innerHTML = icon("trash");
+  clearBtn.title = "Clear log";
+  clearBtn.onclick = () => { out.innerHTML = ""; };
+  const copyBtn = document.createElement("button");
+  copyBtn.className = "kicon";
+  copyBtn.innerHTML = icon("copy");
+  copyBtn.title = "Copy log";
+  copyBtn.onclick = () => copyText(out.innerText || "");
+  const saveBtn = document.createElement("button");
+  saveBtn.className = "kicon";
+  saveBtn.innerHTML = icon("push");
+  saveBtn.title = "Save transcript";
+  saveBtn.onclick = () => {
+    const blob = new Blob([out.innerText || ""], { type: "text/plain" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "serial-" + Date.now() + ".log";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  };
   const out = document.createElement("pre");
-  out.style.cssText = "flex:1;min-height:60px;overflow:auto;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px;margin:0;font-family:var(--mono);font-size:12px;white-space:pre-wrap;";
-  const sendRow = document.createElement("div");
-  sendRow.style.cssText = "display:flex;gap:6px;flex:none;";
-  const inp = document.createElement("input");
-  inp.placeholder = "type to send… (Enter)";
-  inp.style.cssText = "flex:1;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font:inherit;";
-  const sendBtn = document.createElement("button");
-  sendBtn.className = "mini";
-  sendBtn.textContent = "Send";
-  function slog(t, err) {
-    const d = document.createElement("div");
-    if (err) d.style.color = "var(--error)";
-    d.textContent = t;
-    out.appendChild(d);
+  out.style.cssText = "flex:1;min-height:60px;overflow:auto;background:var(--bg);border:1px solid var(--sep);border-radius:var(--r-md);padding:8px 10px;margin:0;font-family:var(--font-mono);font-size:12px;white-space:pre-wrap;position:relative;";
+  const jump = document.createElement("button");
+  jump.className = "kbtn";
+  jump.textContent = "↓ latest";
+  jump.style.cssText = "position:absolute;right:14px;bottom:14px;display:none;";
+  jump.onclick = () => { out.scrollTop = out.scrollHeight; SER.autoscroll = true; scBtn.classList.add("on"); jump.style.display = "none"; };
+  const jumpWrap = document.createElement("div");
+  jumpWrap.style.cssText = "position:relative;flex:1;min-height:0;display:flex;";
+  out.style.flex = "1";
+  jumpWrap.appendChild(out);
+  jumpWrap.appendChild(jump);
+  out.addEventListener("scroll", () => {
+    const near = out.scrollHeight - out.scrollTop - out.clientHeight < 40;
+    if (!near && SER.autoscroll) { SER.autoscroll = false; scBtn.classList.remove("on"); }
+    jump.style.display = !near ? "" : "none";
+  });
+  const stamp = () => {
+    if (!SER.ts) return "";
+    const d = new Date();
+    const p = n => String(n).padStart(2, "0");
+    return "[" + p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds()) + "] ";
+  };
+  function cap() {
     while (out.children.length > 500) out.removeChild(out.firstChild);
-    out.scrollTop = out.scrollHeight;
+    if (SER.autoscroll) out.scrollTop = out.scrollHeight;
   }
-  function slogRaw(t) {
+  function slog(t, cls, color) {
+    const d = document.createElement("div");
+    if (cls) d.className = cls;
+    d.style.color = color || "var(--text2)";
+    d.textContent = stamp() + t;
+    out.appendChild(d);
+    cap();
+  }
+  function slogRx(t) {
     const d = document.createElement("span");
     d.textContent = t;
     out.appendChild(d);
-    while (out.children.length > 500) out.removeChild(out.firstChild);
-    out.scrollTop = out.scrollHeight;
+    cap();
   }
+  function slogTx(t) {
+    const d = document.createElement("div");
+    d.style.color = "var(--accent)";
+    d.textContent = stamp() + "→ " + t;
+    out.appendChild(d);
+    cap();
+  }
+  const empty = document.createElement("div");
+  empty.style.cssText = "border:1px dashed var(--sep);border-radius:var(--r-md);padding:12px;color:var(--text2);font-size:13px;display:none;gap:8px;flex-direction:column;";
+  const eh = document.createElement("div");
+  eh.innerHTML = icon("info") + " <b>No serial ports found.</b>";
+  const ep = document.createElement("div");
+  ep.textContent = "On Linux your user needs the dialout group, then reconnect the device:";
+  const ecode = document.createElement("div");
+  ecode.style.cssText = "display:flex;gap:6px;align-items:center;";
+  const epre = document.createElement("code");
+  epre.textContent = "sudo usermod -aG dialout $USER && newgrp dialout";
+  epre.style.cssText = "font-family:var(--font-mono);font-size:12px;background:var(--raised);padding:5px 8px;border-radius:6px;flex:1;overflow-x:auto;";
+  const ecopy = document.createElement("button");
+  ecopy.className = "kbtn";
+  ecopy.textContent = "Copy";
+  ecopy.onclick = () => copyText("sudo usermod -aG dialout $USER && newgrp dialout");
+  ecode.appendChild(epre);
+  ecode.appendChild(ecopy);
+  const eref = document.createElement("button");
+  eref.className = "kbtn";
+  eref.textContent = "Refresh ports";
+  eref.onclick = () => loadPorts();
+  empty.appendChild(eh);
+  empty.appendChild(ep);
+  empty.appendChild(ecode);
+  empty.appendChild(eref);
   async function loadPorts() {
     try {
       const j = await get("/serial/ports");
-      if (j.error) { slog("ports: " + j.error, true); return; }
-      portSel.innerHTML = "";
-      (j.ports || []).forEach(p => {
-        const o = document.createElement("option");
-        o.value = p;
-        o.textContent = p;
-        portSel.appendChild(o);
-      });
-      if (!j.ports || !j.ports.length) slog("no serial ports found (need dialout permission?)");
-    } catch (e) { slog(String(e), true); }
+      if (j.error) { slog("ports: " + j.error, "", "var(--error)"); return; }
+      const ports = j.ports || [];
+      if (SER.port && !ports.includes(SER.port)) SER.port = null;
+      if (!SER.port && ports.length === 1) SER.port = ports[0];
+      empty.style.display = ports.length ? "none" : "flex";
+      if (!ports.length) slog("no serial ports found — see below", "", "var(--warn)");
+      paintPickers();
+      savePrefs();
+    } catch (e) { slog(String(e), "", "var(--error)"); }
   }
+  portBtn.onclick = async e => {
+    try {
+      const j = await get("/serial/ports");
+      const ports = j.ports || [];
+      const r = portBtn.getBoundingClientRect();
+      const items = ports.map(p => ({
+        label: p + (p === SER.port ? "  ●" : ""),
+        run: () => { SER.port = p; paintPickers(); savePrefs(); },
+      }));
+      if (!items.length) items.push({ label: "No ports — refresh", run: () => loadPorts(), disabled: true });
+      showMenu(r.left, r.bottom + 4, items);
+    } catch (err) { slog(String(err), "", "var(--error)"); }
+  };
+  baudBtn.onclick = e => {
+    const r = baudBtn.getBoundingClientRect();
+    const items = [9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600].map(b => ({
+      label: String(b) + (String(b) === String(SER.baud || "115200") ? "  ●" : ""),
+      run: () => { SER.baud = String(b); paintPickers(); savePrefs(); },
+    }));
+    showMenu(r.left, r.bottom + 4, items);
+  };
+  if (!SER.baud) SER.baud = "115200";
+  paintPickers();
   function setConn(on) {
     SER.connected = on;
-    connBtn.textContent = on ? "Disconnect" : "Connect";
+    clab.textContent = on ? "Disconnect" : "Connect";
+    dot.style.background = on ? "var(--ok)" : "var(--text3)";
+    dot.style.boxShadow = on ? "0 0 6px var(--ok)" : "none";
+    connBtn.classList.toggle("kbtn-acc", !on);
   }
+  refBtn.onclick = () => loadPorts();
   connBtn.onclick = () => {
     if (SER.connected) {
       try { SER.socket.send("close"); } catch (e) {}
@@ -2785,28 +3088,27 @@ function showSerial() {
       slog("disconnected");
       return;
     }
-    const port = portSel.value, baud = baudSel.value;
-    if (!port) { slog("pick a port first", true); return; }
+    if (!SER.port) { slog("pick a port first", "", "var(--error)"); return; }
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
-    let url = proto + "//" + location.host + "/serial/ws?port=" + encodeURIComponent(port) + "&baud=" + encodeURIComponent(baud);
+    let url = proto + "//" + location.host + "/serial/ws?port=" + encodeURIComponent(SER.port) + "&baud=" + encodeURIComponent(SER.baud || "115200");
     if (token) url += "&token=" + encodeURIComponent(token);
     let sock;
     try { sock = new WebSocket(url); }
-    catch (e) { slog("cannot open socket", true); return; }
+    catch (e) { slog("cannot open socket", "", "var(--error)"); return; }
     sock.binaryType = "arraybuffer";
     SER.socket = sock;
-    connBtn.textContent = "…";
+    clab.textContent = "…";
     sock.onmessage = ev => {
       if (typeof ev.data === "string") {
         try {
           const j = JSON.parse(ev.data);
-          if (j.error) { slog(j.error, true); try { sock.close(); } catch (e2) {} return; }
-          if (j.open) { setConn(true); slog("connected: " + j.open); return; }
+          if (j.error) { slog(j.error, "", "var(--error)"); try { sock.close(); } catch (e2) {} return; }
+          if (j.open) { setConn(true); slog("connected: " + j.open, "", "var(--ok)"); return; }
         } catch (e) {}
         slog(ev.data);
         return;
       }
-      slogRaw(new TextDecoder().decode(new Uint8Array(ev.data)));
+      slogRx(new TextDecoder().decode(new Uint8Array(ev.data)));
     };
     const dead = () => {
       if (SER.socket === sock) {
@@ -2818,24 +3120,46 @@ function showSerial() {
     sock.onclose = dead;
     sock.onerror = dead;
   };
+  const sendRow = document.createElement("div");
+  sendRow.style.cssText = "display:flex;gap:6px;flex:none;padding-bottom:2px;";
+  const inp = document.createElement("input");
+  inp.className = "kinput";
+  inp.placeholder = "Type to send… (Enter)";
+  inp.style.flex = "1";
+  inp.setAttribute("aria-label", "Send to serial port");
+  const sendBtn = document.createElement("button");
+  sendBtn.className = "kbtn kbtn-acc";
+  sendBtn.textContent = "Send";
   function doSend() {
     if (!inp.value || !SER.connected || !SER.socket) return;
+    const text = inp.value + (nlSw.checked ? "\n" : "");
     try {
-      SER.socket.send(new TextEncoder().encode(inp.value + (nlBox.checked ? "\n" : "")));
-    } catch (e) { slog(String(e), true); }
+      SER.socket.send(new TextEncoder().encode(text));
+      slogTx(inp.value);
+    } catch (e) { slog(String(e), "", "var(--error)"); }
     inp.value = "";
   }
   sendBtn.onclick = doSend;
-  inp.onkeydown = e => { if (e.key === "Enter") doSend(); };
-  row.appendChild(portSel);
-  row.appendChild(baudSel);
-  row.appendChild(refBtn);
-  row.appendChild(connBtn);
-  row.appendChild(nl);
+  inp.onkeydown = e => {
+    e.stopPropagation();
+    if (e.key === "Enter") doSend();
+  };
   sendRow.appendChild(inp);
   sendRow.appendChild(sendBtn);
+  row.appendChild(portBtn);
+  row.appendChild(baudBtn);
+  row.appendChild(refBtn);
+  row.appendChild(connBtn);
+  row.appendChild(spacer);
+  row.appendChild(tsBtn);
+  row.appendChild(scBtn);
+  row.appendChild(nlLab);
+  row.appendChild(clearBtn);
+  row.appendChild(copyBtn);
+  row.appendChild(saveBtn);
   wrap.appendChild(row);
-  wrap.appendChild(out);
+  wrap.appendChild(empty);
+  wrap.appendChild(jumpWrap);
   wrap.appendChild(sendRow);
   body.appendChild(wrap);
   loadPorts();
@@ -2856,7 +3180,7 @@ function setBottomTab(t, silent) {
   if (silent) return;
   if (t === "problems") renderProblems();
   else if (t === "tasks") showTasks();
-  else if (t === "search") runSearch();
+  else if (t === "search") { renderSearchPanel(); runSearch(); }
   else if (t === "terminal") showTerminal();
   else if (t === "serial") showSerial();
   else renderConsole();
@@ -4180,20 +4504,21 @@ document.getElementById("finder").addEventListener("focus", e => {
 document.getElementById("finder").addEventListener("keydown", e => {
   if (e.key === "Enter") palOpen(true);
 });
-document.getElementById("needle").addEventListener("input", () => {
-  setBottomTab("search", true);
-  clearTimeout(window.__st);
-  window.__st = setTimeout(runSearch, 180);
-});
 document.getElementById("t-left").onclick = () => toggleDock("left");
 document.getElementById("t-right").onclick = () => toggleDock("right");
 document.getElementById("t-bottom").onclick = () => toggleDock("bottom");
 document.querySelectorAll("#left .docktabs button").forEach(b => {
   b.onclick = () => setLeftTab(b.dataset.ltab);
 });
-document.querySelectorAll("#bottom .docktabs button").forEach(b => {
+document.querySelectorAll("#bottom .docktabs button[data-btab]").forEach(b => {
   b.onclick = () => setBottomTab(b.dataset.btab);
 });
+document.getElementById("bmax").onclick = () => {
+  const b = document.getElementById("bottom");
+  b.classList.toggle("tall");
+  document.getElementById("bmax").classList.toggle("on", b.classList.contains("tall"));
+};
+document.getElementById("bclose").onclick = () => toggleDock("bottom", false);
 document.getElementById("palinput").addEventListener("input", () => { S.palSel = 0; palRender(); });
 document.getElementById("palinput").addEventListener("keydown", e => {
   if (e.key === "Escape") palClose();
