@@ -996,3 +996,111 @@ pub fn syntax_errors(lang: LangKind, path: &Path, text: &str) -> Vec<Diagnostic>
 pub fn syntax_errors(_lang: LangKind, _path: &Path, _text: &str) -> Vec<Diagnostic> {
     Vec::new()
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct TsSpan {
+    pub line: u64,
+    pub col: u64,
+    pub len: u64,
+    pub kind: TokenKind,
+}
+
+fn ts_kind(name: &str) -> Option<TokenKind> {
+    let base = name.split('.').next().unwrap_or(name);
+    match base {
+        "keyword" => Some(TokenKind::Keyword),
+        "string" => Some(TokenKind::Str),
+        "comment" => Some(TokenKind::Comment),
+        "number" | "float" | "integer" => Some(TokenKind::Number),
+        "function" | "method" | "constructor" => Some(TokenKind::Keyword),
+        "type" | "class" | "interface" | "enum" => Some(TokenKind::Keyword),
+        _ => None,
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn highlights_query(lang: LangKind) -> Option<&'static str> {
+    match lang {
+        LangKind::Rust => Some(tree_sitter_rust::HIGHLIGHTS_QUERY),
+        LangKind::JavaScript => Some(tree_sitter_javascript::HIGHLIGHTS_QUERY),
+        LangKind::Python => Some(tree_sitter_python::HIGHLIGHTS_QUERY),
+        LangKind::Go => Some(tree_sitter_go::HIGHLIGHTS_QUERY),
+        LangKind::TypeScript => Some(tree_sitter_typescript::HIGHLIGHTS_QUERY_TYPESCRIPT),
+        LangKind::Tsx => Some(tree_sitter_typescript::HIGHLIGHTS_QUERY_TSX),
+        _ => None,
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn ts_highlight(lang: LangKind, text: &str) -> Vec<TsSpan> {
+    let language = match ts_language(lang) {
+        Some(l) => l,
+        None => return Vec::new(),
+    };
+    let source = match highlights_query(lang) {
+        Some(q) => q,
+        None => return Vec::new(),
+    };
+    let query = match tree_sitter::Query::new(&language, source) {
+        Ok(q) => q,
+        Err(_) => return Vec::new(),
+    };
+    let mut parser = tree_sitter::Parser::new();
+    if parser.set_language(&language).is_err() {
+        return Vec::new();
+    }
+    let tree = match parser.parse(text, None) {
+        Some(t) => t,
+        None => return Vec::new(),
+    };
+    let mut cursor = tree_sitter::QueryCursor::new();
+    let names = query.capture_names();
+    let mut out: Vec<TsSpan> = Vec::new();
+    for m in cursor.matches(&query, tree.root_node(), text.as_bytes()) {
+        for cap in m.captures {
+            let raw = &names[cap.index as usize];
+            let name: &str = raw.as_ref();
+            let Some(kind) = ts_kind(name) else {
+                continue;
+            };
+            let node = cap.node;
+            let sp = node.start_position();
+            let len = node.end_byte().saturating_sub(node.start_byte()) as u64;
+            if len == 0 || len > 500 {
+                continue;
+            }
+            out.push(TsSpan {
+                line: (sp.row + 1) as u64,
+                col: (sp.column + 1) as u64,
+                len,
+                kind,
+            });
+            if out.len() >= 20000 {
+                break;
+            }
+        }
+        if out.len() >= 20000 {
+            break;
+        }
+    }
+    out.sort_by(|a, b| {
+        (a.line, a.col, b.len)
+            .cmp(&(b.line, b.col, a.len))
+    });
+    let mut clean: Vec<TsSpan> = Vec::new();
+    let mut end_line = 0u64;
+    let mut end_col = 0u64;
+    for s in out {
+        if s.line > end_line || (s.line == end_line && s.col >= end_col) {
+            end_line = s.line;
+            end_col = s.col + s.len;
+            clean.push(s);
+        }
+    }
+    clean
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn ts_highlight(_lang: LangKind, _text: &str) -> Vec<TsSpan> {
+    Vec::new()
+}
