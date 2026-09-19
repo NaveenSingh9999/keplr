@@ -730,10 +730,10 @@ async fn term_loop(
     mut socket: axum::extract::ws::WebSocket,
 ) {
     use alacritty_terminal::term::{Config, Term};
-    use alacritty_terminal::vte::ansi::Processor;
+    use alacritty_terminal::vte::ansi::{Processor, StdSyncHandler};
     let size = TermSize { cols, rows };
     let mut term = Term::new(Config::default(), &size, TermListener);
-    let mut processor = Processor::new();
+    let mut processor: Processor<StdSyncHandler> = Processor::new();
     use axum::extract::ws::Message;
     use std::io::{Read, Write};
     let pty_system = portable_pty::native_pty_system();
