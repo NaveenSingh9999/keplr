@@ -78,8 +78,7 @@ jobs:
           cp assets/icon/keplr-256.png Keplr.AppDir/keplr.png
           printf '#!/bin/sh\nexec "$APPDIR/usr/bin/keplr" "$@"\n' > Keplr.AppDir/AppRun
           chmod +x Keplr.AppDir/AppRun
-          ARCH=x86_64 ./appimagetool Keplr.AppDir dist/
-          mv dist/Keplr-x86_64.AppImage "dist/keplr-${VER}-x86_64.AppImage"
+          ARCH=x86_64 ./appimagetool Keplr.AppDir "dist/keplr-${VER}-x86_64.AppImage"
       - uses: actions/upload-artifact@v4
         with:
           name: keplr-linux-x86_64
@@ -128,7 +127,7 @@ jobs:
       - name: rpm
         run: |
           sudo apt-get install -y -qq rpm
-          rpmbuild -bb packaging/rpm/keplr.spec \
+          rpmbuild --target aarch64 -bb packaging/rpm/keplr.spec \
             --define "keplr_version ${VER}" --define "keplr_arch aarch64" \
             --define "keplr_bin $PWD/target/aarch64-unknown-linux-gnu/release/keplr" \
             --define "keplr_desktop $PWD/packaging/linux/keplr.desktop" \
@@ -145,8 +144,7 @@ jobs:
           cp assets/icon/keplr-256.png Keplr.AppDir/keplr.png
           printf '#!/bin/sh\nexec "$APPDIR/usr/bin/keplr" "$@"\n' > Keplr.AppDir/AppRun
           chmod +x Keplr.AppDir/AppRun
-          ARCH=aarch64 ./appimagetool Keplr.AppDir dist/
-          mv dist/Keplr-aarch64.AppImage "dist/keplr-${VER}-aarch64.AppImage"
+          ARCH=aarch64 ./appimagetool Keplr.AppDir "dist/keplr-${VER}-aarch64.AppImage"
       - uses: actions/upload-artifact@v4
         with:
           name: keplr-linux-aarch64
