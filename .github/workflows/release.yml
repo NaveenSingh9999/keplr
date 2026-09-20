@@ -128,15 +128,16 @@ jobs:
       # target arch ("No compatible architectures"). deb/AppImage/raw cover ARM.
       - name: appimage
         run: |
-          curl -sSfL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-aarch64.AppImage
+          curl -sSfL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod +x appimagetool
+          curl -sSfL -o runtime-aarch64 https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-aarch64
           rm -rf Keplr.AppDir && mkdir -p Keplr.AppDir/usr/bin
           cp target/aarch64-unknown-linux-gnu/release/keplr Keplr.AppDir/usr/bin/
           cp packaging/linux/keplr.desktop Keplr.AppDir/
           cp assets/icon/keplr-256.png Keplr.AppDir/keplr.png
           printf '#!/bin/sh\nexec "$APPDIR/usr/bin/keplr" "$@"\n' > Keplr.AppDir/AppRun
           chmod +x Keplr.AppDir/AppRun
-          ARCH=aarch64 ./appimagetool Keplr.AppDir "dist/keplr-${VER}-aarch64.AppImage"
+          ARCH=aarch64 ./appimagetool --runtime-file runtime-aarch64 Keplr.AppDir "dist/keplr-${VER}-aarch64.AppImage"
       - uses: actions/upload-artifact@v4
         with:
           name: keplr-linux-aarch64
