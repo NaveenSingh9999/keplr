@@ -100,7 +100,7 @@ Prebuilt binaries live on the [releases page](https://github.com/NaveenSingh9999
 | OS | Arch | Download |
 |---|---|---|
 | Linux | x86_64 | `keplr_x.y.z_amd64.deb`, `keplr-x.y.z-1.x86_64.rpm`, `keplr-x.y.z-x86_64.AppImage`, or raw `keplr-x86_64-unknown-linux-gnu` |
-| Linux | aarch64 | `keplr_x.y.z_arm64.deb`, `keplr-x.y.z-1.aarch64.rpm`, `keplr-x.y.z-aarch64.AppImage`, or raw `keplr-aarch64-unknown-linux-gnu` |
+| Linux | aarch64 | `keplr_x.y.z_arm64.deb`, `keplr-x.y.z-aarch64.AppImage`, or raw `keplr-aarch64-unknown-linux-gnu` |
 | macOS | universal (arm64 + x86_64) | `Keplr-x.y.z-universal.dmg` (drag to Applications) |
 | Windows | x86_64 | `Keplr-Setup-x.y.z-x86_64.exe` installer (Start Menu entries + uninstaller) |
 

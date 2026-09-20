@@ -124,16 +124,8 @@ jobs:
            source control, headless serve plus desktop and TUI, Git LFS aware.
           EOF
           dpkg-deb --build "$P" "dist/keplr_${VER}_arm64.deb"
-      - name: rpm
-        run: |
-          sudo apt-get install -y -qq rpm
-          rpmbuild --target aarch64 -bb packaging/rpm/keplr.spec \
-            --define "keplr_version ${VER}" --define "keplr_arch aarch64" \
-            --define "keplr_bin $PWD/target/aarch64-unknown-linux-gnu/release/keplr" \
-            --define "keplr_desktop $PWD/packaging/linux/keplr.desktop" \
-            --define "keplr_icons $PWD/assets/icon" \
-            --define "_topdir $PWD/rpmbuild"
-          mv rpmbuild/RPMS/*/*.rpm dist/
+      # NOTE: no aarch64 RPM — rpmbuild on x86_64 hosts rejects the aarch64
+      # target arch ("No compatible architectures"). deb/AppImage/raw cover ARM.
       - name: appimage
         run: |
           curl -sSfL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-aarch64.AppImage
