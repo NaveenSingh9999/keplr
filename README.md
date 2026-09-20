@@ -94,7 +94,23 @@ Reproduce: `cargo run --release -p keplr-cli -- --root /tmp/benchroot bench --fi
 
 ## Install
 
+Prebuilt binaries live on the [releases page](https://github.com/NaveenSingh9999/keplr/releases)
+(first release: `v0.1.0`):
+
+| OS | Arch | Download |
+|---|---|---|
+| Linux | x86_64 | `keplr_x.y.z_amd64.deb`, `keplr-x.y.z-1.x86_64.rpm`, `keplr-x.y.z-x86_64.AppImage`, or raw `keplr-x86_64-unknown-linux-gnu` |
+| Linux | aarch64 | `keplr_x.y.z_arm64.deb`, `keplr-x.y.z-1.aarch64.rpm`, `keplr-x.y.z-aarch64.AppImage`, or raw `keplr-aarch64-unknown-linux-gnu` |
+| macOS | universal (arm64 + x86_64) | `Keplr-x.y.z-universal.dmg` (drag to Applications) |
+| Windows | x86_64 | `Keplr-Setup-x.y.z-x86_64.exe` installer (Start Menu entries + uninstaller) |
+
 ```bash
+# Debian/Ubuntu:
+sudo dpkg -i keplr_0.1.0_amd64.deb
+# Fedora/RHEL:
+sudo rpm -i keplr-0.1.0-1.x86_64.rpm
+# Any Linux: chmod +x keplr-0.1.0-x86_64.AppImage && ./keplr-0.1.0-x86_64.AppImage
+
 # From source (Rust stable):
 cargo install --git https://github.com/NaveenSingh9999/keplr.git keplr-cli
 # Or build locally:
@@ -107,9 +123,9 @@ keplr list                           # running instances
 keplr stop --name dev                # or --all
 ```
 
-`keplr install --version latest` fetches prebuilt release binaries
-(`keplr-{target}` assets) into `~/.keplr/bin` — needs `GITHUB_TOKEN` while
-releases are being set up. On Windows add `%USERPROFILE%\.keplr\bin` to PATH.
+`keplr install --version latest` fetches the same prebuilt release binaries
+(`keplr-{target}` assets) into `~/.keplr/bin` — no token needed, the repo is
+public. On Windows add `%USERPROFILE%\.keplr\bin` to PATH.
 
 ## Quickstart
 

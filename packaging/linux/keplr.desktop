@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Keplr
+GenericName=Code Editor
+Comment=Personal lightweight IDE — serve, edit, sync
+Exec=keplr desktop
+Icon=keplr
+Terminal=false
+Categories=Development;IDE;TextEditor;
+Keywords=code;editor;ide;rust;
+StartupWMClass=keplr

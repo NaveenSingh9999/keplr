@@ -1,0 +1,240 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check-tag:
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: tag matches Cargo version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VER=$(grep '^version' crates/keplr-cli/Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          echo "tag=$TAG cargo=$VER"
+          test "v$VER" = "$TAG" || { echo "tag $TAG != cargo v$VER"; exit 1; }
+
+  linux-x86_64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: version
+        run: echo "VER=$(grep '^version' crates/keplr-cli/Cargo.toml | head -1 | sed 's/.*\"\(.*\)\"/\1/')" >> "$GITHUB_ENV"
+      - run: cargo build --release --features desktop -p keplr-cli
+      - name: raw binary
+        run: |
+          mkdir -p dist
+          cp target/release/keplr "dist/keplr-x86_64-unknown-linux-gnu"
+      - name: deb
+        run: |
+          P="deb/keplr_${VER}_amd64"
+          mkdir -p "$P/DEBIAN" "$P/usr/bin" "$P/usr/share/applications"
+          for s in 16 32 48 128 256 512; do
+            mkdir -p "$P/usr/share/icons/hicolor/${s}x${s}/apps"
+            cp "assets/icon/keplr-${s}.png" "$P/usr/share/icons/hicolor/${s}x${s}/apps/keplr.png"
+          done
+          cp target/release/keplr "$P/usr/bin/keplr"
+          chmod 755 "$P/usr/bin/keplr"
+          cp packaging/linux/keplr.desktop "$P/usr/share/applications/keplr.desktop"
+          cat > "$P/DEBIAN/control" <<EOF
+          Package: keplr
+          Version: ${VER}
+          Architecture: amd64
+          Maintainer: Keplr <keplr@example.com>
+          Description: Personal lightweight IDE in a single binary
+           Tree-sitter highlighting, web UI, PTY terminals, serial monitor,
+           source control, headless serve plus desktop and TUI, Git LFS aware.
+          EOF
+          dpkg-deb --build "$P" "dist/keplr_${VER}_amd64.deb"
+      - name: rpm
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq rpm
+          rpmbuild -bb packaging/rpm/keplr.spec \
+            --define "keplr_version ${VER}" --define "keplr_arch x86_64" \
+            --define "keplr_bin $PWD/target/release/keplr" \
+            --define "keplr_desktop $PWD/packaging/linux/keplr.desktop" \
+            --define "keplr_icons $PWD/assets/icon" \
+            --define "_topdir $PWD/rpmbuild"
+          mv rpmbuild/RPMS/*/*.rpm dist/
+      - name: appimage
+        run: |
+          curl -sSfL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool
+          rm -rf Keplr.AppDir && mkdir -p Keplr.AppDir/usr/bin
+          cp target/release/keplr Keplr.AppDir/usr/bin/
+          cp packaging/linux/keplr.desktop Keplr.AppDir/
+          cp assets/icon/keplr-256.png Keplr.AppDir/keplr.png
+          printf '#!/bin/sh\nexec "$APPDIR/usr/bin/keplr" "$@"\n' > Keplr.AppDir/AppRun
+          chmod +x Keplr.AppDir/AppRun
+          ARCH=x86_64 ./appimagetool Keplr.AppDir dist/
+          mv dist/Keplr-x86_64.AppImage "dist/keplr-${VER}-x86_64.AppImage"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: keplr-linux-x86_64
+          path: dist/
+
+  linux-aarch64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
+      - uses: Swatinem/rust-cache@v2
+      - name: version
+        run: echo "VER=$(grep '^version' crates/keplr-cli/Cargo.toml | head -1 | sed 's/.*\"\(.*\)\"/\1/')" >> "$GITHUB_ENV"
+      - name: cross toolchain
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq gcc-aarch64-linux-gnu
+      - run: cargo build --release --features desktop -p keplr-cli --target aarch64-unknown-linux-gnu
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+      - name: raw binary
+        run: |
+          mkdir -p dist
+          cp target/aarch64-unknown-linux-gnu/release/keplr "dist/keplr-aarch64-unknown-linux-gnu"
+      - name: deb
+        run: |
+          P="deb/keplr_${VER}_arm64"
+          mkdir -p "$P/DEBIAN" "$P/usr/bin" "$P/usr/share/applications"
+          for s in 16 32 48 128 256 512; do
+            mkdir -p "$P/usr/share/icons/hicolor/${s}x${s}/apps"
+            cp "assets/icon/keplr-${s}.png" "$P/usr/share/icons/hicolor/${s}x${s}/apps/keplr.png"
+          done
+          cp target/aarch64-unknown-linux-gnu/release/keplr "$P/usr/bin/keplr"
+          chmod 755 "$P/usr/bin/keplr"
+          cp packaging/linux/keplr.desktop "$P/usr/share/applications/keplr.desktop"
+          cat > "$P/DEBIAN/control" <<EOF
+          Package: keplr
+          Version: ${VER}
+          Architecture: arm64
+          Maintainer: Keplr <keplr@example.com>
+          Description: Personal lightweight IDE in a single binary
+           Tree-sitter highlighting, web UI, PTY terminals, serial monitor,
+           source control, headless serve plus desktop and TUI, Git LFS aware.
+          EOF
+          dpkg-deb --build "$P" "dist/keplr_${VER}_arm64.deb"
+      - name: rpm
+        run: |
+          sudo apt-get install -y -qq rpm
+          rpmbuild -bb packaging/rpm/keplr.spec \
+            --define "keplr_version ${VER}" --define "keplr_arch aarch64" \
+            --define "keplr_bin $PWD/target/aarch64-unknown-linux-gnu/release/keplr" \
+            --define "keplr_desktop $PWD/packaging/linux/keplr.desktop" \
+            --define "keplr_icons $PWD/assets/icon" \
+            --define "_topdir $PWD/rpmbuild"
+          mv rpmbuild/RPMS/*/*.rpm dist/
+      - name: appimage
+        run: |
+          curl -sSfL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-aarch64.AppImage
+          chmod +x appimagetool
+          rm -rf Keplr.AppDir && mkdir -p Keplr.AppDir/usr/bin
+          cp target/aarch64-unknown-linux-gnu/release/keplr Keplr.AppDir/usr/bin/
+          cp packaging/linux/keplr.desktop Keplr.AppDir/
+          cp assets/icon/keplr-256.png Keplr.AppDir/keplr.png
+          printf '#!/bin/sh\nexec "$APPDIR/usr/bin/keplr" "$@"\n' > Keplr.AppDir/AppRun
+          chmod +x Keplr.AppDir/AppRun
+          ARCH=aarch64 ./appimagetool Keplr.AppDir dist/
+          mv dist/Keplr-aarch64.AppImage "dist/keplr-${VER}-aarch64.AppImage"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: keplr-linux-aarch64
+          path: dist/
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+      - name: version
+        run: echo "VER=$(grep '^version' crates/keplr-cli/Cargo.toml | head -1 | sed 's/.*\"\(.*\)\"/\1/')" >> "$GITHUB_ENV"
+      - run: cargo build --release --features desktop -p keplr-cli --target x86_64-apple-darwin
+      - run: cargo build --release --features desktop -p keplr-cli --target aarch64-apple-darwin
+      - name: universal binary plus raw per-arch binaries
+        run: |
+          mkdir -p dist
+          cp target/x86_64-apple-darwin/release/keplr dist/keplr-x86_64-apple-darwin
+          cp target/aarch64-apple-darwin/release/keplr dist/keplr-aarch64-apple-darwin
+          mkdir -p univ
+          lipo -create target/x86_64-apple-darwin/release/keplr target/aarch64-apple-darwin/release/keplr -output univ/keplr
+          lipo -archs univ/keplr
+      - name: dmg
+        run: |
+          rm -rf dmgroot Keplr.app
+          mkdir -p Keplr.app/Contents/MacOS Keplr.app/Contents/Resources
+          cp univ/keplr Keplr.app/Contents/MacOS/keplr
+          sed "s/0\.1\.0/${VER}/g" packaging/macos/Info.plist > Keplr.app/Contents/Info.plist
+          sips -s format icns assets/icon/keplr-512.png --out Keplr.app/Contents/Resources/keplr.icns
+          mkdir -p dmgroot
+          cp -R Keplr.app dmgroot/
+          ln -s /Applications dmgroot/Applications
+          hdiutil create -volname Keplr -srcfolder dmgroot -ov -format UDZO "dist/Keplr-${VER}-universal.dmg"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: keplr-macos
+          path: dist/
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: version
+        shell: bash
+        run: echo "VER=$(grep '^version' crates/keplr-cli/Cargo.toml | head -1 | sed 's/.*\"\(.*\)\"/\1/')" >> "$GITHUB_ENV"
+      - run: cargo build --release --features desktop -p keplr-cli
+      - name: raw binary
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp target/release/keplr.exe dist/keplr-x86_64-pc-windows-msvc.exe
+      - name: icon
+        shell: bash
+        run: |
+          python -m pip install -q pillow
+          mkdir -p packaging/windows/build
+          cp target/release/keplr.exe packaging/windows/build/keplr.exe
+          python -c "from PIL import Image; Image.open('assets/icon/keplr-256.png').save('packaging/windows/build/keplr.ico', sizes=[(16,16),(32,32),(48,48),(128,128),(256,256)])"
+      - name: installer
+        shell: bash
+        run: |
+          choco install nsis -y
+          export PATH="$PATH:/c/Program Files (x86)/NSIS"
+          makensis "/DKEPLR_VERSION=${VER}" packaging/windows/keplr.nsi
+          mv "Keplr-Setup-${VER}-x86_64.exe" dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: keplr-windows
+          path: dist/
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [check-tag, linux-x86_64, linux-aarch64, macos, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: keplr-*
+          merge-multiple: true
+          path: dist
+      - name: contents
+        run: ls -la dist/
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

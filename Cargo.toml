@@ -1,5 +1,8 @@
 [workspace]
 members = ["crates/keplr-core", "crates/keplr-sync", "crates/keplr-build", "crates/keplr-lang", "crates/keplr-serve", "crates/keplr-cli", "crates/keplr-render", "crates/keplr-ui", "crates/keplr-web", "crates/keplr-theme"]
+
+[profile.release]
+strip = "symbols"
 resolver = "2"
 
 [workspace.dependencies]
