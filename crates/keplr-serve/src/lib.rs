@@ -581,6 +581,25 @@ async fn git_diff(State(state): State<AppState>) -> Json<serde_json::Value> {
     }
 }
 
+async fn git_filediff(
+    State(state): State<AppState>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Json<serde_json::Value> {
+    let rel = params.get("path").cloned().unwrap_or_default();
+    let full = match safe_rel(&state.root, &rel) {
+        Ok(p) => p,
+        Err(e) => return Json(serde_json::json!({ "error": format!("{e:#}") })),
+    };
+    let relpath = full
+        .strip_prefix(&state.root)
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or(rel);
+    match keplr_core::git::file_hunks(&state.root, &relpath) {
+        Ok((hunks, untracked)) => Json(serde_json::json!({ "hunks": hunks, "untracked": untracked })),
+        Err(e) => Json(serde_json::json!({ "error": format!("{e:#}") })),
+    }
+}
+
 fn safe_rel(root: &Path, rel: &str) -> anyhow::Result<PathBuf> {
     use std::path::Component;
     let p = Path::new(rel);
@@ -867,6 +886,33 @@ async fn git_push(
     }
 }
 
+async fn git_ahead(State(state): State<AppState>) -> Json<serde_json::Value> {
+    match keplr_core::git::ahead_behind(&state.root) {
+        Ok((ahead, behind)) => Json(serde_json::json!({ "ahead": ahead, "behind": behind })),
+        Err(e) => Json(serde_json::json!({ "error": format!("{e:#}") })),
+    }
+}
+
+async fn git_difftext(
+    State(state): State<AppState>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Json<serde_json::Value> {
+    let rel = params.get("path").cloned().unwrap_or_default();
+    let staged = params.get("staged").map(|v| v == "1").unwrap_or(false);
+    let full = match safe_rel(&state.root, &rel) {
+        Ok(p) => p,
+        Err(e) => return Json(serde_json::json!({ "error": format!("{e:#}") })),
+    };
+    let relpath = full
+        .strip_prefix(&state.root)
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or(rel);
+    match keplr_core::git::file_diff(&state.root, &relpath, staged) {
+        Ok(text) => Json(serde_json::json!({ "text": text })),
+        Err(e) => Json(serde_json::json!({ "error": format!("{e:#}") })),
+    }
+}
+
 async fn lfs_pointer(
     State(state): State<AppState>,
     Query(params): Query<HashMap<String, String>>,
@@ -1023,13 +1069,13 @@ fn term_css(c: &alacritty_terminal::vte::ansi::Color) -> Option<String> {
         Color::Named(n) => Some(
             match n {
                 NamedColor::Black => "#000000",
-                NamedColor::Red => "#f85149",
-                NamedColor::Green => "#3fb950",
-                NamedColor::Yellow => "#d29922",
-                NamedColor::Blue => "#58a6ff",
-                NamedColor::Magenta => "#bc8cff",
-                NamedColor::Cyan => "#39c5cf",
-                NamedColor::White => "#e6edf3",
+                NamedColor::Red => "#FF453A",
+                NamedColor::Green => "#30D158",
+                NamedColor::Yellow => "#FF9F0A",
+                NamedColor::Blue => "#0A84FF",
+                NamedColor::Magenta => "#BF5AF2",
+                NamedColor::Cyan => "#64D2FF",
+                NamedColor::White => "#F5F5F7",
                 NamedColor::BrightBlack => "#6e7681",
                 NamedColor::BrightRed => "#ff7b72",
                 NamedColor::BrightGreen => "#7ee787",
@@ -1038,18 +1084,18 @@ fn term_css(c: &alacritty_terminal::vte::ansi::Color) -> Option<String> {
                 NamedColor::BrightMagenta => "#d2a8ff",
                 NamedColor::BrightCyan => "#56d4dd",
                 NamedColor::BrightWhite => "#ffffff",
-                NamedColor::Foreground | NamedColor::BrightForeground => "#e6edf3",
+                NamedColor::Foreground | NamedColor::BrightForeground => "#F5F5F7",
                 NamedColor::Background => return None,
-                NamedColor::Cursor => "#58a6ff",
+                NamedColor::Cursor => "#0A84FF",
                 NamedColor::DimBlack => "#000000",
-                NamedColor::DimRed => "#f85149",
-                NamedColor::DimGreen => "#3fb950",
-                NamedColor::DimYellow => "#d29922",
-                NamedColor::DimBlue => "#58a6ff",
-                NamedColor::DimMagenta => "#bc8cff",
-                NamedColor::DimCyan => "#39c5cf",
-                NamedColor::DimWhite => "#e6edf3",
-                NamedColor::DimForeground => "#8b949e",
+                NamedColor::DimRed => "#FF453A",
+                NamedColor::DimGreen => "#30D158",
+                NamedColor::DimYellow => "#FF9F0A",
+                NamedColor::DimBlue => "#0A84FF",
+                NamedColor::DimMagenta => "#BF5AF2",
+                NamedColor::DimCyan => "#64D2FF",
+                NamedColor::DimWhite => "#F5F5F7",
+                NamedColor::DimForeground => "#8D8D93",
             }
             .to_string(),
         ),
@@ -1060,8 +1106,8 @@ fn term_css(c: &alacritty_terminal::vte::ansi::Color) -> Option<String> {
 
 fn indexed_css(i: u8) -> String {
     const BASE: [&str; 16] = [
-        "#000000", "#f85149", "#3fb950", "#d29922", "#58a6ff", "#bc8cff", "#39c5cf",
-        "#e6edf3", "#6e7681", "#ff7b72", "#7ee787", "#ffa657", "#79c0ff", "#d2a8ff",
+        "#000000", "#FF453A", "#30D158", "#FF9F0A", "#0A84FF", "#BF5AF2", "#64D2FF",
+        "#F5F5F7", "#6e7681", "#ff7b72", "#7ee787", "#ffa657", "#79c0ff", "#d2a8ff",
         "#56d4dd", "#ffffff",
     ];
     if i < 16 {
@@ -1586,6 +1632,7 @@ pub async fn serve_full(
         .route("/git/log", get(git_log))
         .route("/git/branches", get(git_branches))
         .route("/git/diff", get(git_diff))
+        .route("/git/filediff", get(git_filediff))
         .route("/git/stage", post(git_stage))
         .route("/git/unstage", post(git_unstage))
         .route("/git/discard", post(git_discard))
@@ -1593,6 +1640,8 @@ pub async fn serve_full(
         .route("/git/switch", post(git_switch))
         .route("/git/stash", post(git_stash))
         .route("/git/push", post(git_push))
+        .route("/git/ahead", get(git_ahead))
+        .route("/git/difftext", get(git_difftext))
         .route("/fs/create", post(fs_create))
         .route("/fs/rename", post(fs_rename))
         .route("/fs/delete", post(fs_delete))

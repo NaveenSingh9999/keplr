@@ -9,6 +9,7 @@ serde.workspace = true
 serde_json.workspace = true
 keplr-core = { path = "../keplr-core" }
 keplr-lang = { path = "../keplr-lang" }
+keplr-theme = { path = "../keplr-theme" }
 winit = { workspace = true, optional = true }
 wgpu = { workspace = true, optional = true, features = ["wgsl"] }
 pollster = { workspace = true, optional = true }

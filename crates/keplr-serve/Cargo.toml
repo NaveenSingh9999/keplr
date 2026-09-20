@@ -14,6 +14,7 @@ keplr-build = { path = "../keplr-build" }
 keplr-render = { path = "../keplr-render" }
 keplr-lang = { path = "../keplr-lang" }
 keplr-sync = { path = "../keplr-sync" }
+keplr-theme = { path = "../keplr-theme" }
 portable-pty.workspace = true
 alacritty_terminal.workspace = true
 libc = "0.2"

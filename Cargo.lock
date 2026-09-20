@@ -1701,6 +1701,7 @@ dependencies = [
  "image",
  "keplr-core",
  "keplr-lang",
+ "keplr-theme",
  "pollster",
  "serde",
  "serde_json",
@@ -1720,6 +1721,7 @@ dependencies = [
  "keplr-lang",
  "keplr-render",
  "keplr-sync",
+ "keplr-theme",
  "libc",
  "portable-pty",
  "reqwest",
@@ -1737,6 +1739,14 @@ dependencies = [
  "serde",
  "serde_json",
  "yrs",
+]
+
+[[package]]
+name = "keplr-theme"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

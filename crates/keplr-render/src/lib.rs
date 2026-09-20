@@ -17,16 +17,19 @@ pub struct Theme {
 }
 
 impl Theme {
-    pub fn zed_dark() -> Self {
+    /// The one Keplr identity theme. Sourced from `keplr-theme` so the
+    /// desktop snapshot, GPU window and WASM canvas match the web UI.
+    pub fn amoled() -> Self {
+        let t = keplr_theme::Theme::amoled();
         Self {
-            bg: String::from("#0e1116"),
-            surface: String::from("#161b22"),
-            border: String::from("#2a3340"),
-            text: String::from("#e6edf3"),
-            text_dim: String::from("#8b949e"),
-            accent: String::from("#58a6ff"),
-            error: String::from("#f85149"),
-            warning: String::from("#d29922"),
+            bg: String::from(t.bg),
+            surface: String::from(t.raised),
+            border: String::from(t.separator),
+            text: String::from(t.text),
+            text_dim: String::from(t.text_secondary),
+            accent: String::from(t.accent),
+            error: String::from(t.error),
+            warning: String::from(t.warn),
         }
     }
 }
