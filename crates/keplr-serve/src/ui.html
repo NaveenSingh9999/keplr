@@ -696,17 +696,17 @@
   .cm-matchingBracket { outline: 1px solid color-mix(in srgb, var(--accent) 70%, transparent); border-radius: 3px; }
   .cm-cursor { border-left-color: var(--accent); border-left-width: 2px; transition: transform 60ms linear; }
   .cm-content { caret-color: var(--accent); }
-  .tok-keyword { color: var(--syn-keyword); }
-  .tok-string { color: var(--syn-string); }
-  .tok-comment { color: var(--syn-comment); }
-  .tok-number { color: var(--syn-number); }
-  .tok-type { color: var(--syn-type); }
-  .tok-function { color: var(--syn-function); }
-  .tok-macro { color: var(--syn-macro); }
-  .tok-attribute { color: var(--syn-macro); }
-  .tok-constant { color: var(--syn-constant); }
-  .tok-parameter { color: var(--syn-plain); }
-  .tok-punctuation { color: var(--text3); }
+  .k-keyword { color: var(--syn-keyword); }
+  .k-string { color: var(--syn-string); }
+  .k-comment { color: var(--syn-comment); }
+  .k-number { color: var(--syn-number); }
+  .k-type { color: var(--syn-type); }
+  .k-function { color: var(--syn-function); }
+  .k-macro { color: var(--syn-macro); }
+  .k-attribute { color: var(--syn-macro); }
+  .k-constant { color: var(--syn-constant); }
+  .k-parameter { color: var(--syn-plain); }
+  .k-punctuation { color: var(--text3); }
   .cm-line.gitadd { box-shadow: inset 3px 0 var(--ok); }
   .cm-line.gitmod { box-shadow: inset 3px 0 var(--warn); }
   .cm-line.gitdel { box-shadow: inset 3px 0 var(--error); }
@@ -1350,20 +1350,31 @@ let ED = null; // adapter or null (focused group's)
 let ED2 = null; // second group's editor (lazily created)
 const ED_ALL = [null, null];
 function langExt(label, mods) {
+  const modFn = m => {
+    if (!m) return null;
+    if (typeof m === "function") return m;
+    if (typeof m.default === "function") return m.default;
+    return null;
+  };
+  const call = (m, arg) => {
+    const f = modFn(m);
+    if (!f) return [];
+    try { return f(arg); } catch (e) { return []; }
+  };
   switch (label) {
-    case "rust": return mods.rust ? mods.rust() : [];
-    case "python": return mods.python ? mods.python() : [];
-    case "javascript": return mods.javascript ? mods.javascript() : [];
-    case "typescript": return mods.javascript ? mods.javascript({ typescript: true }) : [];
-    case "tsx": return mods.javascript ? mods.javascript({ typescript: true, jsx: true }) : [];
+    case "rust": return call(mods.rust);
+    case "python": return call(mods.python);
+    case "javascript": return call(mods.javascript);
+    case "typescript": return call(mods.javascript, { typescript: true });
+    case "tsx": return call(mods.javascript, { typescript: true, jsx: true });
     case "cpp": case "c": case "csharp": case "java": case "kotlin":
-      return mods.cpp ? mods.cpp() : [];
-    case "go": return mods.go ? mods.go() : [];
-    case "html": case "php": return mods.html ? mods.html() : [];
-    case "css": return mods.css ? mods.css() : [];
-    case "json": return mods.json ? mods.json() : [];
-    case "markdown": return mods.markdown ? mods.markdown() : [];
-    case "sql": return mods.sql ? mods.sql() : [];
+      return call(mods.cpp);
+    case "go": return call(mods.go);
+    case "html": case "php": return call(mods.html);
+    case "css": return call(mods.css);
+    case "json": return call(mods.json);
+    case "markdown": return call(mods.markdown);
+    case "sql": return call(mods.sql);
     default: return [];
   }
 }
@@ -1442,7 +1453,11 @@ async function makeEditor(parentEl, gi) {
     const M = S.marks;
     if (!tab || !M || M.path !== tab.path) return view.Decoration.none;
     const doc = st.doc;
-    const B = new state.RangeSetBuilder();
+    const out = [];
+    const push = (a, b, deco) => {
+      if (!(a >= 0) || !(b >= a) || b > doc.length) return;
+      out.push({ a, b, deco });
+    };
     const atLine = n => {
       try {
         return doc.line(Math.max(1, Math.min(n, doc.lines)));
@@ -1455,51 +1470,65 @@ async function makeEditor(parentEl, gi) {
       const b = Math.min(a + Math.max(0, s.len), L.to);
       if (b <= a) continue;
       const cls = KIND[s.kind];
-      if (cls) B.add(a, b, view.Decoration.mark({ class: "tok-" + cls }));
+      if (cls) push(a, b, view.Decoration.mark({ class: "k-" + cls }));
     }
     for (const h of M.hunks || []) {
       if (h.len === 0) {
         const L = atLine(h.start);
-        if (L) B.add(L.from, L.from, view.Decoration.line({ class: "gitdel" }));
+        if (L) push(L.from, L.from, view.Decoration.line({ class: "gitdel" }));
       } else {
         for (let i = 0; i < h.len; i++) {
           const L = atLine(h.start + i);
           if (!L) break;
-          B.add(L.from, L.from, view.Decoration.line({ class: h.kind === "add" ? "gitadd" : "gitmod" }));
+          push(L.from, L.from, view.Decoration.line({ class: h.kind === "add" ? "gitadd" : "gitmod" }));
         }
       }
     }
     if (M.untracked && doc.lines <= 2000) {
       for (let i = 1; i <= doc.lines; i++) {
         const L = atLine(i);
-        if (L) B.add(L.from, L.from, view.Decoration.line({ class: "gitadd" }));
+        if (L) push(L.from, L.from, view.Decoration.line({ class: "gitadd" }));
       }
     }
     for (const d of M.diags || []) {
       const L = atLine(d.line);
-      if (L) B.add(L.from, L.from, view.Decoration.line({ class: d.sev === "warn" ? "diagwarn" : "diagerr" }));
+      if (L) push(L.from, L.from, view.Decoration.line({ class: d.sev === "warn" ? "diagwarn" : "diagerr" }));
     }
     if (doc.lines <= 5000) {
       for (let i = 1; i <= doc.lines; i++) {
         const L = atLine(i);
         if (!L) continue;
         const m = /^[ \t]+/.exec(L.text);
-        if (m) B.add(L.from, L.from + m[0].length, view.Decoration.mark({ class: "indent-lead" }));
+        if (m) push(L.from, L.from + m[0].length, view.Decoration.mark({ class: "indent-lead" }));
       }
     }
     for (const f of M.find || []) {
-      if (f.to > f.from) B.add(f.from, f.to, view.Decoration.mark({ class: f.cur ? "kfind-cur" : "kfind-mark" }));
+      if (f.to > f.from) push(f.from, f.to, view.Decoration.mark({ class: f.cur ? "kfind-cur" : "kfind-mark" }));
+    }
+    out.sort((x, y) => (x.a - y.a) || (x.b - y.b));
+    const B = new state.RangeSetBuilder();
+    for (const r of out) {
+      try {
+        B.add(r.a, r.b, r.deco);
+      } catch (e) { /* skip one bad range, keep the rest */ }
     }
     return B.finish();
   }
   const markTick = state.StateEffect.define();
   const markField = state.StateField.define({
-    create: () => 0,
+    create: () => view.Decoration.none,
     update: (v, tr) => {
-      for (const e of tr.effects) if (e.is(markTick)) return v + 1;
+      let ticked = false;
+      for (const e of tr.effects) {
+        if (e.is(markTick)) { ticked = true; break; }
+      }
+      if (ticked) return buildMarks(tr.state);
+      if (tr.docChanged) {
+        try { return v.map(tr.changes); } catch (e) { return v; }
+      }
       return v;
     },
-    provide: f => view.EditorView.decorations.from(f, () => buildMarks(ed.state)),
+    provide: f => view.EditorView.decorations.from(f),
   });
   ed.dispatch({ effects: state.StateEffect.appendConfig.of([markField]) });
   return {
@@ -2528,13 +2557,20 @@ function buildTree(paths) {
   });
   return root;
 }
+let treeBudget = 2000;
 function renderTree(box, node, depth, base) {
   base = base || "";
+  if (depth === 0) {
+    treeBudget = 2000;
+    const old = box.querySelector(":scope > .tree-more");
+    if (old) old.remove();
+  }
   const names = Object.keys(node).sort((a, b) => {
     const da = node[a].__kids ? 0 : 1, db = node[b].__kids ? 0 : 1;
     return da - db || (a < b ? -1 : 1);
   });
   names.forEach(name => {
+    if (treeBudget-- <= 0) return;
     const n = node[name];
     const full = base ? base + "/" + name : name;
     const row = document.createElement("div");
@@ -2598,6 +2634,12 @@ function renderTree(box, node, depth, base) {
       }
     }
   });
+  if (depth === 0 && treeBudget <= 0) {
+    const more = document.createElement("div");
+    more.className = "logline tree-more";
+    more.textContent = "…list capped at 2000 rows — narrow with the finder (Ctrl+P)";
+    box.appendChild(more);
+  }
 }
 function loadFiles() {
   const q = "";
@@ -3174,7 +3216,7 @@ function showSerial() {
     } catch (e) {}
   };
   const wrap = document.createElement("div");
-  wrap.style.cssText = "display:flex;flex-direction:column;height:100%;gap:6px;padding:8px 12px 10px;";
+  wrap.style.cssText = "display:flex;flex-direction:column;height:100%;gap:6px;padding:8px 12px 10px;overflow-y:auto;";
   const row = document.createElement("div");
   row.style.cssText = "display:flex;gap:6px;align-items:center;flex:none;flex-wrap:wrap;";
   const portBtn = document.createElement("button");
@@ -3330,6 +3372,8 @@ function showSerial() {
       if (SER.port && !ports.includes(SER.port)) SER.port = null;
       if (!SER.port && ports.length === 1) SER.port = ports[0];
       empty.style.display = ports.length ? "none" : "flex";
+      out.style.display = ports.length ? "" : "none";
+      jump.style.display = "none";
       if (!ports.length) slog("no serial ports found — see below", "", "var(--warn)");
       paintPickers();
       savePrefs();
@@ -3407,7 +3451,7 @@ function showSerial() {
     sock.onerror = dead;
   };
   const sendRow = document.createElement("div");
-  sendRow.style.cssText = "display:flex;gap:6px;flex:none;padding-bottom:2px;";
+  sendRow.style.cssText = "display:flex;gap:6px;flex:none;padding-bottom:2px;position:sticky;bottom:0;background:var(--bg);padding-top:6px;";
   const inp = document.createElement("input");
   inp.className = "kinput";
   inp.placeholder = "Type to send… (Enter)";
@@ -3514,6 +3558,7 @@ function moveDockIndicator() {
   ind.style.width = sel.offsetWidth + "px";
 }
 function setLeftTab(t) {
+  S.leftTab = t;
   document.querySelectorAll("#left .docktabs button").forEach(b => {
     b.classList.toggle("sel", b.dataset.ltab === t);
   });
@@ -5035,6 +5080,7 @@ function focusGroup(i) {
   health();
   await loadFiles();
   renderProblems();
+  renderTabs();
   log("console", "keplr web ui ready");
   requestAnimationFrame(moveDockIndicator);
   try {

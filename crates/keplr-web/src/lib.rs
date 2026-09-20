@@ -51,8 +51,8 @@ fn paint(
 ) -> Result<(), JsValue> {
     let w = canvas.width() as f64;
     let h = canvas.height() as f64;
-    let theme = keplr_render::Theme::zed_dark();
-    ctx.set_fill_style_str("#0e1116");
+    let theme = keplr_render::Theme::amoled();
+    ctx.set_fill_style_str("#000000");
     ctx.fill_rect(0.0, 0.0, w, h);
     ctx.set_font("13px 'JetBrains Mono','SF Mono',monospace");
     ctx.set_fill_style_str(&theme.surface);
@@ -96,7 +96,7 @@ fn paint(
         h - 9.0,
     )?;
     if scene.palette_open {
-        ctx.set_fill_style_str("#161b22ee");
+        ctx.set_fill_style_str("#161618");
         ctx.fill_rect(w * 0.25, 60.0, w * 0.5, 220.0);
         ctx.set_fill_style_str(&theme.text);
         ctx.fill_text(&scene.palette_query, w * 0.25 + 12.0, 84.0)?;

@@ -14,8 +14,8 @@ codebase, Git LFS aware, and CRDT sync between machines.
 
 ## Why keplr
 
-- **One binary, 17 MB.** No runtime, no Electron, no `node_modules`. Copy it anywhere.
-- **Starts in 54 ms.** Measured cold start (`keplr --help`, release build).
+- **One binary, 17.2 MB.** No runtime, no Electron, no `node_modules`. Copy it anywhere.
+- **Starts in 43 ms.** Measured cold start (`keplr --help`, release build).
 - **Use it anywhere.** Local TUI, desktop window, or `keplr serve` + any browser —
   including your phone on the same network, or a headless box over SSH.
 - **Real terminals.** Every terminal tab is an independent PTY shell, painted on
@@ -52,8 +52,8 @@ type back. Perfect for ESP32/Arduino/STM32 work.
 
 | | keplr | VS Code |
 |---|---|---|
-| Install size | **17 MB** single binary (measured) | Electron distribution, hundreds of MB |
-| Cold start | **54 ms** (measured, release) | seconds (Electron runtime) |
+| Install size | **17.2 MB** single binary (measured) | Electron distribution, hundreds of MB |
+| Cold start | **43 ms** (measured, release) | seconds (Electron runtime) |
 | Terminal | built-in PTY tabs, no extensions | built-in terminal, one session per panel |
 | Serial monitor | **built in** | needs an extension |
 | Git push | **one-click button** | button in Source Control |
@@ -65,8 +65,8 @@ type back. Perfect for ESP32/Arduino/STM32 work.
 | Memory footprint | one native process | Electron + extension host |
 
 keplr is not a VS Code replacement — it is a *complement*: the tool you reach for
-on servers, Chromebooks, tablets, and embedded benches, where a 17 MB binary
-that starts in 54 ms beats an Electron install.
+on servers, Chromebooks, tablets, and embedded benches, where a 17.2 MB binary
+that starts in 43 ms beats an Electron install.
 
 ## Speed (measured)
 
@@ -74,13 +74,15 @@ Release build on Termux/aarch64, `bench --files 200 --lines 20`:
 
 | Operation | Time |
 |---|---|
-| Cold start (`--help`) | **54 ms** |
-| Binary size | **17 MB** |
-| Walk 200 files | **34 ms** |
-| Index 200 files | **19 ms** |
-| Fuzzy match p50 | **398 µs** |
-| Content grep p50 | **52 ms** |
-| CAS store throughput | **52,594 puts/s** |
+| Cold start (`--help`) | **43 ms** |
+| Binary size | **17.2 MB** |
+| Walk 200 files | **27 ms** |
+| Index 200 files | **16 ms** |
+| Fuzzy match p50 | **420 µs** |
+| Content grep p50 | **53 ms** |
+| CAS store throughput | **52,794 puts/s** |
+| Server response (localhost) | **11 ms** |
+| First paint (headless test rig) | **~0.3 s** |
 
 Reproduce: `cargo run --release -p keplr-cli -- --root /tmp/benchroot bench --files 200 --lines 20 --json`
 
@@ -158,3 +160,7 @@ that sloppy-mode checkers miss).
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+UI icon credits: IDE chrome from [Feather Icons](https://feathericons.com) (MIT),
+file glyphs from the [Seti UI](https://github.com/jesseweed/seti-ui) file-icon set
+(MIT) — both inlined into the app, no network needed.

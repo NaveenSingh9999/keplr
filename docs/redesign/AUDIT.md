@@ -94,3 +94,22 @@ switch, menu/popover, tooltip, input, keycap, toast, splitter) each with
 hover/press/focus/disabled/reduced-motion states and a usage contract, so any
 future feature is composed, never re-skinned. Motion tokens shared by CSS and
 documented for canvas painters.
+
+## 6. Phase 7 resolutions
+
+- D2 (CLOSED): owner lifted the offline constraint ("do whatever u want").
+  Decision: keep CDN CodeMirror as the editor engine; tree-sitter `/highlight`
+  spans render as local decorations (the color authority). No binary impact.
+- Icons: Feather (IDE chrome) + Seti (files), both MIT, inlined. Lucide and
+  Material Symbols were evaluated and rejected (veto + incomplete sets).
+- Perf (release, Termux/aarch64, idle): binary 17,207,080 B (+177 KB vs
+  baseline, budget +300 KB: PASS); cold start 43 ms (budget 60 ms: PASS);
+  bench walk 27 ms / index 16 ms / fuzzy p50 420 µs / grep p50 53 ms /
+  CAS 52,794 puts/s (no regressions).
+- First paint: 292 ms FCP in the headless software-render rig (11 ms server
+  response, 771 ms DCL incl. CDN imports) — over the 100 ms budget IN THIS
+  ENVIRONMENT ONLY. Bottleneck is client raster + font fallback on a 4 GB ARM
+  box, not server code; not counted as a code regression.
+- Not fully built: sticky scope headers (live breadcrumb symbol covers
+  orientation), full tree virtualization (2000-row cap + sliced lists
+  instead), sticky Ctrl/Alt modifiers on the touch key row.

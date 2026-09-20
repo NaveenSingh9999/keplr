@@ -3,7 +3,7 @@ use std::path::Path;
 
 #[test]
 fn theme_scene_paint_and_diff_are_real() {
-    let t = Theme::zed_dark();
+    let t = Theme::amoled();
     assert!(t.bg.starts_with('#'));
     assert!(t.text.starts_with('#'));
 
