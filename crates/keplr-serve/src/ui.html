@@ -886,6 +886,7 @@
     #bottom[data-detent="peek"] { height: 76px; }
     #bottom[data-detent="half"] { height: 45vh; }
     #bottom[data-detent="full"] { height: calc(100vh - 40px - 24px); }
+  }
   #bottomtabs .grab {
     display: none; width: 36px; height: 4px; border-radius: 999px; background: var(--text3);
     margin: 6px auto 2px; flex: none; cursor: pointer;
@@ -900,6 +901,77 @@
     }
     .kbtn-acc { background: Highlight; color: HighlightText; }
     .tab.sel, .kseg button.sel { outline: 1px solid Highlight; }
+  }
+
+  /* ============ Liquid Glass menu bar (Tahoe recipe) ============ */
+  #menubar {
+    height: 30px; display: flex; align-items: stretch; gap: 2px; padding: 0 8px;
+    background: var(--bg); border-bottom: 1px solid var(--sep); flex: none;
+  }
+  #menubar.hidden { display: none; }
+  #menubar > button {
+    appearance: none; background: transparent; border: 0; color: var(--text2);
+    font: 400 13px var(--font-ui); padding: 0 10px; border-radius: 6px; cursor: pointer;
+    transition: background .15s ease-out, color .15s ease-out;
+  }
+  #menubar > button:hover, #menubar > button.open { background: rgba(255,255,255,.09); color: var(--text); }
+  .mpop {
+    position: fixed; z-index: 250; min-width: 272px; max-width: 340px;
+    max-height: min(62vh, 480px); display: flex; flex-direction: column;
+    contain: layout paint;
+    background: rgba(24,24,27,.72);
+    -webkit-backdrop-filter: blur(28px) saturate(180%) brightness(1.12);
+    backdrop-filter: blur(28px) saturate(180%) brightness(1.12);
+    border: 1px solid rgba(255,255,255,.14);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 24px 60px rgba(0,0,0,.6);
+    border-radius: 14px; padding: 6px; transform-origin: top left;
+    animation: mopen 340ms cubic-bezier(.3,1.15,.5,1);
+  }
+  @keyframes mopen {
+    0% { opacity: 0; transform: translateY(-10px) scaleY(.6); }
+    60% { opacity: 1; transform: translateY(2px) scaleY(1.03); }
+    100% { opacity: 1; transform: none; }
+  }
+  .mpop.closing { animation: mclose 140ms ease-in forwards; }
+  @keyframes mclose {
+    to { opacity: 0; transform: translateY(-6px) scaleY(.98); }
+  }
+  .mpop .mfilter {
+    margin: 2px 2px 6px; border-radius: 8px; height: 30px; font-size: 13.5px;
+  }
+  .mpop .mlist { overflow-y: auto; min-height: 0; }
+  .mpop .mrow {
+    display: flex; gap: 9px; align-items: center; padding: 5px 10px; border-radius: 6px;
+    cursor: pointer; color: var(--text); font-size: 13px;
+    animation: mrow-in 160ms ease-out backwards; animation-delay: calc(min(var(--i, 0), 6) * 10ms);
+    transition: background 80ms linear, color 80ms linear;
+  }
+  @keyframes mrow-in { from { opacity: 0; transform: translateY(3px); } }
+  .mpop .mrow:hover, .mpop .mrow.sel { background: var(--accent); color: #fff; }
+  .mpop .mrow .ic { color: var(--text2); transition: color 80ms linear; }
+  .mpop .mrow:hover .ic, .mpop .mrow.sel .ic { color: #fff; }
+  .mpop .mrow span.lb { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mpop .mrow .kkey { transition: background 80ms linear, color 80ms linear; }
+  .mpop .mrow:hover .kkey, .mpop .mrow.sel .kkey {
+    color: #fff; background: rgba(255,255,255,.22); border-color: transparent;
+  }
+  .mpop .hd {
+    font-size: var(--fs-cap); color: var(--text3); padding: 7px 10px 3px;
+    text-transform: uppercase; letter-spacing: .07em;
+  }
+  .mpop .sep { height: 1px; background: var(--sep); margin: 5px 8px; }
+  .mpop .none { padding: 10px; color: var(--text3); font-size: 13px; text-align: center; }
+  @media (prefers-reduced-transparency: reduce) {
+    .mpop {
+      -webkit-backdrop-filter: none; backdrop-filter: none;
+      background: #101014;
+    }
+  }
+  #modalwrap.open #sctable { width: 100%; border-collapse: collapse; }
+  #modalwrap.open #sctable td { padding: 5px 8px; font-size: 13px; border-bottom: 1px solid var(--sep); }
+  #modalwrap.open #sctable td:first-child { white-space: nowrap; width: 130px; }
+  @media (max-width: 720px) {
+    #menubar { display: none; }
   }
 </style>
 <script type="importmap">
@@ -983,6 +1055,15 @@
   <button id="syncpill" data-tip="Connection status"><span id="dot"></span><span id="syncword">live</span></button>
   <button class="kicon" id="t-settings" data-tip="Settings"><svg class="ic"><use href="#i-gear"/></svg></button>
 </header>
+<div id="menubar" role="menubar" aria-label="Application menus">
+  <button role="menuitem" data-menu="file">File</button>
+  <button role="menuitem" data-menu="edit">Edit</button>
+  <button role="menuitem" data-menu="view">View</button>
+  <button role="menuitem" data-menu="go">Go</button>
+  <button role="menuitem" data-menu="run">Run</button>
+  <button role="menuitem" data-menu="terminal">Terminal</button>
+  <button role="menuitem" data-menu="help">Help</button>
+</div>
 <div id="workbench">
   <div class="dock" id="left">
     <div class="docktabs" role="tablist" aria-label="Sidebar">
@@ -4559,6 +4640,7 @@ const COMMANDS = [
   ["show terminal", () => setBottomTab("terminal"), "view"],
   ["save file", () => saveActive(), "file"],
   ["close tab", () => closeActive(), "file"],
+  ["toggle menu bar", () => setMenuBar(!menuBarOn()), "view"],
   ["split right", () => toggleSplit(), "view"],
   ["focus left pane", () => focusGroup(0), "view"],
   ["focus right pane", () => focusGroup(1), "view"],
@@ -4799,6 +4881,502 @@ function wireFind() {
   tg.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); flip(); } };
 }
 
+/* ============ spotlight menu bar ============
+   VS Code-style File/Edit/View/Go/Run/Terminal/Help, Apple-style behavior:
+   glass spotlight panels, live filter, spring motion, full keyboard parity. */
+let menuOpen = null;
+function menuBarOn() {
+  return !document.getElementById("menubar").classList.contains("hidden");
+}
+function setMenuBar(on) {
+  document.getElementById("menubar").classList.toggle("hidden", !on);
+  try { localStorage.setItem("keplr-menubar", on ? "1" : "0"); } catch (e) {}
+}
+async function newFileRoot() {
+  const name = await askInput({ title: "New file", placeholder: "name.ext" });
+  if (name) fsOp("/fs/create", { path: name, dir: false });
+}
+async function newFolderRoot() {
+  const name = await askInput({ title: "New folder", placeholder: "name" });
+  if (name) fsOp("/fs/create", { path: name, dir: true });
+}
+function closeOthers() {
+  const g = G();
+  const keep = g.active;
+  for (let j = g.tabs.length - 1; j >= 0; j--) {
+    if (j !== keep) closeTab(j);
+  }
+}
+function closeAllTabs() {
+  const g = G();
+  for (let j = g.tabs.length - 1; j >= 0; j--) closeTab(j);
+}
+function revealActive() {
+  const t = A();
+  if (t) revealInTree(t.path);
+  else msg("no active file");
+}
+function copyActivePath() {
+  const t = A();
+  if (t) copyText(t.path);
+  else msg("no active file");
+}
+function stepTab(d) {
+  const g = G();
+  if (g.tabs.length) activateTab((g.active + d + g.tabs.length) % g.tabs.length);
+}
+async function edCopy(cut) {
+  const t = A();
+  if (!t || !ED) return;
+  try {
+    if (ED.cm) {
+      const s = ED.view.state.selection.main;
+      const txt = ED.view.state.sliceDoc(s.from, s.to);
+      if (!txt) return;
+      copyText(txt);
+      if (cut) {
+        ED.view.dispatch({ changes: { from: s.from, to: s.to, insert: "" } });
+        markDirty(true);
+      }
+    } else {
+      const ta = document.getElementById("fallback");
+      if (!ta) return;
+      const txt = ta.value.slice(ta.selectionStart, ta.selectionEnd);
+      if (!txt) return;
+      copyText(txt);
+      if (cut) {
+        ta.value = ta.value.slice(0, ta.selectionStart) + ta.value.slice(ta.selectionEnd);
+        markDirty(true);
+      }
+    }
+  } catch (e) { msg(String(e), true); }
+}
+async function edPaste() {
+  const t = A();
+  if (!t || !ED) return;
+  let txt = "";
+  try {
+    txt = await navigator.clipboard.readText();
+  } catch (e) {
+    toast("Clipboard read denied — use Ctrl+V", "err");
+    return;
+  }
+  if (!txt) return;
+  try {
+    if (ED.cm) {
+      const s = ED.view.state.selection.main;
+      ED.view.dispatch({ changes: { from: s.from, to: s.to, insert: txt } });
+    } else {
+      const ta = document.getElementById("fallback");
+      const a = ta.selectionStart;
+      ta.value = ta.value.slice(0, a) + txt + ta.value.slice(ta.selectionEnd);
+      ta.selectionStart = ta.selectionEnd = a + txt.length;
+    }
+    markDirty(true);
+  } catch (e) { msg(String(e), true); }
+}
+function edSelectAll() {
+  const t = A();
+  if (!t || !ED) return;
+  try {
+    if (ED.cm) ED.view.dispatch({ selection: { anchor: 0, head: ED.view.state.doc.length } });
+    else {
+      const ta = document.getElementById("fallback");
+      ta.focus();
+      ta.select();
+    }
+  } catch (e) {}
+}
+function edSelectLine() {
+  const t = A();
+  if (!t || !ED) return;
+  try {
+    if (ED.cm) {
+      const s = ED.view.state.selection.main;
+      const l = ED.view.state.doc.lineAt(s.head);
+      ED.view.dispatch({ selection: { anchor: l.from, head: l.to } });
+      ED.focus();
+    } else {
+      const ta = document.getElementById("fallback");
+      const v = ta.value;
+      const a = ta.selectionStart;
+      const s = v.lastIndexOf("\n", a - 1) + 1;
+      let e = v.indexOf("\n", a);
+      if (e < 0) e = v.length;
+      ta.focus();
+      ta.selectionStart = s;
+      ta.selectionEnd = e;
+    }
+  } catch (e) {}
+}
+let cmCmds = null, cmCmdsTried = false;
+async function cmCommands() {
+  if (cmCmds || cmCmdsTried) return cmCmds;
+  cmCmdsTried = true;
+  try {
+    cmCmds = await import("@codemirror/commands");
+  } catch (e) {
+    cmCmds = null;
+  }
+  return cmCmds;
+}
+async function edUndo() {
+  if (!ED || !ED.cm) return;
+  const m = await cmCommands();
+  if (!m || typeof m.undo !== "function") {
+    toast("Undo unavailable", "err");
+    return;
+  }
+  try {
+    m.undo({ state: ED.view.state, dispatch: ED.view.dispatch.bind(ED.view) });
+  } catch (e) {}
+}
+async function edRedo() {
+  if (!ED || !ED.cm) return;
+  const m = await cmCommands();
+  if (!m || typeof m.redo !== "function") {
+    toast("Redo unavailable", "err");
+    return;
+  }
+  try {
+    m.redo({ state: ED.view.state, dispatch: ED.view.dispatch.bind(ED.view) });
+  } catch (e) {}
+}
+async function runSingleTask(name) {
+  setBottomTab("tasks");
+  log("console", "$ keplr run " + name);
+  try {
+    const j = await post("/tasks/run", { target: name, jobs: 1 });
+    const r = (j.reports || [])[0];
+    log("console", name + ": " + (!j.ok ? j.error || "failed" : r && r.failed ? "failed" : "done"));
+    showTasks();
+  } catch (e) {
+    log("console", name + ": " + String(e));
+  }
+}
+const SHORTCUTS = [
+  ["Ctrl P", "Find files / commands"],
+  ["Ctrl K", "Commands"],
+  ["Ctrl B", "Toggle sidebar"],
+  ["Ctrl F", "Find in file"],
+  ["Ctrl S", "Save file"],
+  ["Ctrl \\", "Split editor"],
+  ["Ctrl Enter", "Commit (message box)"],
+  ["Alt F/E/V/G/R/T/H", "Open menu"],
+  ["↑ ↓ Enter", "Navigate menus"],
+  ["F2", "Rename in tree"],
+  ["Esc", "Close dialog"],
+];
+function shortcutsSheet() {
+  const wrap = document.getElementById("modalwrap");
+  const modal = document.getElementById("modal");
+  modal.innerHTML = "";
+  const h = document.createElement("h3");
+  h.textContent = "Keyboard shortcuts";
+  modal.appendChild(h);
+  const tb = document.createElement("table");
+  tb.id = "sctable";
+  SHORTCUTS.forEach(([k, d]) => {
+    const tr = document.createElement("tr");
+    const a = document.createElement("td");
+    const kc = document.createElement("span");
+    kc.className = "kkey";
+    kc.textContent = k;
+    a.appendChild(kc);
+    const b = document.createElement("td");
+    b.textContent = d;
+    tr.appendChild(a);
+    tr.appendChild(b);
+    tb.appendChild(tr);
+  });
+  modal.appendChild(tb);
+  const row = document.createElement("div");
+  row.className = "row";
+  row.style.justifyContent = "flex-end";
+  const ok = document.createElement("button");
+  ok.className = "kbtn kbtn-acc";
+  ok.textContent = "Done";
+  const close = () => {
+    wrap.classList.remove("open");
+    wrap.onclick = null;
+  };
+  ok.onclick = close;
+  row.appendChild(ok);
+  modal.appendChild(row);
+  wrap.classList.add("open");
+  wrap.onclick = e => {
+    if (e.target === wrap) close();
+  };
+  ok.focus();
+}
+function aboutSheet() {
+  const wrap = document.getElementById("modalwrap");
+  const modal = document.getElementById("modal");
+  modal.innerHTML = "";
+  const h = document.createElement("h3");
+  h.textContent = "Keplr";
+  modal.appendChild(h);
+  const p = document.createElement("p");
+  p.style.cssText = "color:var(--text2);font-size:13px;line-height:1.6;";
+  p.textContent = "A personal lightweight IDE in a single Rust binary — MIT licensed. Web UI, TUI and desktop from one codebase.";
+  modal.appendChild(p);
+  const row = document.createElement("div");
+  row.className = "row";
+  row.style.justifyContent = "flex-end";
+  const ok = document.createElement("button");
+  ok.className = "kbtn kbtn-acc";
+  ok.textContent = "Done";
+  const close = () => {
+    wrap.classList.remove("open");
+    wrap.onclick = null;
+  };
+  ok.onclick = close;
+  row.appendChild(ok);
+  modal.appendChild(row);
+  wrap.classList.add("open");
+  wrap.onclick = e => {
+    if (e.target === wrap) close();
+  };
+  ok.focus();
+}
+
+function menuRows(id) {
+  switch (id) {
+    case "file":
+      return [
+        { label: "New File…", icon: "plus", run: () => newFileRoot() },
+        { label: "New Folder…", icon: "plus", run: () => newFolderRoot() },
+        { sep: true },
+        { label: "Open File…", icon: "file", shortcut: "Ctrl P", run: () => palOpen(true) },
+        { label: "Save", icon: "check", shortcut: "Ctrl S", run: () => saveActive() },
+        { sep: true },
+        { label: "Close Tab", icon: "x", run: () => closeActive() },
+        { label: "Close Other Tabs", icon: "x", run: () => closeOthers() },
+        { label: "Close All Tabs", icon: "x", run: () => closeAllTabs() },
+        { sep: true },
+        { label: "Reveal in Tree", icon: "search", run: () => revealActive() },
+        { label: "Copy Path", icon: "copy", run: () => copyActivePath() },
+      ];
+    case "edit":
+      return [
+        { label: "Undo", icon: "chev-r", shortcut: "Ctrl Z", run: () => edUndo() },
+        { label: "Redo", icon: "chev-r", shortcut: "Ctrl Y", run: () => edRedo() },
+        { sep: true },
+        { label: "Cut", shortcut: "Ctrl X", run: () => edCopy(true) },
+        { label: "Copy", shortcut: "Ctrl C", run: () => edCopy(false) },
+        { label: "Paste", shortcut: "Ctrl V", run: () => edPaste() },
+        { sep: true },
+        { label: "Select All", shortcut: "Ctrl A", run: () => edSelectAll() },
+        { label: "Select Line", run: () => edSelectLine() },
+        { sep: true },
+        { label: "Find…", icon: "search", shortcut: "Ctrl F", run: () => openFind() },
+      ];
+    case "view":
+      return [
+        { label: "Toggle Sidebar", icon: "side", shortcut: "Ctrl B", run: () => toggleDock("left") },
+        { label: "Toggle Panel", icon: "panel", run: () => toggleDock("bottom") },
+        { label: "Toggle Outline", icon: "list", run: () => toggleDock("right") },
+        { label: "Split Editor Right", icon: "copy", shortcut: "Ctrl \\", run: () => toggleSplit() },
+        { sep: true },
+        { label: "Command Palette…", icon: "search", shortcut: "Ctrl P", run: () => palOpen(true) },
+        { label: "Find in File…", icon: "search", shortcut: "Ctrl F", run: () => openFind() },
+        { label: "Terminal", icon: "terminal", run: () => setBottomTab("terminal") },
+        { label: "Serial Monitor", icon: "activity", run: () => setBottomTab("serial") },
+        { label: "Problems", icon: "xcirc", run: () => setBottomTab("problems") },
+        { sep: true },
+        { label: "Settings…", icon: "gear", run: () => toggleSettings(true) },
+        { label: "Menu Bar", icon: "check", run: () => setMenuBar(!menuBarOn()) },
+      ];
+    case "go":
+      return [
+        { label: "Go to File…", icon: "file", shortcut: "Ctrl P", run: () => palOpen(true) },
+        { label: "Go to Line…", icon: "list", run: () => palPrefill(":") },
+        { label: "Go to Symbol…", icon: "search", run: () => palPrefill("@") },
+        { label: "Search Content…", icon: "search", run: () => palPrefill("#") },
+        { sep: true },
+        { label: "Next Tab", icon: "chev-r", run: () => stepTab(1) },
+        { label: "Previous Tab", icon: "chev-r", run: () => stepTab(-1) },
+        { sep: true },
+        { label: "Go to Terminal", icon: "terminal", run: () => setBottomTab("terminal") },
+        { label: "Go to Source Control", icon: "branch", run: () => { if (!S.docks.left) toggleDock("left", true); setLeftTab("source"); } },
+      ];
+    case "terminal":
+      return [
+        { label: "New Terminal", icon: "plus", run: () => { setBottomTab("terminal"); newTerm(); } },
+        { label: "Close Terminal", icon: "x", run: () => closeTerm(TERM.active) },
+        { sep: true },
+        { label: "Serial Monitor", icon: "activity", run: () => setBottomTab("serial") },
+      ];
+    case "help":
+      return [
+        { label: "Keyboard Shortcuts", icon: "list", run: () => shortcutsSheet() },
+        { label: "Welcome", icon: "info", run: () => toast("Welcome — Ctrl+P finds files, the gear tunes keplr") },
+        { label: "About Keplr", icon: "info", run: () => aboutSheet() },
+      ];
+    default:
+      return [];
+  }
+}
+async function runMenuRows() {
+  const rows = [
+    { label: "Run All Tasks", icon: "play", run: () => runAllTasks() },
+    { label: "Show Tasks", icon: "list", run: () => setBottomTab("tasks") },
+  ];
+  try {
+    const tasks = await get("/tasks");
+    const names = Object.keys(tasks || {});
+    if (names.length) {
+      rows.push({ hd: "Tasks" });
+      names.forEach(n => rows.push({ label: n, icon: "play", run: () => runSingleTask(n) }));
+    }
+  } catch (e) {}
+  return rows;
+}
+function openMenu(id, btn, rows) {
+  closeMenu(true);
+  document.querySelectorAll("#menubar > button").forEach(x => x.classList.toggle("open", x === btn));
+  const p = document.createElement("div");
+  p.className = "mpop";
+  p.setAttribute("role", "menu");
+  const f = document.createElement("input");
+  f.className = "kinput mfilter";
+  f.placeholder = "Filter…";
+  f.setAttribute("aria-label", "Filter menu");
+  f.autocomplete = "off";
+  f.spellcheck = false;
+  const list = document.createElement("div");
+  list.className = "mlist";
+  p.appendChild(f);
+  p.appendChild(list);
+  document.body.appendChild(p);
+  const st = { id, panel: p, btn, rows, sel: 0, filter: "", visCount: 0 };
+  menuOpen = st;
+  const r = btn.getBoundingClientRect();
+  p.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 300)) + "px";
+  p.style.top = r.bottom + 4 + "px";
+  const paint = () => {
+    const q = st.filter.toLowerCase();
+    const vis = st.rows.filter(it => it.sep || it.hd || !q || (it.label || "").toLowerCase().includes(q));
+    list.innerHTML = "";
+    let vi = 0;
+    vis.forEach(it => {
+      if (it.sep) {
+        const s = document.createElement("div");
+        s.className = "sep";
+        list.appendChild(s);
+        return;
+      }
+      if (it.hd) {
+        const h = document.createElement("div");
+        h.className = "hd";
+        h.textContent = it.hd;
+        list.appendChild(h);
+        return;
+      }
+      const d = document.createElement("div");
+      d.className = "mrow" + (vi === st.sel ? " sel" : "");
+      d.style.setProperty("--i", Math.min(vi, 6));
+      d.setAttribute("role", "menuitem");
+      const lb = document.createElement("span");
+      lb.className = "lb";
+      lb.textContent = it.label;
+      d.appendChild(lb);
+      if (it.shortcut) {
+        const k = document.createElement("span");
+        k.className = "kkey";
+        k.textContent = it.shortcut;
+        d.appendChild(k);
+      }
+      d.onclick = () => {
+        const fn = it.run;
+        closeMenu();
+        if (fn) fn();
+      };
+      d.onmouseenter = () => {
+        st.sel = vi;
+        paintSel();
+      };
+      list.appendChild(d);
+      vi++;
+    });
+    if (!vi) {
+      const n = document.createElement("div");
+      n.className = "none";
+      n.textContent = "No matches";
+      list.appendChild(n);
+    }
+    st.visCount = vi;
+    if (st.sel >= vi) st.sel = Math.max(0, vi - 1);
+  };
+  const paintSel = () => {
+    list.querySelectorAll(".mrow").forEach((el, i) => el.classList.toggle("sel", i === st.sel));
+    const sel = list.querySelector(".mrow.sel");
+    if (sel) sel.scrollIntoView({ block: "nearest" });
+  };
+  st.paint = paint;
+  st.paintSel = paintSel;
+  f.addEventListener("input", () => {
+    st.filter = f.value;
+    st.sel = 0;
+    paint();
+  });
+  f.addEventListener("keydown", e => {
+    e.stopPropagation();
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      st.sel = Math.min((st.visCount || 1) - 1, st.sel + 1);
+      paintSel();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      st.sel = Math.max(0, st.sel - 1);
+      paintSel();
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const items = list.querySelectorAll(".mrow");
+      const el = items[st.sel];
+      if (el) el.click();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      closeMenu();
+      btn.focus();
+    }
+  });
+  paint();
+  f.focus();
+}
+async function openMenuFor(id, btn) {
+  if (id === "run") openMenu(id, btn, await runMenuRows());
+  else openMenu(id, btn, menuRows(id));
+}
+function closeMenu(instant) {
+  if (!menuOpen) return;
+  const p = menuOpen.panel;
+  document.querySelectorAll("#menubar > button.open").forEach(x => x.classList.remove("open"));
+  menuOpen = null;
+  if (instant || document.body.classList.contains("noanim")) {
+    if (p.parentNode) p.parentNode.removeChild(p);
+    return;
+  }
+  p.classList.add("closing");
+  setTimeout(() => {
+    if (p.parentNode) p.parentNode.removeChild(p);
+  }, 140);
+}
+function wireMenuBar() {
+  document.querySelectorAll("#menubar > button").forEach(b => {
+    b.onclick = () => {
+      if (menuOpen && menuOpen.id === b.dataset.menu) closeMenu();
+      else openMenuFor(b.dataset.menu, b);
+    };
+    b.onmouseenter = () => {
+      if (menuOpen && menuOpen.id !== b.dataset.menu) openMenuFor(b.dataset.menu, b);
+    };
+  });
+  document.addEventListener("click", e => {
+    if (menuOpen && !e.target.closest(".mpop") && !e.target.closest("#menubar")) closeMenu();
+  });
+}
+
 /* ============ status/misc ============ */
 function setDot(ok) {
   document.getElementById("dot").className = ok ? "ok" : "bad";
@@ -5015,8 +5593,22 @@ document.addEventListener("keydown", e => {
     e.preventDefault();
     if (!S.docks.bottom) toggleDock("bottom", true);
     setBottomTab("terminal");
+  } else if (e.altKey && !mod && e.key.length === 1) {
+    const map = { f: "file", e: "edit", v: "view", g: "go", r: "run", t: "terminal", h: "help" };
+    const id = map[e.key.toLowerCase()];
+    const ae = document.activeElement;
+    const typing = ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.tagName === "CANVAS" || (ae.classList && ae.classList.contains("cm-content")));
+    if (id && !typing) {
+      e.preventDefault();
+      const btn = document.querySelector('#menubar > button[data-menu="' + id + '"]');
+      if (btn) {
+        if (menuOpen && menuOpen.id === id) closeMenu();
+        else openMenuFor(id, btn);
+      }
+    }
   } else if (e.key === "Escape") {
-    if (document.body.classList.contains("nav-open")) document.body.classList.remove("nav-open");
+    if (menuOpen) closeMenu();
+    else if (document.body.classList.contains("nav-open")) document.body.classList.remove("nav-open");
     else if (FIND.open) closeFind();
     else if (document.getElementById("palwrap").classList.contains("open")) palClose();
     else if (document.getElementById("settingswrap").classList.contains("open")) toggleSettings(false);
@@ -5076,6 +5668,12 @@ function focusGroup(i) {
   document.getElementById("settings-close").onclick = () => toggleSettings(false);
   wireShell();
   wireFind();
+  wireMenuBar();
+  try {
+    if (localStorage.getItem("keplr-menubar") === "0") {
+      document.getElementById("menubar").classList.add("hidden");
+    }
+  } catch (e) {}
   initSplitters();
   health();
   await loadFiles();
