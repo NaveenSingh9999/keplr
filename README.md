@@ -28,6 +28,12 @@ codebase, Git LFS aware, and CRDT sync between machines.
 
 ## Tour
 
+**Spotlight** — `Alt+Space` (or `Ctrl+P`) opens the centered finder: files,
+commands, symbols (`@`), line jumps (`:`) and content search (`#`), with Top Hit
+pre-selected. Watch it in motion:
+
+<video src="docs/showcase/shots/spotlight.mp4" width="100%" controls muted loop playsinline></video>
+
 **Editor** — fuzzy finder (`Ctrl+P`), tree-sitter highlighting, split panes,
 vim mode, diagnostics, symbols, Markdown/PDF/image previews.
 
