@@ -838,6 +838,69 @@
   table.diffsplit td.add { color: var(--ok); }
   table.diffsplit td.del { color: var(--error); }
   table.diffsplit td.hunk { color: var(--accent); text-align: left; }
+
+  /* ============ PHASE 6 touch, density, settings, a11y ============ */
+  body.compact .tab { height: 32px; }
+  body.compact #titlebar { height: 36px; }
+  body.compact .trow { padding-top: 1px; padding-bottom: 1px; }
+  body.compact .filerow { padding-top: 3px; padding-bottom: 3px; }
+  #settingswrap {
+    background: var(--overlay); -webkit-backdrop-filter: blur(var(--overlay-blur)); backdrop-filter: blur(var(--overlay-blur));
+    border: 1px solid var(--sep); box-shadow: inset 0 .5px rgba(255,255,255,.06), 0 24px 70px rgba(0,0,0,.65);
+    border-radius: var(--r-lg);
+  }
+  #settingsbody .row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--sep); }
+  #settingsbody .row:last-child { border-bottom: 0; }
+  #settingsbody .row label { flex: 1; font-size: var(--fs-ui); }
+  #settingsbody .row .hint { display: block; font-size: 12px; color: var(--text2); font-weight: 400; }
+  #settingsbody h4 { font-size: var(--fs-cap); text-transform: uppercase; letter-spacing: .07em; color: var(--text3); margin: 14px 0 2px; }
+  #settingsbody h4:first-child { margin-top: 0; }
+  #termkeys {
+    display: flex; gap: 6px; overflow-x: auto; flex: none; padding: 6px 12px;
+    border-top: 1px solid var(--sep); background: var(--bg);
+  }
+  #termkeys .kbtn { flex: none; min-width: 44px; font-family: var(--font-mono); }
+  @media (pointer: coarse) {
+    .trow .rowact { display: inline-flex; }
+    .filerow .act { display: inline-flex; }
+    .tab .x { display: inline-flex; }
+  }
+  @media (max-width: 720px) {
+    #left {
+      position: fixed; left: 0; top: 40px; bottom: 24px; width: min(84vw, 340px) !important;
+      z-index: 120; background: var(--bg); border-right: 1px solid var(--sep);
+      box-shadow: 20px 0 60px rgba(0,0,0,.5);
+      transform: translateX(-105%); transition: transform var(--d2) var(--ease);
+    }
+    body.nav-open #left { transform: none; }
+    #right { display: none; }
+    .ksplit { display: none !important; }
+    #finder { min-width: 0; }
+    #crumb { display: none; }
+    #bottom {
+      position: fixed; left: 0; right: 0; bottom: 24px; z-index: 110;
+      border-top: 1px solid var(--sep); border-radius: 14px 14px 0 0;
+      box-shadow: 0 -12px 40px rgba(0,0,0,.5); background: var(--bg);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    #bottom[data-detent="peek"] { height: 76px; }
+    #bottom[data-detent="half"] { height: 45vh; }
+    #bottom[data-detent="full"] { height: calc(100vh - 40px - 24px); }
+  #bottomtabs .grab {
+    display: none; width: 36px; height: 4px; border-radius: 999px; background: var(--text3);
+    margin: 6px auto 2px; flex: none; cursor: pointer;
+  }
+  @media (max-width: 720px) {
+    #bottomtabs .grab { display: block; }
+    #statusbar { padding-bottom: env(safe-area-inset-bottom); }
+  }
+  @media (forced-colors: active) {
+    .kbtn, .kinput, .kseg, .kmenu, .ktoast, #findcard, #palwrap {
+      border: 1px solid ButtonText;
+    }
+    .kbtn-acc { background: Highlight; color: HighlightText; }
+    .tab.sel, .kseg button.sel { outline: 1px solid Highlight; }
+  }
 </style>
 <script type="importmap">
 {"imports": {
@@ -928,7 +991,7 @@
       <button data-ltab="source" role="tab"><svg class="ic"><use href="#i-branch"/></svg>Source</button>
       <span class="kslide"></span>
     </div>
-    <div class="dockbody" id="leftbody"></div>
+    <div class="dockbody" id="leftbody" role="tree" aria-label="Files"></div>
   </div>
   <div id="center">
     <div class="col" id="col0">
@@ -951,6 +1014,7 @@
 </div>
 <div id="bottom" class="hidden">
   <div class="docktabs" id="bottomtabs" role="tablist" aria-label="Panel">
+    <span class="grab" id="bgrab" title="Panel size"></span>
     <button data-btab="search" class="sel" role="tab"><svg class="ic"><use href="#i-search"/></svg>Search</button>
     <button data-btab="problems" role="tab"><svg class="ic"><use href="#i-xcirc"/></svg>Problems<span class="cnt hidden" id="cnt-problems">0</span></button>
     <button data-btab="tasks" role="tab"><svg class="ic"><use href="#i-play"/></svg>Tasks</button>
@@ -975,7 +1039,7 @@
   <button class="sbtn" id="sfilesbtn" data-tip="Find files"><span id="sfiles">…</span></button>
   <button class="sbtn" id="slockbtn" data-tip="Token lock"><svg class="ic"><use href="#i-lock"/></svg></button>
 </div>
-<div id="ctxmenu"></div>
+<div id="ctxmenu" role="menu"></div>
 <div id="suggest"></div>
 <div id="settingswrap">
   <header>settings
@@ -984,7 +1048,7 @@
   <div id="settingsbody"></div>
 </div>
 <div id="modalwrap"><div id="modal"></div></div>
-<div id="palwrap"><input id="palinput" placeholder="type a command or filename…" autocomplete="off" spellcheck="false"><div id="palist"></div></div>
+<div id="palwrap" role="dialog" aria-label="Command palette"><input id="palinput" placeholder="type a command or filename…" autocomplete="off" spellcheck="false"><div id="palist"></div></div>
 <div id="findcard" role="search">
   <div class="frow">
     <input id="findneedle" class="kinput" placeholder="Find in file" autocomplete="off" spellcheck="false">
@@ -2481,6 +2545,8 @@ function renderTree(box, node, depth, base) {
       row.innerHTML = '<span class="tri">' + icon("chev-r") + "</span>" + setiIcon("f-folder") + "<span></span>";
       row.lastChild.textContent = name;
       row.dataset.dir = full;
+      row.setAttribute("role", "treeitem");
+      row.setAttribute("aria-expanded", isAncestor ? "true" : "false");
       const kids = document.createElement("div");
       kids.className = "tkids" + (isAncestor ? "" : " closed");
       let open = !!isAncestor;
@@ -2489,6 +2555,7 @@ function renderTree(box, node, depth, base) {
       row.onclick = () => {
         open = !open;
         kids.classList.toggle("closed", !open);
+        row.setAttribute("aria-expanded", open ? "true" : "false");
         setTri();
       };
       const newBtn = document.createElement("button");
@@ -2514,6 +2581,7 @@ function renderTree(box, node, depth, base) {
       row.innerHTML = '<span class="tri"></span>' + fileIconFor(n.__full || name) + "<span></span>";
       row.lastChild.textContent = name;
       row.dataset.path = n.__full;
+      row.setAttribute("role", "treeitem");
       const badge = gitBadge(n.__full);
       if (badge) row.appendChild(badge);
       if (n.__full === (A() || {}).path) row.classList.add("sel");
@@ -2731,7 +2799,7 @@ function renderConsole() {
 }
 
 /* ============ terminal (canvas, alacritty_terminal grid) ============ */
-const TERM = { sessions: [], active: -1, n: 0, strip: null, holder: null, cellW: 8, cellH: 16, font: "" };
+const TERM = { sessions: [], active: -1, n: 0, strip: null, holder: null, cellW: 8, cellH: 16, font: "", accent: "#0A84FF", accentSoft: "rgba(10,132,255,.28)" };
 
 function termActive() {
   if (TERM.active < 0 || TERM.active >= TERM.sessions.length) return null;
@@ -2816,7 +2884,7 @@ function termDraw() {
   if (s.sel && s.sel.active) {
     const x0 = Math.min(s.sel.ax, s.sel.fx), x1 = Math.max(s.sel.ax, s.sel.fx);
     const y0 = Math.min(s.sel.ay, s.sel.fy), y1 = Math.max(s.sel.ay, s.sel.fy);
-    ctx.fillStyle = "rgba(10,132,255,.28)";
+    ctx.fillStyle = TERM.accentSoft || "rgba(10,132,255,.28)";
     for (let l = y0; l <= y1 && l < g.rows; l++) {
       const c0 = l === y0 ? x0 : 0;
       const c1 = l === y1 ? x1 : g.cols - 1;
@@ -2825,7 +2893,7 @@ function termDraw() {
   }
   if (g.show) {
     const cl = Math.min(g.cursor[0], g.rows - 1), cc = Math.min(g.cursor[1], g.cols - 1);
-    ctx.fillStyle = "#0A84FF";
+    ctx.fillStyle = TERM.accent || "#0A84FF";
     ctx.fillRect(cc * TERM.cellW, cl * TERM.cellH, TERM.cellW, TERM.cellH);
     const cell = (g.cells[cl] || [])[cc];
     if (cell && cell[0] && cell[0] !== " ") {
@@ -2908,6 +2976,19 @@ function showTerminal() {
   body.appendChild(holder);
   TERM.strip = strip;
   TERM.holder = holder;
+  if (window.matchMedia("(pointer:coarse)").matches && !document.getElementById("termkeys")) {
+    const kb = document.createElement("div");
+    kb.id = "termkeys";
+    const keys = [["Esc", "\x1b"], ["Tab", "\t"], ["|", "|"], ["~", "~"], ["/", "/"], ["-", "-"], ["←", "\x1b[D"], ["→", "\x1b[C"], ["↑", "\x1b[A"], ["↓", "\x1b[B"], ["^C", "\x03"], ["^D", "\x04"]];
+    keys.forEach(([label, seq]) => {
+      const b = document.createElement("button");
+      b.className = "kbtn";
+      b.textContent = label;
+      b.onclick = () => termSend(new TextEncoder().encode(seq));
+      kb.appendChild(b);
+    });
+    body.insertBefore(kb, holder);
+  }
   termMeasure();
   for (const s of TERM.sessions) {
     s.canvas.style.display = "none";
@@ -3395,12 +3476,27 @@ function setBottomTab(t, silent) {
 function toggleDock(which, force) {
   const on = force !== undefined ? force : !S.docks[which];
   S.docks[which] = on;
-  document.getElementById(which === "bottom" ? "bottom" : which).classList.toggle("hidden", !on);
+  const small = window.matchMedia("(max-width: 720px)").matches;
+  if (which === "left" && small) {
+    document.body.classList.toggle("nav-open", on);
+  } else {
+    document.getElementById(which === "bottom" ? "bottom" : which).classList.toggle("hidden", !on);
+  }
+  if (which === "bottom" && on && small) {
+    const b = document.getElementById("bottom");
+    if (!b.dataset.detent) b.dataset.detent = "half";
+  }
   const tb = document.getElementById("t-" + which);
   if (tb) { tb.classList.toggle("on", on); tb.classList.toggle("off", !on); }
   saveLayout();
   moveDockIndicator();
   applyLayout();
+}
+function cycleDetent() {
+  const b = document.getElementById("bottom");
+  const order = ["peek", "half", "full"];
+  const cur = order.indexOf(b.dataset.detent || "half");
+  b.dataset.detent = order[(cur + 1) % order.length];
 }
 function moveDockIndicator() {
   const bar = document.querySelector("#left .docktabs");
@@ -3484,6 +3580,7 @@ function showMenu(x, y, items) {
       return;
     }
     const d = document.createElement("button");
+    d.setAttribute("role", "menuitem");
     if (it.danger) d.classList.add("danger");
     if (it.disabled) d.disabled = true;
     const ic = document.createElement("span");
@@ -4057,7 +4154,11 @@ const DEFAULT_SETTINGS = {
   liveDiagnostics: true,
   vimMode: false,
   animations: "full",
-  terminalFontSize: 13
+  terminalFontSize: 13,
+  accent: "blue",
+  density: "comfortable",
+  minimap: false,
+  keymap: "vscode",
 };
 S.settings = loadSettings();
 function loadSettings() {
@@ -4103,8 +4204,13 @@ const SETTING_DEFS = [
   ["Interface", [
     ["animations", "select", "Animations", "Motion across the interface", { options: [["full", "full"], ["reduced", "reduced"], ["none", "none"]] }],
     ["terminalFontSize", "number", "Terminal font size", "Canvas terminal glyph size", { min: 10, max: 18 }],
+    ["accent", "select", "Accent color", "Apple system accent used everywhere", { options: [["Blue", "blue"], ["Green", "green"], ["Orange", "orange"], ["Red", "red"], ["Purple", "purple"], ["Teal", "teal"], ["Yellow", "yellow"]] }],
+    ["density", "select", "Density", "Comfortable or compact chrome", { options: [["comfortable", "comfortable"], ["compact", "compact"]] }],
+    ["minimap", "bool", "Overview ruler", "Marker gutter beside the editor (off by default)", {}],
+    ["keymap", "select", "Keymap preset", "VS Code, Zed, or Vim bindings", { options: [["VS Code", "vscode"], ["Zed", "zed"], ["Vim", "vim"]] }],
   ]],
 ];
+const ACCENT_HEX = { blue: "#0A84FF", green: "#30D158", orange: "#FF9F0A", red: "#FF453A", purple: "#BF5AF2", teal: "#64D2FF", yellow: "#FFD60A" };
 function renderSettings() {
   const body = document.getElementById("settingsbody");
   body.innerHTML = "";
@@ -4128,12 +4234,16 @@ function renderSettings() {
       if (type === "bool") {
         const c = document.createElement("input");
         c.type = "checkbox";
+        c.className = "kswitch";
         c.checked = !!cur;
+        c.setAttribute("aria-label", label);
         c.onchange = () => { S.settings[key] = c.checked; changed(); };
         row.appendChild(c);
       } else if (type === "number" || type === "range") {
         const n = document.createElement("input");
         n.type = type === "range" ? "range" : "number";
+        n.className = "kinput";
+        n.setAttribute("aria-label", label);
         n.min = opts.min; n.max = opts.max;
         if (opts.step) n.step = opts.step;
         n.value = cur;
@@ -4152,6 +4262,8 @@ function renderSettings() {
         row.appendChild(val);
       } else if (type === "select") {
         const s = document.createElement("select");
+        s.className = "kinput";
+        s.setAttribute("aria-label", label);
         opts.options.forEach(([name, v]) => {
           const o = document.createElement("option");
           o.value = JSON.stringify(v);
@@ -4159,15 +4271,21 @@ function renderSettings() {
           if (JSON.stringify(cur) === JSON.stringify(v)) o.selected = true;
           s.appendChild(o);
         });
-        s.onchange = () => { S.settings[key] = JSON.parse(s.value); changed(); };
+        s.onchange = () => {
+          S.settings[key] = JSON.parse(s.value);
+          if (key === "keymap" && S.settings.keymap === "vim") S.settings.vimMode = true;
+          changed();
+          if (key === "keymap" || key === "vimMode") renderSettings();
+        };
         row.appendChild(s);
       }
       body.appendChild(row);
     });
   });
   const reset = document.createElement("button");
+  reset.className = "kbtn";
   reset.textContent = "Reset to defaults";
-  reset.style.cssText = "margin-top:14px;background:var(--border);color:var(--text);border:none;border-radius:6px;font:inherit;padding:6px 14px;cursor:pointer;";
+  reset.style.marginTop = "14px";
   reset.onclick = () => {
     S.settings = Object.assign({}, DEFAULT_SETTINGS);
     saveSettings();
@@ -4180,6 +4298,17 @@ function applySettings() {
   const a = S.settings.animations;
   document.body.classList.toggle("noanim", a === "none");
   document.body.classList.toggle("calm", a === "reduced");
+  document.body.classList.toggle("compact", S.settings.density === "compact");
+  const hex = ACCENT_HEX[S.settings.accent] || ACCENT_HEX.blue;
+  document.documentElement.style.setProperty("--accent", hex);
+  try {
+    const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+    TERM.accent = "rgb(" + r + "," + g + "," + b + ")";
+    TERM.accentSoft = "rgba(" + r + "," + g + "," + b + ",.28)";
+  } catch (e) {}
+  document.querySelectorAll(".oruler").forEach(el => {
+    el.style.display = S.settings.minimap ? "" : "none";
+  });
   if (ED && ED.applySettings) {
     try { ED.applySettings(); } catch (e) {}
   }
@@ -4810,6 +4939,7 @@ document.getElementById("bmax").onclick = () => {
   document.getElementById("bmax").classList.toggle("on", b.classList.contains("tall"));
 };
 document.getElementById("bclose").onclick = () => toggleDock("bottom", false);
+document.getElementById("bgrab").onclick = () => cycleDetent();
 document.getElementById("palinput").addEventListener("input", () => { S.palSel = 0; palRender(); });
 document.getElementById("palinput").addEventListener("keydown", e => {
   if (e.key === "Escape") palClose();
@@ -4836,8 +4966,13 @@ document.addEventListener("keydown", e => {
       saveActive();
     }
   } else if (mod && e.key === "\\") { e.preventDefault(); toggleSplit(); }
-  else if (e.key === "Escape") {
-    if (FIND.open) closeFind();
+  else if (S.settings.keymap === "zed" && mod && e.key === "`") {
+    e.preventDefault();
+    if (!S.docks.bottom) toggleDock("bottom", true);
+    setBottomTab("terminal");
+  } else if (e.key === "Escape") {
+    if (document.body.classList.contains("nav-open")) document.body.classList.remove("nav-open");
+    else if (FIND.open) closeFind();
     else if (document.getElementById("palwrap").classList.contains("open")) palClose();
     else if (document.getElementById("settingswrap").classList.contains("open")) toggleSettings(false);
     else hideSuggest();
@@ -4902,6 +5037,12 @@ function focusGroup(i) {
   renderProblems();
   log("console", "keplr web ui ready");
   requestAnimationFrame(moveDockIndicator);
+  try {
+    if (!localStorage.getItem("keplr-onboarded")) {
+      localStorage.setItem("keplr-onboarded", "1");
+      setTimeout(() => toast("Welcome — Ctrl+P finds files, the gear tunes keplr"), 800);
+    }
+  } catch (e) {}
   // Deep links for sharing/screenshots: ?open=path&line=12&bottom=terminal&left=source
   try {
     const q = new URLSearchParams(location.search);
