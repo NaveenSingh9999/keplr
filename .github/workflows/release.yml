@@ -215,7 +215,8 @@ jobs:
         run: |
           choco install nsis -y
           export PATH="$PATH:/c/Program Files (x86)/NSIS"
-          makensis "/DKEPLR_VERSION=${VER}" packaging/windows/keplr.nsi
+          # NOTE: //D (not /D) — Git Bash mangles single-slash args into paths.
+          makensis "//DKEPLR_VERSION=${VER}" packaging/windows/keplr.nsi
           mv "Keplr-Setup-${VER}-x86_64.exe" dist/
       - uses: actions/upload-artifact@v4
         with:

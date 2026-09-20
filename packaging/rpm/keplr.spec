@@ -14,15 +14,14 @@ headless serve plus desktop and TUI, Git LFS aware, CRDT sync.
 %install
 mkdir -p %{buildroot}%{_bindir}
 mkdir -p %{buildroot}%{_datadir}/applications
-mkdir -p %{buildroot}%{_datadir}/icons/hicolor/{16x16,32x32,48x48,128x128,256x256,512x512}/apps
-install -m755 %{keplr_bin} %{buildroot}%{_bindir}/keplr
-install -m644 %{keplr_desktop} %{buildroot}%{_datadir}/applications/keplr.desktop
-install -m644 %{keplr_icons}/keplr-16.png %{buildroot}%{_datadir}/icons/hicolor/16x16/apps/keplr.png
-install -m644 %{keplr_icons}/keplr-32.png %{buildroot}%{_datadir}/icons/hicolor/32x32/apps/keplr.png
-install -m644 %{keplr_icons}/keplr-48.png %{buildroot}%{_datadir}/icons/hicolor/48x48/apps/keplr.png
-install -m644 %{keplr_icons}/keplr-128.png %{buildroot}%{_datadir}/icons/hicolor/128x128/apps/keplr.png
-install -m644 %{keplr_icons}/keplr-256.png %{buildroot}%{_datadir}/icons/hicolor/256x256/apps/keplr.png
-install -m644 %{keplr_icons}/keplr-512.png %{buildroot}%{_datadir}/icons/hicolor/512x512/apps/keplr.png
+install -D -m755 %{keplr_bin} %{buildroot}%{_bindir}/keplr
+install -D -m644 %{keplr_desktop} %{buildroot}%{_datadir}/applications/keplr.desktop
+install -D -m644 %{keplr_icons}/keplr-16.png %{buildroot}%{_datadir}/icons/hicolor/16x16/apps/keplr.png
+install -D -m644 %{keplr_icons}/keplr-32.png %{buildroot}%{_datadir}/icons/hicolor/32x32/apps/keplr.png
+install -D -m644 %{keplr_icons}/keplr-48.png %{buildroot}%{_datadir}/icons/hicolor/48x48/apps/keplr.png
+install -D -m644 %{keplr_icons}/keplr-128.png %{buildroot}%{_datadir}/icons/hicolor/128x128/apps/keplr.png
+install -D -m644 %{keplr_icons}/keplr-256.png %{buildroot}%{_datadir}/icons/hicolor/256x256/apps/keplr.png
+install -D -m644 %{keplr_icons}/keplr-512.png %{buildroot}%{_datadir}/icons/hicolor/512x512/apps/keplr.png
 
 %files
 %{_bindir}/keplr
@@ -30,5 +29,5 @@ install -m644 %{keplr_icons}/keplr-512.png %{buildroot}%{_datadir}/icons/hicolor
 %{_datadir}/icons/hicolor/*/apps/keplr.png
 
 %changelog
-* Fri Sep 19 2026 Keplr <keplr@example.com> - 0.1.0-1
+* Sun Sep 20 2026 Keplr <keplr@example.com> - 0.1.0-1
 - First public release
