@@ -58,7 +58,7 @@ fn push_quad(v: &mut Vec<f32>, x: f32, y: f32, w: f32, h: f32, c: [f32; 3]) {
 }
 
 fn layout_quads(_scene: &Scene, w: u32, h: u32) -> Vec<f32> {
-    let theme = Theme::zed_dark();
+    let theme = Theme::amoled();
     let bg = parse_hex(&theme.bg);
     let surface = parse_hex(&theme.surface);
     let accent = parse_hex(&theme.accent);
@@ -195,7 +195,7 @@ pub fn snapshot_scene_png(scene_json: &str, width: u32, height: u32) -> anyhow::
         view_formats: &[],
     });
     let view = tex.create_view(&wgpu::TextureViewDescriptor::default());
-    let theme = Theme::zed_dark();
+    let theme = Theme::amoled();
     let bg = parse_hex(&theme.bg);
     let mut encoder =
         device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
@@ -564,7 +564,7 @@ impl ApplicationHandler for App {
                             }
                         };
                         if let Some([x, y, w, h]) = cursor_rect {
-                            let accent = parse_hex(&Theme::zed_dark().accent);
+                            let accent = parse_hex(&Theme::amoled().accent);
                             quads.extend(cursor_px_to_ndc(
                                 x,
                                 y,
@@ -577,7 +577,7 @@ impl ApplicationHandler for App {
                         }
                         let n = quads.len() / 6;
                         gpu.upload(&quads);
-                        let bg = parse_hex(&Theme::zed_dark().bg);
+                        let bg = parse_hex(&Theme::amoled().bg);
                         let clear = wgpu::Color {
                             r: bg[0] as f64,
                             g: bg[1] as f64,
