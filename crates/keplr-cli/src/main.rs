@@ -409,7 +409,7 @@ async fn main() -> anyhow::Result<()> {
                         index = keplr_core::Index::build(&ws);
                         let _ = index.save(&ws);
                     }
-                    index.grep(&needle, limit)
+                    index.grep(&ws, &needle, limit)
                 }
                 "trigram" => ws.grep_trigram(&needle, limit),
                 _ => ws.grep(&needle, limit),

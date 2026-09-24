@@ -98,7 +98,7 @@ impl Workspace {
     }
 
     #[cfg(target_arch = "wasm32")]
-    pub fn walk_files(&self, _limit: usize) -> Vec<FileEntry> {
+    pub fn grep(&self, _ws: &Workspace, _needle: &str, _limit: usize) -> Vec<SearchHit> {
         Vec::new()
     }
 
@@ -112,7 +112,10 @@ impl Workspace {
             if hits.len() >= limit {
                 break;
             }
-            let Ok(text) = std::fs::read_to_string(&entry.path) else { continue };
+            // entry.path is root-relative: re-anchor for filesystem reads so
+            // grep works regardless of the process working directory.
+            let full = self.root.join(&entry.path);
+            let Ok(text) = std::fs::read_to_string(&full) else { continue };
             for (idx, line) in text.lines().enumerate() {
                 if hits.len() >= limit {
                     break;
@@ -313,7 +316,7 @@ impl Index {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    pub fn grep(&self, needle: &str, limit: usize) -> Vec<SearchHit> {
+    pub fn grep(&self, ws: &Workspace, needle: &str, limit: usize) -> Vec<SearchHit> {
         let mut hits = Vec::new();
         if needle.is_empty() {
             return hits;
@@ -322,7 +325,8 @@ impl Index {
             if hits.len() >= limit {
                 break;
             }
-            let Ok(text) = std::fs::read_to_string(&entry.path) else {
+            // entry.path is root-relative: re-anchor for filesystem reads.
+            let Ok(text) = std::fs::read_to_string(ws.root.join(&entry.path)) else {
                 continue;
             };
             for (idx, line) in text.lines().enumerate() {
@@ -427,7 +431,7 @@ impl TrigramIndex {
                 idx.unindexed.push(entry.path);
                 continue;
             }
-            match std::fs::read(&entry.path) {
+            match std::fs::read(ws.root.join(&entry.path)) {
                 Ok(bytes) => {
                     if bytes.len() < 3 {
                         continue;
