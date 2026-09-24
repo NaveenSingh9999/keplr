@@ -604,7 +604,16 @@ fn safe_rel(root: &Path, rel: &str) -> anyhow::Result<PathBuf> {
     use std::path::Component;
     let p = Path::new(rel);
     if p.is_absolute() {
-        anyhow::bail!("absolute paths not allowed");
+        // Absolute paths are fine as long as they resolve inside the
+        // workspace (e.g. deep links, or callers holding absolute paths).
+        let root_c = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
+        let full_c = p
+            .canonicalize()
+            .map_err(|_| anyhow::anyhow!("unreadable path"))?;
+        if !full_c.starts_with(&root_c) {
+            anyhow::bail!("path escapes workspace");
+        }
+        return Ok(full_c);
     }
     let mut out = root.to_path_buf();
     for comp in p.components() {

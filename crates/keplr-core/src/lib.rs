@@ -65,20 +65,27 @@ impl Workspace {
             if !entry.file_type().map(|t| t.is_file()).unwrap_or(false) {
                 continue;
             }
-            let path = entry.path().to_path_buf();
-            if !is_tracked_path(&path) {
+            let full = entry.path().to_path_buf();
+            if !is_tracked_path(&full) {
                 continue;
             }
-            let Ok(meta) = std::fs::metadata(&path) else { continue };
+            let Ok(meta) = std::fs::metadata(&full) else { continue };
             let mtime = meta
                 .modified()
                 .ok()
                 .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
                 .map(|d| d.as_secs() as i64)
                 .unwrap_or(0);
-            let hash = std::fs::read(&path)
+            let hash = std::fs::read(&full)
                 .map(|b| fingerprint_bytes(&b))
                 .unwrap_or_else(|_| String::from("unreadable"));
+            // Always store root-relative paths: the walker joins entries onto
+            // root, so an absolute root (e.g. from `keplr start`) used to leak
+            // absolute paths here, which the server's path gate then rejected.
+            let path = full
+                .strip_prefix(&self.root)
+                .map(|p| p.to_path_buf())
+                .unwrap_or_else(|_| full.clone());
             out.push(FileEntry {
                 path,
                 size: meta.len(),
@@ -198,7 +205,19 @@ impl Index {
             Ok(t) => match serde_json::from_str::<Vec<FileEntry>>(&t) {
                 Ok(vec) => (
                     Self {
-                        entries: vec.into_iter().map(|e| (e.path.clone(), e)).collect(),
+                        // Heal indexes written before paths went root-relative:
+                        // absolutize nothing, just demote in-root absolutes.
+                        entries: vec
+                            .into_iter()
+                            .map(|mut e| {
+                                if e.path.is_absolute() {
+                                    if let Ok(rel) = e.path.strip_prefix(&ws.root).map(|p| p.to_path_buf()) {
+                                        e.path = rel;
+                                    }
+                                }
+                                (e.path.clone(), e)
+                            })
+                            .collect(),
                     },
                     IndexState::Fresh,
                 ),
