@@ -98,6 +98,11 @@ impl Workspace {
     }
 
     #[cfg(target_arch = "wasm32")]
+    pub fn walk_files(&self, _limit: usize) -> Vec<FileEntry> {
+        Vec::new()
+    }
+
+    #[cfg(target_arch = "wasm32")]
     pub fn grep(&self, _needle: &str, _limit: usize) -> Vec<SearchHit> {
         Vec::new()
     }
