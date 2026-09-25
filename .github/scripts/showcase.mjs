@@ -11,12 +11,53 @@ const page = await browser.newPage({
   viewport: { width: 2560, height: 1264 },
   deviceScaleFactor: 1,
 });
+const browserErrors = [];
+page.on("console", message => {
+  const line = `[browser:${message.type()}] ${message.text()}`;
+  browserErrors.push(line);
+  console.log(line);
+});
+page.on("pageerror", error => {
+  const line = `[pageerror] ${error.stack || error}`;
+  browserErrors.push(line);
+  console.log(line);
+});
+page.on("requestfailed", request => {
+  const line = `[requestfailed] ${request.url()} ${request.failure()?.errorText || "unknown"}`;
+  browserErrors.push(line);
+  console.log(line);
+});
 
 async function openPage(query) {
-  await page.goto(`${base}/${query}`, { waitUntil: "domcontentloaded" });
-  await page.waitForSelector("#pane-surface", { timeout: 30000 });
-  await page.waitForSelector(".pane-card", { timeout: 30000 });
-  await page.waitForTimeout(1800);
+  const response = await page.goto(`${base}/${query}`, { waitUntil: "domcontentloaded" });
+  console.log(`[page] ${response?.status() || "no-status"} ${page.url()}`);
+  try {
+    await page.waitForSelector("#pane-surface", { state: "attached", timeout: 30000 });
+    const paneState = await page.locator("#pane-surface").evaluate(element => {
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return {
+        rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+        display: style.display,
+        visibility: style.visibility,
+        hidden: element.hidden,
+        parent: element.parentElement?.id || null,
+      };
+    });
+    console.log(`[pane] ${JSON.stringify(paneState)}`);
+    await page.waitForSelector(".pane-card", { state: "visible", timeout: 30000 });
+    await page.waitForTimeout(1800);
+  } catch (error) {
+    const state = await page.evaluate(() => ({
+      readyState: document.readyState,
+      paneCount: document.querySelectorAll("#pane-surface").length,
+      bodyText: document.body?.innerText?.slice(0, 800) || "",
+      html: document.documentElement?.outerHTML?.slice(0, 4000) || "",
+    })).catch(() => null);
+    console.log(`[debug] ${JSON.stringify(state)}`);
+    console.log(`[errors] ${JSON.stringify(browserErrors)}`);
+    throw error;
+  }
 }
 
 async function capture(name) {
