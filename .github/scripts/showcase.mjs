@@ -45,7 +45,24 @@ async function openPage(query) {
       };
     });
     console.log(`[pane] ${JSON.stringify(paneState)}`);
+    const domState = await page.evaluate(() => {
+      const ids = ["workbench", "pane-surface", "left", "center", "editorwrap", "fallback", "bottom"];
+      return Object.fromEntries(ids.map(id => {
+        const element = document.getElementById(id);
+        return [id, element ? {
+          connected: element.isConnected,
+          parent: element.parentElement?.id || null,
+          parentClass: element.parentElement?.className || null,
+        } : null];
+      }));
+    });
+    console.log(`[dom] ${JSON.stringify(domState)}`);
     await page.waitForSelector(".pane-card", { state: "visible", timeout: 30000 });
+    await page.waitForFunction(() => {
+      const wrap = document.getElementById("editorwrap");
+      const fallback = document.getElementById("fallback");
+      return !!wrap && (!!wrap.querySelector(".cm-editor") || (!!fallback && getComputedStyle(fallback).display !== "none"));
+    }, { timeout: 30000 });
     await page.waitForTimeout(1800);
   } catch (error) {
     const state = await page.evaluate(() => ({
