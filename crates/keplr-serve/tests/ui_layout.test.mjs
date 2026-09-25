@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   LAYOUT_VERSION,
   currentLayout,
+  getCard,
   leafIds,
   splitLeaf,
   moveCard,
@@ -11,15 +12,48 @@ import {
   setLeafVisible,
   serialize,
   deserialize,
+  normalizeLayout,
 } from "../src/ui_layout.js";
 
-test("current layout preserves the existing workbench", () => {
+test("current layout keeps the left rail outside movable panes", () => {
   const layout = currentLayout();
   assert.equal(layout.version, LAYOUT_VERSION);
-  assert.deepEqual(leafIds(layout), ["left", "editor", "right", "bottom"]);
-  assert.equal(layout.tree.leaves.left.visible, true);
+  assert.deepEqual(leafIds(layout), ["editor", "right", "bottom"]);
+  assert.equal(layout.tree.leaves.left, undefined);
+  assert.equal(layout.tree.leaves.editor.visible, true);
   assert.equal(layout.tree.leaves.right.visible, false);
   assert.equal(layout.tree.leaves.bottom.visible, false);
+});
+
+test("legacy layouts remove the left leaf and restore editor focus", () => {
+  const current = currentLayout();
+  const legacyLeft = {
+    type: "leaf",
+    id: "left",
+    cards: [{ id: "files-default", kind: "files", title: "Files", resource: null }],
+    activeCard: "files-default",
+    visible: true,
+  };
+  const legacy = {
+    version: LAYOUT_VERSION,
+    tree: {
+      root: {
+        type: "split",
+        id: "legacy-root",
+        axis: "horizontal",
+        ratio: 0.22,
+        first: legacyLeft,
+        second: current.tree.root,
+      },
+      leaves: { left: legacyLeft, ...current.tree.leaves },
+    },
+    focusedLeaf: "left",
+  };
+
+  const normalized = normalizeLayout(legacy);
+  assert.deepEqual(leafIds(normalized), ["editor", "right", "bottom"]);
+  assert.equal(normalized.focusedLeaf, "editor");
+  assert.equal(getCard(normalized, "files-default"), null);
 });
 
 test("splitting and moving cards preserves the rest of the graph", () => {
