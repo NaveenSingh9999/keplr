@@ -43,3 +43,11 @@ async fn health_and_search_respond() {
     assert_eq!(font.status(), 200);
     assert!(font.content_length().unwrap_or(0) > 1000);
 }
+
+#[test]
+fn ui_document_closes_style_before_body() {
+    let html = include_str!("../src/ui.html");
+    let style_end = html.find("</style>").expect("UI style must be closed");
+    let body_start = html.find("<body>").expect("UI body must be present");
+    assert!(style_end < body_start);
+}
