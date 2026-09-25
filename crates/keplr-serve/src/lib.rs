@@ -1045,6 +1045,44 @@ async fn ui_root() -> axum::response::Html<&'static str> {
     axum::response::Html(include_str!("ui.html"))
 }
 
+async fn ui_layout_js() -> impl IntoResponse {
+    (
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "text/javascript; charset=utf-8",
+        ), (
+            axum::http::header::CACHE_CONTROL,
+            "no-cache",
+        )],
+        include_str!("ui_layout.js"),
+    )
+        .into_response()
+}
+
+async fn jetbrains_mono_regular() -> impl IntoResponse {
+    font_response(include_bytes!("../../../assets/fonts/JetBrainsMono-Regular.ttf"))
+}
+
+async fn jetbrains_mono_bold() -> impl IntoResponse {
+    font_response(include_bytes!("../../../assets/fonts/JetBrainsMono-Bold.ttf"))
+}
+
+fn font_response(bytes: &'static [u8]) -> impl IntoResponse {
+    (
+        [
+            (axum::http::header::CONTENT_TYPE, "font/ttf"),
+            (
+                axum::http::header::CACHE_CONTROL,
+                "public, max-age=31536000, immutable",
+            ),
+        ],
+        bytes,
+    )
+        .into_response()
+}
+
+const TERM_HISTORY_LINES: usize = 2000;
+
 #[derive(Clone, Copy, Debug)]
 struct TermSize {
     cols: usize,
@@ -1053,7 +1091,7 @@ struct TermSize {
 
 impl alacritty_terminal::grid::Dimensions for TermSize {
     fn total_lines(&self) -> usize {
-        self.rows
+        self.rows + TERM_HISTORY_LINES
     }
 
     fn screen_lines(&self) -> usize {
@@ -1141,12 +1179,25 @@ fn term_snapshot(
     cols: usize,
     rows: usize,
 ) -> serde_json::Value {
+    use alacritty_terminal::grid::Dimensions;
     use alacritty_terminal::index::{Column, Line};
     use alacritty_terminal::term::cell::Flags;
     use alacritty_terminal::term::TermMode;
     let content = term.renderable_content();
     let show = content.mode.contains(TermMode::SHOW_CURSOR);
     let cur = content.cursor.point;
+    let history_limit = term.grid().history_size().min(500);
+    let mut history = Vec::new();
+    for l in -(history_limit as i32)..0 {
+        let mut line = String::with_capacity(cols);
+        for c in 0..cols {
+            line.push(term.grid()[Line(l)][Column(c)].c);
+        }
+        history.push(line.trim_end().to_string());
+    }
+    while history.last().is_some_and(|line| line.is_empty()) {
+        history.pop();
+    }
     let mut cells = Vec::with_capacity(rows);
     for l in 0..rows {
         let mut row = Vec::with_capacity(cols);
@@ -1175,8 +1226,9 @@ fn term_snapshot(
         "cols": cols,
         "rows": rows,
         "cursor": [cur.line.0, cur.column.0],
-        "show": show,
-        "cells": cells,
+         "show": show,
+         "history": history,
+         "cells": cells,
     })
 }
 
@@ -1386,19 +1438,44 @@ async fn term_ws(
         .and_then(|v| v.parse().ok())
         .unwrap_or(24);
     let root = state.root.clone();
-    ws.on_upgrade(move |socket| term_loop(root, cols.max(1), rows.max(1), socket))
+    let cwd = params.get("cwd").cloned().unwrap_or_default();
+    ws.on_upgrade(move |socket| term_loop(root, cols.max(1), rows.max(1), cwd, socket))
+}
+
+fn safe_terminal_cwd(root: &Path, requested: &str) -> PathBuf {
+    let raw = Path::new(requested);
+    if requested.is_empty() || raw.is_absolute() {
+        return root.to_path_buf();
+    }
+    if raw
+        .components()
+        .any(|part| matches!(part, std::path::Component::ParentDir))
+    {
+        return root.to_path_buf();
+    }
+    let candidate = root.join(raw);
+    if candidate.starts_with(root) {
+        candidate
+    } else {
+        root.to_path_buf()
+    }
 }
 
 async fn term_loop(
     root: PathBuf,
     cols: usize,
     rows: usize,
+    cwd: String,
     mut socket: axum::extract::ws::WebSocket,
 ) {
     use alacritty_terminal::term::{Config, Term};
     use alacritty_terminal::vte::ansi::{Processor, StdSyncHandler};
     let size = TermSize { cols, rows };
-    let mut term = Term::new(Config::default(), &size, TermListener);
+    let config = Config {
+        scrolling_history: TERM_HISTORY_LINES,
+        ..Config::default()
+    };
+    let mut term = Term::new(config, &size, TermListener);
     let mut processor: Processor<StdSyncHandler> = Processor::new();
     use axum::extract::ws::Message;
     use std::io::{Read, Write};
@@ -1417,7 +1494,7 @@ async fn term_loop(
         Err(_) => return,
     };
     let mut cmd = portable_pty::CommandBuilder::new("sh");
-    cmd.cwd(&root);
+    cmd.cwd(safe_terminal_cwd(&root, &cwd));
     let _child = match pair.slave.spawn_command(cmd) {
         Ok(c) => c,
         Err(_) => return,
@@ -1621,6 +1698,9 @@ pub async fn serve_full(
     }
     let app = Router::new()
         .route("/", get(ui_root))
+        .route("/ui-layout.js", get(ui_layout_js))
+        .route("/fonts/JetBrainsMono-Regular.ttf", get(jetbrains_mono_regular))
+        .route("/fonts/JetBrainsMono-Bold.ttf", get(jetbrains_mono_bold))
         .route("/health", get(health))
         .route("/search", get(search))
         .route("/open", get(open))
@@ -1866,4 +1946,19 @@ async fn sync_status(State(state): State<AppState>) -> Json<serde_json::Value> {
         })
         .collect();
     Json(serde_json::json!({ "docs": list }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::safe_terminal_cwd;
+    use std::path::Path;
+
+    #[test]
+    fn terminal_cwd_stays_inside_the_workspace() {
+        let root = Path::new("workspace");
+        assert_eq!(safe_terminal_cwd(root, "src"), root.join("src"));
+        assert_eq!(safe_terminal_cwd(root, "../escape"), root);
+        let absolute = if cfg!(windows) { "C:\\escape" } else { "/etc" };
+        assert_eq!(safe_terminal_cwd(root, absolute), root);
+    }
 }

@@ -6,6 +6,18 @@
 <title>keplr</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect x='16' y='16' width='480' height='480' rx='110' fill='%230e1116'/><ellipse cx='256' cy='256' rx='150' ry='96' fill='none' stroke='%2358a6ff' stroke-width='30' transform='rotate(-18 256 256)'/><circle cx='256' cy='256' r='22' fill='%23e6edf3'/><circle cx='336' cy='158' r='34' fill='%2358a6ff'/></svg>">
 <style>
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/JetBrainsMono-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/JetBrainsMono-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-display: swap;
+}
 :root {
   --bg: #000000;
   --surface: #000000;
@@ -544,7 +556,7 @@
   .ksplit:hover::after, .ksplit.drag::after { background: var(--accent); box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 60%, transparent); }
 
   /* ============ PHASE 2 shell ============ */
-  #titlebar { height: 40px; display: flex; align-items: center; gap: 8px; padding: 0 10px; background: var(--bg); border-bottom: 1px solid var(--sep); flex: none; }
+  #titlebar { height: 36px; display: flex; align-items: center; gap: 8px; padding: 0 10px; background: var(--bg); border-bottom: 1px solid var(--sep); flex: none; }
   #titlebar .spacer { flex: 1 1 0; min-width: 8px; }
   #root {
     appearance: none; background: transparent; border: 1px solid transparent; color: var(--text);
@@ -890,7 +902,7 @@
   }
   @media (max-width: 720px) {
     #left {
-      position: fixed; left: 0; top: 40px; bottom: 24px; width: min(84vw, 340px) !important;
+      position: fixed; left: 0; top: 36px; bottom: 24px; width: min(84vw, 340px) !important;
       z-index: 120; background: var(--bg); border-right: 1px solid var(--sep);
       box-shadow: 20px 0 60px rgba(0,0,0,.5);
       transform: translateX(-105%); transition: transform var(--d2) var(--ease);
@@ -908,7 +920,7 @@
     }
     #bottom[data-detent="peek"] { height: 76px; }
     #bottom[data-detent="half"] { height: 45vh; }
-    #bottom[data-detent="full"] { height: calc(100vh - 40px - 24px); }
+    #bottom[data-detent="full"] { height: calc(100vh - 36px - 24px); }
   }
   #bottomtabs .grab {
     display: none; width: 36px; height: 4px; border-radius: 999px; background: var(--text3);
@@ -941,7 +953,130 @@
   #palist .prow .fic { width: 16px; height: 16px; margin-right: 2px; }
   #palist .prow.top { box-shadow: inset 2px 0 var(--accent); }
   #palist .prow.top.sel { box-shadow: none; }
-</style>
+  :root {
+    --glass-bg: rgba(13,13,15,.78);
+    --glass-bg-strong: rgba(13,13,15,.92);
+    --glass-border: rgba(255,255,255,.13);
+    --glass-highlight: rgba(255,255,255,.16);
+    --glass-shadow: 0 18px 48px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.08);
+    --grain-opacity: .035;
+    --spring-fast: 160ms cubic-bezier(.16,1,.3,1);
+    --spring-snap: 280ms cubic-bezier(.16,1,.3,1);
+  }
+  body::after {
+    content: ""; position: fixed; inset: 0; z-index: 1000; pointer-events: none;
+    opacity: var(--grain-opacity); mix-blend-mode: screen;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.42'/%3E%3C/svg%3E");
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    :root { --glass-bg: #0d0d0f; --glass-bg-strong: #161618; --glass-border: rgba(255,255,255,.12); }
+    body::after { display: none; }
+  }
+  .finder-trigger {
+    appearance: none; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    height: 28px; min-width: 118px; padding: 0 10px; border: 1px solid var(--glass-border);
+    border-radius: 999px; background: var(--glass-bg); color: var(--text2); cursor: pointer;
+    -webkit-backdrop-filter: blur(18px) saturate(1.15); backdrop-filter: blur(18px) saturate(1.15);
+    box-shadow: inset 0 1px 0 var(--glass-highlight);
+    font: 500 12px var(--font-ui); transition: transform var(--spring-fast), background var(--spring-fast), color var(--spring-fast), border-color var(--spring-fast);
+  }
+  .finder-trigger:hover { color: var(--text); border-color: rgba(255,255,255,.22); background: var(--glass-bg-strong); }
+  .finder-trigger:active { transform: scale(.96); }
+  .finder-trigger .kkey { padding: 0 4px; font-size: 10px; }
+  #titlebar, #statusbar { background: var(--glass-bg); -webkit-backdrop-filter: blur(20px) saturate(1.12); backdrop-filter: blur(20px) saturate(1.12); }
+  #titlebar { box-shadow: inset 0 -1px 0 var(--glass-border); }
+  #statusbar { box-shadow: inset 0 1px 0 var(--glass-border); }
+  #pane-surface {
+    flex: 1; min-width: 0; min-height: 0; display: flex; position: relative; isolation: isolate;
+  }
+  .pane-split { display: flex; flex: 1; min-width: 0; min-height: 0; gap: 0; }
+  .pane-split[data-axis="horizontal"] { flex-direction: row; }
+  .pane-split[data-axis="vertical"] { flex-direction: column; }
+  .pane-node { min-width: 0; min-height: 0; }
+  .pane-child { display: flex; flex: 1; min-width: 0; min-height: 0; }
+  .pane-node[hidden] { display: none; }
+  .pane-splitter {
+    position: relative; z-index: 20; flex: 0 0 8px; touch-action: none;
+  }
+  .pane-splitter[data-axis="horizontal"] { cursor: col-resize; }
+  .pane-splitter[data-axis="vertical"] { cursor: row-resize; }
+  .pane-splitter::after {
+    content: ""; position: absolute; background: var(--glass-border); transition: background var(--spring-fast), box-shadow var(--spring-fast);
+  }
+  .pane-splitter[data-axis="horizontal"]::after { inset: 0 auto 0 3px; width: 2px; }
+  .pane-splitter[data-axis="vertical"]::after { inset: 3px 0 0; height: 2px; }
+  .pane-splitter:hover::after, .pane-splitter.dragging::after { background: var(--accent); box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 48%, transparent); }
+  .pane-leaf {
+    display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; overflow: hidden;
+    background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 10px;
+    -webkit-backdrop-filter: blur(22px) saturate(1.12); backdrop-filter: blur(22px) saturate(1.12);
+    box-shadow: var(--glass-shadow); animation: pane-in var(--spring-snap) both;
+  }
+  .pane-leaf.focused { border-color: color-mix(in srgb, var(--accent) 54%, var(--glass-border)); }
+  .pane-cardbar {
+    display: flex; align-items: center; gap: 3px; height: 32px; flex: none; padding: 0 6px;
+    border-bottom: 1px solid var(--glass-border); background: rgba(0,0,0,.16); overflow-x: auto; scrollbar-width: none;
+  }
+  .pane-cardbar::-webkit-scrollbar { display: none; }
+  .pane-card {
+    appearance: none; display: inline-flex; align-items: center; gap: 6px; height: 24px; max-width: 180px;
+    padding: 0 8px; border: 1px solid transparent; border-radius: 7px; background: transparent;
+    color: var(--text2); cursor: grab; font: 500 12px var(--font-ui); white-space: nowrap; flex: none;
+    transition: transform var(--spring-fast), background var(--spring-fast), color var(--spring-fast), border-color var(--spring-fast);
+  }
+  .pane-card:hover { color: var(--text); background: rgba(255,255,255,.06); }
+  .pane-card:active { cursor: grabbing; transform: scale(.96); }
+  .pane-card.sel { color: var(--text); background: rgba(255,255,255,.085); border-color: var(--glass-border); }
+  .pane-card .pane-card-label { overflow: hidden; text-overflow: ellipsis; }
+  .pane-card-close { display: none; margin-left: 2px; color: var(--text3); font-size: 14px; line-height: 1; }
+  .pane-card:hover .pane-card-close, .pane-card.sel .pane-card-close { display: inline-flex; }
+  .pane-card-close:hover { color: var(--error); }
+  .pane-content { display: flex; flex: 1; min-width: 0; min-height: 0; overflow: hidden; position: relative; }
+  .pane-content > #left, .pane-content > #center, .pane-content > #right, .pane-content > #bottom {
+    flex: 1; width: auto !important; height: auto !important; min-width: 0 !important; min-height: 0 !important;
+    max-width: none !important; max-height: none !important; resize: none; border: 0 !important;
+  }
+  .pane-content > #bottom { overflow: hidden; }
+  .pane-card-placeholder {
+    display: flex; flex: 1; min-width: 0; min-height: 0; align-items: center; justify-content: center;
+    color: var(--text2); font: 12px var(--font-ui); text-align: center; padding: 24px;
+  }
+  .pane-card-placeholder strong { display: block; color: var(--text); font-size: 14px; margin-bottom: 5px; }
+  .pane-drag-ghost { position: fixed; z-index: 1200; pointer-events: none; opacity: .9; transform: translate(-50%, -50%) scale(1.04); box-shadow: 0 24px 60px rgba(0,0,0,.5); }
+  .pane-drop-target { outline: 1px solid var(--accent); outline-offset: -2px; background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .pane-drop-before { box-shadow: inset 3px 0 var(--accent); }
+  .pane-drop-after { box-shadow: inset -3px 0 var(--accent); }
+  @keyframes pane-in { from { opacity: 0; transform: scale(.985) translateY(3px); } to { opacity: 1; transform: none; } }
+  @keyframes kstretch { 0% { transform: scale(1); } 45% { transform: scale(.965, 1.035); } 100% { transform: scale(.97); } }
+  .kbtn:active, .kicon:active, .pane-card:active { animation: kstretch 180ms var(--ease); }
+  @media (prefers-reduced-motion: reduce) {
+    .pane-leaf, .kbtn:active, .kicon:active, .pane-card:active { animation: none; }
+    .tree-viewport { scroll-behavior: auto; }
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    .pane-leaf, .finder-trigger { -webkit-backdrop-filter: none; backdrop-filter: none; }
+  }
+  .trow { min-height: 24px; }
+  .tree-toolbar { display: flex; align-items: center; gap: 6px; padding: 5px 6px 6px; position: sticky; top: 0; z-index: 4; background: linear-gradient(var(--glass-bg) 78%, transparent); }
+  .tree-filter { height: 24px; min-width: 0; flex: 1; padding: 0 8px; font-size: 12px; }
+  .tree-count { flex: none; color: var(--text3); font: 10px var(--font-mono); }
+  .tree-viewport { position: relative; height: calc(100% - 35px); min-height: 0; overflow: auto; contain: strict; scroll-behavior: smooth; }
+  .tree-spacer { width: 1px; opacity: 0; }
+  .tree-window { position: absolute; inset: 0 0 auto; display: flex; flex-direction: column; }
+  .tree-window .trow { height: 24px; min-height: 24px; padding-top: 0; padding-bottom: 0; }
+  .tree-window .trow .rowact { margin-left: auto; }
+  .term-tools { display: flex; align-items: center; gap: 3px; min-height: 30px; padding: 1px 8px; border-bottom: 1px solid var(--glass-border); flex: none; }
+  .term-tools .kicon { width: 24px; height: 24px; }
+  .term-cwd { margin-left: auto; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text3); font: 10px var(--font-mono); }
+  .term-search { position: absolute; top: 8px; right: 12px; z-index: 4; display: flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--glass-border); border-radius: 8px; background: var(--glass-bg-strong); box-shadow: var(--glass-shadow); }
+  .term-search input { width: 180px; height: 24px; }
+  .dockbody, #bbody { overscroll-behavior: contain; }
+  #editorwrap .cm-scroller, #termholder { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) {
+    #editorwrap .cm-scroller, #termholder { scroll-behavior: auto; }
+  }
+  .trow, .filerow, .pane-card { will-change: transform; }
+
 <script type="importmap">
 {"imports": {
   "codemirror": "https://esm.sh/codemirror@6.0.1",
@@ -1014,9 +1149,12 @@
   <button class="kicon" id="t-left" data-tip="Toggle sidebar"><svg class="ic"><use href="#i-side"/></svg></button>
   <button id="root" data-tip="Project root — open file finder">…</button>
   <span class="spacer"></span>
-  <input id="finder" class="kinput" placeholder="Search files and commands…" autocomplete="off" spellcheck="false">
+  <button id="finder" class="finder-trigger" data-tip="Search files and commands · Ctrl+P" aria-label="Search files and commands">
+    <svg class="ic"><use href="#i-search"/></svg><span>Search</span><span class="kkey">⌘P</span>
+  </button>
   <span class="spacer"></span>
   <div class="kseg" id="layoutseg" role="group" aria-label="Layout">
+    <button id="layout-menu" data-tip="Layout controls"><svg class="ic"><use href="#i-panel"/></svg></button>
     <button id="t-bottom" data-tip="Toggle panel"><svg class="ic"><use href="#i-panel"/></svg></button>
     <button id="t-right" data-tip="Toggle outline"><svg class="ic"><use href="#i-list"/></svg></button>
   </div>
@@ -1111,6 +1249,7 @@ import { EditorView, basicSetup } from "codemirror";
 import { EditorState, Compartment } from "@codemirror/state";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { keymap } from "@codemirror/view";
+import * as PaneLayout from "/ui-layout.js";
 
 /* ============ transport ============ */
 let token = "";
@@ -1268,11 +1407,22 @@ const S = {
   log: [],
   docks: { left: true, right: false, bottom: false },
   layout: { left: 264, right: 232, bottom: 192 },
+  paneLayout: null,
+  paneReady: false,
+  paneSurface: null,
+  paneHostCards: new Map(),
+  paneDrag: null,
+  panePresets: {},
 };
 function G() { return S.groups[S.focus]; }
 function A() { const g = G(); return g.tabs[g.active] || null; }
 function saveLayout() {
-  try { localStorage.setItem("keplr-layout", JSON.stringify({ docks: S.docks, layout: S.layout })); } catch (e) {}
+  try {
+    const value = S.paneReady && S.paneLayout
+      ? { version: 2, pane: S.paneLayout, docks: S.docks, layout: S.layout }
+      : { docks: S.docks, layout: S.layout };
+    localStorage.setItem("keplr-layout", JSON.stringify(value));
+  } catch (e) {}
 }
 function loadLayout() {
   try {
@@ -1280,11 +1430,458 @@ function loadLayout() {
     if (l) {
       if (l.docks) S.docks = Object.assign(S.docks, l.docks);
       if (l.layout) S.layout = Object.assign(S.layout, l.layout);
+      if (l.pane) {
+        try { S.paneLayout = PaneLayout.deserialize(l.pane); }
+        catch (e) { S.paneLayout = PaneLayout.migrateLegacyLayout(l); }
+      } else {
+        S.paneLayout = PaneLayout.migrateLegacyLayout(l);
+      }
+    } else {
+      S.paneLayout = PaneLayout.migrateLegacyLayout(l);
     }
-  } catch (e) {}
+  } catch (e) {
+    S.paneLayout = PaneLayout.currentLayout();
+  }
 }
-/* Resizable dock splitters: hairline look, 8px grab, snap-collapse, dblclick reset. */
+function paneApplyLegacySizes() {
+  if (!S.paneLayout) return;
+  const width = Math.max(720, window.innerWidth || 1200);
+  const height = Math.max(480, window.innerHeight || 800);
+  const left = Math.max(72, Math.min(0.45, (S.layout.left || 264) / width));
+  const right = Math.max(0.12, Math.min(0.35, (S.layout.right || 232) / Math.max(1, width - (S.layout.left || 264))));
+  const bottom = Math.max(0.12, Math.min(0.55, (S.layout.bottom || 192) / Math.max(1, height - 60)));
+  for (const [id, ratio] of [["split-root", 1 - bottom], ["split-top", left], ["split-center", 1 - right]]) {
+    try { S.paneLayout = PaneLayout.setSplitRatio(S.paneLayout, id, ratio); } catch (e) {}
+  }
+}
+const PANE_CARD_HOSTS = {
+  "files-default": "left",
+  "search-default": "bottom",
+  "source-default": "left",
+  "outline-default": "left",
+  "editor-default": "center",
+  "symbols-default": "right",
+  "terminal-default": "bottom",
+  "problems-default": "bottom",
+  "tasks-default": "bottom",
+  "console-default": "bottom",
+  "serial-default": "bottom",
+};
+const PANE_CARD_ICONS = {
+  files: "file",
+  editor: "file",
+  outline: "list",
+  search: "search",
+  "source-control": "branch",
+  problems: "xcirc",
+  tasks: "play",
+  console: "list",
+  terminal: "terminal",
+  serial: "activity",
+  chat: "info",
+};
+const PANE_FALLBACK_HOSTS = {
+  files: "left",
+  search: "bottom",
+  "source-control": "left",
+  outline: "right",
+  editor: "center",
+  terminal: "bottom",
+  problems: "bottom",
+  tasks: "bottom",
+  console: "bottom",
+  serial: "bottom",
+};
+function paneCardHost(card) {
+  const id = S.paneHostCards.get(card.id) || PANE_CARD_HOSTS[card.id] || PANE_FALLBACK_HOSTS[card.kind];
+  return id ? document.getElementById(id) : null;
+}
+function paneCardIcon(kind) { return icon(PANE_CARD_ICONS[kind] || "file"); }
+function paneCardTitle(card) { return card.title || card.kind; }
+function paneActiveCard(leafId) {
+  const leaf = S.paneLayout && S.paneLayout.tree.leaves[leafId];
+  if (!leaf) return null;
+  return leaf.cards.find(card => card.id === leaf.activeCard) || leaf.cards[0] || null;
+}
+function paneSyncCardView(card) {
+  if (!card) return;
+  if (card.kind === "files") setLeftTab("project");
+  else if (card.kind === "source-control") setLeftTab("source");
+  else if (card.kind === "search") setBottomTab("search", false, true);
+  else if (["terminal", "problems", "tasks", "console", "serial"].includes(card.kind)) {
+    const tab = card.kind === "console" ? "console" : card.kind;
+    setBottomTab(tab, false, true);
+  }
+}
+function paneSetCardActive(leafId, cardId) {
+  try {
+    S.paneLayout = PaneLayout.setCardActive(S.paneLayout, leafId, cardId);
+    saveLayout();
+    renderPaneLayout();
+    paneSyncCardView(paneActiveCard(leafId));
+  } catch (e) { msg(String(e), true); }
+}
+function paneBuildLeaf(leaf, node) {
+  node.className = "pane-node pane-leaf";
+  node.dataset.leafId = leaf.id;
+  node.setAttribute("role", "group");
+  node.setAttribute("aria-label", leaf.id);
+  const bar = document.createElement("div");
+  bar.className = "pane-cardbar";
+  bar.setAttribute("role", "tablist");
+  bar.setAttribute("aria-label", leaf.id + " cards");
+  const content = document.createElement("div");
+  content.className = "pane-content";
+  for (const card of leaf.cards) {
+    const tab = document.createElement("button");
+    tab.className = "pane-card" + (card.id === leaf.activeCard ? " sel" : "");
+    tab.dataset.cardId = card.id;
+    tab.dataset.leafId = leaf.id;
+    tab.draggable = true;
+    tab.setAttribute("role", "tab");
+    tab.setAttribute("aria-selected", card.id === leaf.activeCard ? "true" : "false");
+    tab.title = paneCardTitle(card);
+    tab.setAttribute("data-tip", paneCardTitle(card));
+    tab.innerHTML = paneCardIcon(card.kind) + '<span class="pane-card-label"></span>';
+    tab.querySelector(".pane-card-label").textContent = paneCardTitle(card);
+    const close = document.createElement("span");
+    close.className = "pane-card-close";
+    close.textContent = "×";
+    close.title = "Close card";
+    close.setAttribute("data-tip", "Close card");
+    close.onclick = e => {
+      e.stopPropagation();
+      try { S.paneLayout = PaneLayout.removeCardFromLayout(S.paneLayout, card.id); saveLayout(); renderPaneLayout(); }
+      catch (err) { msg(String(err), true); }
+    };
+    tab.appendChild(close);
+    tab.onclick = () => paneSetCardActive(leaf.id, card.id);
+    tab.oncontextmenu = e => { e.preventDefault(); e.stopPropagation(); paneCardMenu(e, leaf.id, card.id); };
+    paneWireCardDrag(tab, leaf.id, card.id);
+    bar.appendChild(tab);
+  }
+  node.appendChild(bar);
+  node.appendChild(content);
+  node._paneLeaf = leaf;
+  node._paneContent = content;
+  return node;
+}
+function paneBuildNode(model, parent) {
+  const node = document.createElement("div");
+  node.className = "pane-node";
+  if (model.type === "leaf") {
+    paneBuildLeaf(model, node);
+    parent.appendChild(node);
+    return node;
+  }
+  node.className = "pane-node pane-split";
+  node.dataset.splitId = model.id;
+  node.dataset.axis = model.axis;
+  const first = document.createElement("div");
+  first.className = "pane-node pane-child";
+  const second = document.createElement("div");
+  second.className = "pane-node pane-child";
+  first.style.flex = String(model.ratio);
+  second.style.flex = String(1 - model.ratio);
+  const firstNode = paneBuildNode(model.first, first);
+  const secondNode = paneBuildNode(model.second, second);
+  const splitter = document.createElement("div");
+  splitter.className = "pane-splitter";
+  splitter.dataset.axis = model.axis;
+  splitter.dataset.splitId = model.id;
+  paneWireSplitter(splitter, model, first, second);
+  node.appendChild(first);
+  node.appendChild(splitter);
+  node.appendChild(second);
+  parent.appendChild(node);
+  node._paneFirst = first;
+  node._paneSecond = second;
+  node._paneSplitter = splitter;
+  return node;
+}
+function paneWireCardDrag(tab, leafId, cardId) {
+  tab.addEventListener("dragstart", e => {
+    S.paneDrag = { cardId, leafId };
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/keplr-card", cardId);
+    tab.classList.add("dragging");
+  });
+  tab.addEventListener("dragend", () => {
+    S.paneDrag = null;
+    tab.classList.remove("dragging");
+    document.querySelectorAll(".pane-drop-before,.pane-drop-after,.pane-drop-target").forEach(el => el.classList.remove("pane-drop-before", "pane-drop-after", "pane-drop-target"));
+  });
+  tab.addEventListener("dragover", e => {
+    if (!S.paneDrag) return;
+    e.preventDefault();
+    e.stopPropagation();
+    tab.classList.add("pane-drop-before");
+  });
+  tab.addEventListener("dragleave", () => tab.classList.remove("pane-drop-before"));
+  tab.addEventListener("drop", e => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (S.paneDrag) paneMoveCard(S.paneDrag.cardId, leafId);
+  });
+}
+function paneWireSplitter(splitter, model, first, second) {
+  splitter.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    splitter.setPointerCapture(e.pointerId);
+    splitter.classList.add("dragging");
+    const rect = splitter.parentElement.getBoundingClientRect();
+    const start = model.axis === "horizontal" ? e.clientX : e.clientY;
+    const total = model.axis === "horizontal" ? rect.width : rect.height;
+    const move = ev => {
+      const now = model.axis === "horizontal" ? ev.clientX : ev.clientY;
+      const ratio = Math.max(0.08, Math.min(0.92, (now - start + (model.ratio * total)) / total));
+      first.style.flex = String(ratio);
+      second.style.flex = String(1 - ratio);
+      splitter.parentElement.dataset.dragRatio = String(ratio);
+    };
+    const up = ev => {
+      splitter.releasePointerCapture(ev.pointerId);
+      splitter.classList.remove("dragging");
+      const ratio = Number(splitter.parentElement.dataset.dragRatio || model.ratio);
+      try { S.paneLayout = PaneLayout.setSplitRatio(S.paneLayout, model.id, ratio); } catch (err) {}
+      delete splitter.parentElement.dataset.dragRatio;
+      saveLayout();
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  });
+}
+function paneSyncContent() {
+  const occupied = new Set();
+  for (const leaf of Object.values(S.paneLayout.tree.leaves)) {
+    const node = S.paneSurface.querySelector(`[data-leaf-id="${CSS.escape(leaf.id)}"]`);
+    if (!node || !leaf.visible) continue;
+    const card = paneActiveCard(leaf.id);
+    const content = node._paneContent;
+    content.replaceChildren();
+    if (!card) {
+      const empty = document.createElement("div");
+      empty.className = "pane-card-placeholder";
+      empty.innerHTML = "<div><strong>Empty pane</strong>Drop a card here or add one from Layout.</div>";
+      content.appendChild(empty);
+      continue;
+    }
+    const host = paneCardHost(card);
+    if (host && !occupied.has(host)) {
+      occupied.add(host);
+      host.classList.remove("hidden");
+      content.appendChild(host);
+    } else {
+      const placeholder = document.createElement("div");
+      placeholder.className = "pane-card-placeholder";
+      placeholder.innerHTML = host
+        ? `<div><strong>${esc(paneCardTitle(card))}</strong>This card is hosted by another pane.</div>`
+        : `<div><strong>${esc(paneCardTitle(card))}</strong>Generic view surface</div>`;
+      content.appendChild(placeholder);
+    }
+  }
+}
+function renderPaneLayout() {
+  if (!S.paneReady || !S.paneSurface || !S.paneLayout) return;
+  S.paneSurface.replaceChildren();
+  paneBuildNode(S.paneLayout.tree.root, S.paneSurface);
+  for (const leaf of Object.values(S.paneLayout.tree.leaves)) {
+    S.docks[leaf.id] = !!leaf.visible;
+    const node = S.paneSurface.querySelector(`[data-leaf-id="${CSS.escape(leaf.id)}"]`);
+    if (node) {
+      node.hidden = !leaf.visible;
+      node.classList.toggle("focused", S.paneLayout.focusedLeaf === leaf.id);
+    }
+  }
+  paneSyncContent();
+  const active = document.querySelector(".pane-card.sel");
+  if (active) active.scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+function paneMoveCard(cardId, targetLeaf) {
+  if (!S.paneLayout) return;
+  try {
+    S.paneLayout = PaneLayout.moveCard(S.paneLayout, cardId, targetLeaf);
+    saveLayout();
+    renderPaneLayout();
+    const card = paneActiveCard(targetLeaf);
+    paneSyncCardView(card);
+  } catch (e) { msg(String(e), true); }
+}
+async function paneSplitActive(axis) {
+  if (!S.paneLayout) return;
+  const leafId = S.paneLayout.focusedLeaf;
+  const active = paneActiveCard(leafId);
+  const kind = active && active.kind === "editor" ? "editor" : active && active.kind === "terminal" ? "terminal" : "chat";
+  const id = `${kind}-split-${Date.now()}`;
+  const nextCard = { id, kind, title: kind === "editor" ? "Editor" : kind === "terminal" ? "Terminal" : "Chat", resource: null };
+  try {
+    const result = PaneLayout.splitLeaf(S.paneLayout, leafId, axis, nextCard);
+    S.paneLayout = result.layout;
+    if (kind === "editor") S.paneHostCards.set(id, "col1");
+    saveLayout();
+    renderPaneLayout();
+    paneSetCardActive(result.leafId, id);
+    if (kind === "editor") await panePrimeSecondEditor();
+  } catch (e) { msg(String(e), true); }
+}
+async function panePrimeSecondEditor() {
+  ensureGroup(1);
+  const host = document.getElementById("col1");
+  if (host) host.classList.remove("hidden");
+  if (!ED2 && ED_ALL[0] && ED_ALL[0].cm) {
+    ED2 = await makeEditor(document.getElementById("editorwrap1"), 1);
+    ED_ALL[1] = ED2;
+  }
+  S.focus = 1;
+  ED = ED_ALL[1] || ED_ALL[0];
+  renderTabs();
+}
+function paneAddCard(kind) {
+  if (!S.paneLayout) return;
+  const leafId = S.paneLayout.focusedLeaf;
+  if (kind === "terminal") {
+    for (const leaf of Object.values(S.paneLayout.tree.leaves)) {
+      const terminal = leaf.cards.find(card => card.kind === "terminal");
+      if (terminal) {
+        if (leaf.id === leafId) paneSetCardActive(leafId, terminal.id);
+        else paneMoveCard(terminal.id, leafId);
+        return;
+      }
+    }
+  }
+  const id = `${kind}-${Date.now()}`;
+  const title = kind === "chat" ? "Chat" : kind === "terminal" ? "Terminal" : "Card";
+  try {
+    S.paneLayout = PaneLayout.addCard(S.paneLayout, leafId, { id, kind, title, resource: null });
+    saveLayout();
+    renderPaneLayout();
+    paneSetCardActive(leafId, id);
+  } catch (e) { msg(String(e), true); }
+}
+function paneResetLayout() {
+  S.paneLayout = PaneLayout.currentLayout();
+  S.docks = { left: true, right: false, bottom: false };
+  saveLayout();
+  renderPaneLayout();
+  msg("layout reset");
+}
+async function paneSavePreset() {
+  const name = await askInput({ title: "Save layout preset", placeholder: "name", value: "custom" });
+  if (!name) return;
+  S.panePresets[name] = PaneLayout.serialize(S.paneLayout);
+  try { localStorage.setItem("keplr-layout-presets", JSON.stringify(S.panePresets)); } catch (e) {}
+  msg("saved layout preset: " + name);
+}
+async function paneApplyPreset() {
+  try { S.panePresets = Object.assign(S.panePresets, JSON.parse(localStorage.getItem("keplr-layout-presets") || "{}")); } catch (e) {}
+  const names = Object.keys(S.panePresets);
+  if (!names.length) { msg("no layout presets yet"); return; }
+  const name = await askInput({ title: "Load layout preset", placeholder: "preset name", value: names[0] });
+  if (!name || !S.panePresets[name]) { msg("preset not found"); return; }
+  try {
+    S.paneLayout = PaneLayout.deserialize(S.panePresets[name]);
+    saveLayout();
+    renderPaneLayout();
+  } catch (e) { msg(String(e), true); }
+}
+function paneCardMenu(e, leafId, cardId) {
+  const targetLeaves = Object.keys(S.paneLayout.tree.leaves).filter(id => id !== leafId);
+  const items = [{ hd: paneCardTitle(PaneLayout.getCard(S.paneLayout, cardId)) }];
+  for (const target of targetLeaves) {
+    items.push({ label: "Move to " + target, icon: "panel", run: () => paneMoveCard(cardId, target) });
+  }
+  items.push({ sep: true });
+  items.push({ label: "Split right", icon: "panel", shortcut: "⌘\\", run: () => paneSplitActive("horizontal") });
+  items.push({ label: "Close card", icon: "x", danger: true, run: () => {
+    try { S.paneLayout = PaneLayout.removeCardFromLayout(S.paneLayout, cardId); saveLayout(); renderPaneLayout(); }
+    catch (err) { msg(String(err), true); }
+  }});
+  showMenu(e.clientX, e.clientY, items);
+}
+function paneLayoutMenu(e) {
+  const presets = Object.keys(S.panePresets);
+  showMenu(e.clientX, e.clientY, [
+    { hd: "Layout" },
+    { label: "Split right", icon: "panel", shortcut: "⌘\\", run: () => paneSplitActive("horizontal") },
+    { label: "Split down", icon: "panel", run: () => paneSplitActive("vertical") },
+    { label: "Add terminal card", icon: "terminal", run: () => paneAddCard("terminal") },
+    { label: "Add chat card", icon: "info", run: () => paneAddCard("chat") },
+    { sep: true },
+    { label: "Reset layout", icon: "refresh", run: paneResetLayout },
+    { label: "Save preset", icon: "plus", run: paneSavePreset },
+    { label: "Load preset", icon: "list", disabled: !presets.length, run: paneApplyPreset },
+  ]);
+}
+function paneLeafMenu(e, leafId) {
+  showMenu(e.clientX, e.clientY, [
+    { hd: "Pane" },
+    { label: "Split right", icon: "panel", run: () => { S.paneLayout = PaneLayout.focusLeaf(S.paneLayout, leafId); paneSplitActive("horizontal"); } },
+    { label: "Split down", icon: "panel", run: () => { S.paneLayout = PaneLayout.focusLeaf(S.paneLayout, leafId); paneSplitActive("vertical"); } },
+    { label: "Add chat card", icon: "info", run: () => { S.paneLayout = PaneLayout.focusLeaf(S.paneLayout, leafId); paneAddCard("chat"); } },
+    { sep: true },
+    { label: "Hide pane", icon: "x", run: () => toggleDock(leafId, false) },
+  ]);
+}
+function paneInstallMenus() {
+  const surface = S.paneSurface;
+  surface.addEventListener("contextmenu", e => {
+    const card = e.target.closest(".pane-card");
+    if (card) return;
+    const leaf = e.target.closest(".pane-leaf");
+    if (leaf) { e.preventDefault(); paneLeafMenu(e, leaf.dataset.leafId); }
+  });
+  surface.addEventListener("dragover", e => {
+    if (!S.paneDrag) return;
+    const leaf = e.target.closest(".pane-leaf");
+    if (!leaf) return;
+    e.preventDefault();
+    leaf.classList.add("pane-drop-target");
+  });
+  surface.addEventListener("dragleave", e => {
+    const leaf = e.target.closest(".pane-leaf");
+    if (leaf && !leaf.contains(e.relatedTarget)) leaf.classList.remove("pane-drop-target");
+  });
+  surface.addEventListener("drop", e => {
+    const leaf = e.target.closest(".pane-leaf");
+    if (!leaf || !S.paneDrag) return;
+    e.preventDefault();
+    leaf.classList.remove("pane-drop-target");
+    paneMoveCard(S.paneDrag.cardId, leaf.dataset.leafId);
+  });
+  document.getElementById("titlebar").oncontextmenu = e => { e.preventDefault(); paneLayoutMenu(e); };
+  document.getElementById("statusbar").oncontextmenu = e => { e.preventDefault(); paneLayoutMenu(e); };
+}
+function initDynamicWorkbench() {
+  if (S.paneReady) return;
+  const wb = document.getElementById("workbench");
+  const bottom = document.getElementById("bottom");
+  const left = document.getElementById("left");
+  const center = document.getElementById("center");
+  const right = document.getElementById("right");
+  const surface = document.createElement("div");
+  surface.id = "pane-surface";
+  wb.replaceChildren(surface);
+  surface.appendChild(left);
+  surface.appendChild(center);
+  surface.appendChild(right);
+  surface.appendChild(bottom);
+  S.paneSurface = surface;
+  S.paneReady = true;
+  try { S.panePresets = JSON.parse(localStorage.getItem("keplr-layout-presets") || "{}"); } catch (e) {}
+  if (!S.paneLayout) S.paneLayout = PaneLayout.migrateLegacyLayout({ docks: S.docks });
+  paneApplyLegacySizes();
+  renderPaneLayout();
+  paneInstallMenus();
+}
 function applyLayout() {
+  if (S.paneReady) {
+    renderPaneLayout();
+    return;
+  }
   const L = { left: 264, right: 232, bottom: 192 };
   S.layout = Object.assign({}, L, S.layout);
   const left = document.getElementById("left");
@@ -1293,12 +1890,6 @@ function applyLayout() {
   if (left && S.docks.left) left.style.width = S.layout.left + "px";
   if (right && S.docks.right) right.style.width = S.layout.right + "px";
   if (bottom && S.docks.bottom) bottom.style.height = S.layout.bottom + "px";
-  const sL = document.getElementById("splitL");
-  const sR = document.getElementById("splitR");
-  const sB = document.getElementById("splitB");
-  if (sL) sL.style.display = S.docks.left ? "" : "none";
-  if (sR) sR.style.display = S.docks.right ? "" : "none";
-  if (sB) sB.style.display = S.docks.bottom ? "" : "none";
   moveDockIndicator();
 }
 function dragSplit(el, axis, opts) {
@@ -1326,7 +1917,7 @@ function dragSplit(el, axis, opts) {
   el.addEventListener("dblclick", resetLayout);
 }
 function initSplitters() {
-  if (document.getElementById("splitL")) return;
+  if (S.paneReady || document.getElementById("splitL")) return;
   const wb = document.getElementById("workbench");
   const center = document.getElementById("center");
   const right = document.getElementById("right");
@@ -2030,7 +2621,12 @@ function closeTab(i) {
   g.active = -1;
   activateTab(Math.min(j, g.tabs.length - 1));
 }
-function openToSide(tab) {
+async function openToSide(tab) {
+  if (S.paneReady) {
+    await paneSplitActive("horizontal");
+    await openFile(tab.path, 0, false);
+    return;
+  }
   const gi = S.focus === 0 && ED2 ? 1 : 0;
   ensureGroup(gi);
   S.focus = gi;
@@ -2582,9 +3178,8 @@ function wireTreeKeys() {
     } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
       const r = rows[cur];
       if (r && r.dataset.dir) {
-        const kids = r.nextElementSibling;
-        const closed = !kids || kids.classList.contains("closed");
-        if ((e.key === "ArrowRight") === closed) { e.preventDefault(); r.click(); }
+        const open = TREE.expanded.has(r.dataset.dir);
+        if ((e.key === "ArrowRight") === !open) { e.preventDefault(); r.click(); }
       }
     } else if (e.key === "F2") {
       const r = rows[cur];
@@ -2620,89 +3215,169 @@ function buildTree(paths) {
   });
   return root;
 }
-let treeBudget = 2000;
-function renderTree(box, node, depth, base) {
-  base = base || "";
-  if (depth === 0) {
-    treeBudget = 2000;
-    const old = box.querySelector(":scope > .tree-more");
-    if (old) old.remove();
-  }
-  const names = Object.keys(node).sort((a, b) => {
-    const da = node[a].__kids ? 0 : 1, db = node[b].__kids ? 0 : 1;
-    return da - db || (a < b ? -1 : 1);
+const TREE = { root: {}, paths: [], rows: [], query: "", expanded: new Set(), initialized: false, scrollTop: 0 };
+function treeNames(node) {
+  return Object.keys(node).sort((a, b) => {
+    const da = node[a].__kids ? 0 : 1;
+    const db = node[b].__kids ? 0 : 1;
+    return da - db || a.localeCompare(b);
   });
-  names.forEach(name => {
-    if (treeBudget-- <= 0) return;
-    const n = node[name];
+}
+function treeHasMatch(node, query) {
+  if (!query) return true;
+  return treeNames(node).some(name => {
+    const item = node[name];
+    const full = item.__full || name;
+    return full.toLowerCase().includes(query) || (item.__kids && treeHasMatch(item.__kids, query));
+  });
+}
+function treeCollect(node, base, depth, out) {
+  const query = TREE.query.trim().toLowerCase();
+  for (const name of treeNames(node)) {
+    const item = node[name];
     const full = base ? base + "/" + name : name;
-    const row = document.createElement("div");
-    row.className = "trow";
-    row.style.paddingLeft = (6 + depth * 14) + "px";
-    if (n.__kids) {
-      const isAncestor = REVEAL && (REVEAL === full || REVEAL.startsWith(full + "/"));
-      row.innerHTML = '<span class="tri">' + icon("chev-r") + "</span>" + setiIcon("f-folder") + "<span></span>";
-      row.lastChild.textContent = name;
-      row.dataset.dir = full;
-      row.setAttribute("role", "treeitem");
-      row.setAttribute("aria-expanded", isAncestor ? "true" : "false");
-      const kids = document.createElement("div");
-      kids.className = "tkids" + (isAncestor ? "" : " closed");
-      let open = !!isAncestor;
-      const setTri = () => { row.classList.toggle("open", open); };
-      setTri();
-      row.onclick = () => {
-        open = !open;
-        kids.classList.toggle("closed", !open);
-        row.setAttribute("aria-expanded", open ? "true" : "false");
-        setTri();
-      };
-      const newBtn = document.createElement("button");
-      newBtn.className = "rowact kicon";
-      newBtn.innerHTML = icon("plus");
-      newBtn.title = "New file in " + full;
-      newBtn.setAttribute("aria-label", "New file in " + full);
-      newBtn.onclick = async ev => {
-        ev.stopPropagation();
-        const nm = await askInput({ title: "New file in " + full, placeholder: "name.ext" });
-        if (nm) fsOp("/fs/create", { path: full + "/" + nm, dir: false });
-      };
-      row.appendChild(newBtn);
-      row.oncontextmenu = e => {
-        e.preventDefault();
-        e.stopPropagation();
-        fileMenu(e.clientX, e.clientY, wsRoot ? wsRoot + "/" + full : full, true);
-      };
-      box.appendChild(row);
-      box.appendChild(kids);
-      renderTree(kids, n.__kids, depth + 1, full);
-    } else {
-      row.innerHTML = '<span class="tri"></span>' + fileIconFor(n.__full || name) + "<span></span>";
-      row.lastChild.textContent = name;
-      row.dataset.path = n.__full;
-      row.setAttribute("role", "treeitem");
-      const badge = gitBadge(n.__full);
-      if (badge) row.appendChild(badge);
-      if (n.__full === (A() || {}).path) row.classList.add("sel");
-      row.onclick = () => openFile(n.__full, 0, true).catch(e => msg(String(e), true));
-      row.oncontextmenu = e => {
-        e.preventDefault();
-        e.stopPropagation();
-        fileMenu(e.clientX, e.clientY, n.__full, false);
-      };
-      box.appendChild(row);
-      if (REVEAL && n.__full === REVEAL) {
-        row.classList.add("sel");
-        row.scrollIntoView({ block: "center" });
-      }
-    }
-  });
-  if (depth === 0 && treeBudget <= 0) {
-    const more = document.createElement("div");
-    more.className = "logline tree-more";
-    more.textContent = "…list capped at 2000 rows — narrow with the finder (Ctrl+P)";
-    box.appendChild(more);
+    const isDir = !!item.__kids;
+    const matches = !query || full.toLowerCase().includes(query) || (isDir && treeHasMatch(item.__kids, query));
+    if (!matches) continue;
+    out.push({ name, full, path: item.__full, dir: isDir, depth });
+    if (isDir && (TREE.expanded.has(full) || query)) treeCollect(item.__kids, full, depth + 1, out);
   }
+}
+function treeExpandAncestors(path) {
+  if (!path) return;
+  const parts = rel(path).split("/");
+  for (let i = 1; i < parts.length; i++) TREE.expanded.add(parts.slice(0, i).join("/"));
+}
+function treeRenderRow(item, index) {
+  const row = document.createElement("div");
+  row.className = "trow";
+  row.dataset.index = String(index);
+  row.style.paddingLeft = (6 + item.depth * 14) + "px";
+  row.setAttribute("role", "treeitem");
+  row.setAttribute("aria-level", String(item.depth + 1));
+  if (item.dir) {
+    const open = TREE.expanded.has(item.full);
+    row.dataset.dir = item.full;
+    row.setAttribute("aria-expanded", open ? "true" : "false");
+    row.classList.toggle("open", open);
+    row.innerHTML = '<span class="tri">' + icon("chev-r") + "</span>" + setiIcon("f-folder") + "<span></span>";
+    row.lastChild.textContent = item.name;
+    row.onclick = () => {
+      if (TREE.expanded.has(item.full)) TREE.expanded.delete(item.full);
+      else TREE.expanded.add(item.full);
+      treeRender();
+    };
+    const add = document.createElement("button");
+    add.className = "rowact kicon";
+    add.innerHTML = icon("plus");
+    add.title = "New file in " + item.full;
+    add.setAttribute("aria-label", "New file in " + item.full);
+    add.onclick = async e => {
+      e.stopPropagation();
+      const name = await askInput({ title: "New file in " + item.full, placeholder: "name.ext" });
+      if (name) fsOp("/fs/create", { path: item.full + "/" + name, dir: false });
+    };
+    row.appendChild(add);
+    row.oncontextmenu = e => {
+      e.preventDefault();
+      e.stopPropagation();
+      fileMenu(e.clientX, e.clientY, wsRoot ? wsRoot + "/" + item.full : item.full, true);
+    };
+  } else {
+    row.dataset.path = item.path;
+    row.innerHTML = '<span class="tri"></span>' + fileIconFor(item.path || item.name) + "<span></span>";
+    row.lastChild.textContent = item.name;
+    const badge = gitBadge(item.path);
+    if (badge) row.appendChild(badge);
+    if (item.path === (A() || {}).path) row.classList.add("sel");
+    row.onclick = () => openFile(item.path, 0, true).catch(e => msg(String(e), true));
+    row.oncontextmenu = e => {
+      e.preventDefault();
+      e.stopPropagation();
+      fileMenu(e.clientX, e.clientY, item.path, false);
+    };
+  }
+  if (REVEAL && item.path === REVEAL) row.classList.add("sel");
+  return row;
+}
+function treeRenderWindow() {
+  const viewport = document.querySelector("#leftbody .tree-viewport");
+  const spacer = viewport && viewport.querySelector(".tree-spacer");
+  const win = viewport && viewport.querySelector(".tree-window");
+  if (!viewport || !spacer || !win) return;
+  const rowHeight = 24;
+  const overscan = 8;
+  const top = viewport.scrollTop;
+  const start = Math.max(0, Math.floor(top / rowHeight) - overscan);
+  const end = Math.min(TREE.rows.length, Math.ceil((top + viewport.clientHeight) / rowHeight) + overscan);
+  spacer.style.height = TREE.rows.length * rowHeight + "px";
+  win.style.transform = "translateY(" + start * rowHeight + "px)";
+  win.replaceChildren();
+  for (let i = start; i < end; i++) win.appendChild(treeRenderRow(TREE.rows[i], i));
+  const count = document.querySelector("#leftbody .tree-count");
+  if (count) count.textContent = TREE.query ? TREE.rows.length + " matches" : TREE.rows.length + " items";
+}
+function treeRender() {
+  const box = document.getElementById("leftbody");
+  if (!box) return;
+  if (!TREE.initialized) {
+    Object.keys(TREE.root).forEach(name => {
+      if (TREE.root[name].__kids) TREE.expanded.add(name);
+    });
+    TREE.initialized = true;
+  }
+  treeExpandAncestors(REVEAL);
+  let toolbar = box.querySelector(".tree-toolbar");
+  if (!toolbar) {
+    toolbar = document.createElement("div");
+    toolbar.className = "tree-toolbar";
+    toolbar.innerHTML = '<input class="kinput tree-filter" placeholder="Filter files…" autocomplete="off" spellcheck="false"><span class="tree-count"></span>';
+    toolbar.querySelector("input").addEventListener("input", e => {
+      TREE.query = e.target.value;
+      TREE.rows = [];
+      treeCollect(TREE.root, "", 0, TREE.rows);
+      treeRenderWindow();
+    });
+    toolbar.querySelector("input").addEventListener("keydown", e => {
+      if (e.key === "Escape") { e.target.value = ""; TREE.query = ""; treeRender(); }
+      if (e.key === "Enter") {
+        const first = TREE.rows.find(item => item.path);
+        if (first) openFile(first.path, 0, true).catch(err => msg(String(err), true));
+      }
+      e.stopPropagation();
+    });
+    box.appendChild(toolbar);
+  }
+  let viewport = box.querySelector(".tree-viewport");
+  if (!viewport) {
+    viewport = document.createElement("div");
+    viewport.className = "tree-viewport";
+    viewport.innerHTML = '<div class="tree-spacer"></div><div class="tree-window"></div>';
+    viewport.addEventListener("scroll", () => {
+      TREE.scrollTop = viewport.scrollTop;
+      treeRenderWindow();
+    }, { passive: true });
+    box.appendChild(viewport);
+  }
+  TREE.rows = [];
+  treeCollect(TREE.root, "", 0, TREE.rows);
+  viewport.scrollTop = TREE.scrollTop;
+  treeRenderWindow();
+  if (REVEAL) {
+    const index = TREE.rows.findIndex(item => item.path === REVEAL);
+    if (index >= 0) {
+      const viewport = box.querySelector(".tree-viewport");
+      viewport.scrollTop = Math.max(0, index * 24 - viewport.clientHeight / 2);
+      TREE.scrollTop = viewport.scrollTop;
+      treeRenderWindow();
+      REVEAL = null;
+    }
+  }
+}
+function renderTree(box, node) {
+  TREE.root = node || {};
+  TREE.initialized = false;
+  treeRender();
 }
 function loadFiles() {
   const q = "";
@@ -2907,7 +3582,7 @@ function renderConsole() {
 }
 
 /* ============ terminal (canvas, alacritty_terminal grid) ============ */
-const TERM = { sessions: [], active: -1, n: 0, strip: null, holder: null, cellW: 8, cellH: 16, font: "", accent: "#0A84FF", accentSoft: "rgba(10,132,255,.28)" };
+const TERM = { sessions: [], active: -1, n: 0, strip: null, holder: null, toolbar: null, query: "", cellW: 8, cellH: 16, font: "", accent: "#0A84FF", accentSoft: "rgba(10,132,255,.28)" };
 
 function termActive() {
   if (TERM.active < 0 || TERM.active >= TERM.sessions.length) return null;
@@ -2966,6 +3641,18 @@ function termDraw() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = "#000000";
   ctx.fillRect(0, 0, W, H);
+  if (s.scrollOffset > 0 && s.history && s.history.length) {
+    ctx.font = TERM.font;
+    ctx.textBaseline = "top";
+    const end = Math.max(0, s.history.length - s.scrollOffset);
+    const start = Math.max(0, end - g.rows);
+    ctx.fillStyle = "#F5F5F7";
+    for (let i = start; i < end; i++) {
+      const text = (s.history[i] || "").slice(0, g.cols);
+      ctx.fillText(text, 0, (i - start) * TERM.cellH + 1);
+    }
+    return;
+  }
   ctx.font = TERM.font;
   ctx.textBaseline = "top";
   for (let l = 0; l < g.rows; l++) {
@@ -2997,6 +3684,22 @@ function termDraw() {
       const c0 = l === y0 ? x0 : 0;
       const c1 = l === y1 ? x1 : g.cols - 1;
       ctx.fillRect(c0 * TERM.cellW, l * TERM.cellH, (c1 - c0 + 1) * TERM.cellW, TERM.cellH);
+    }
+  }
+  if (TERM.query) {
+    const needle = TERM.query.toLowerCase();
+    for (let l = 0; l < g.rows; l++) {
+      const row = g.cells[l] || [];
+      let line = "";
+      for (const cell of row) line += cell && cell[0] ? cell[0] : " ";
+      let from = 0;
+      let at = line.toLowerCase().indexOf(needle, from);
+      while (at >= 0) {
+        ctx.fillStyle = "rgba(255,214,10,.24)";
+        ctx.fillRect(at * TERM.cellW, l * TERM.cellH, Math.max(TERM.cellW, needle.length * TERM.cellW), TERM.cellH);
+        from = at + Math.max(1, needle.length);
+        at = line.toLowerCase().indexOf(needle, from);
+      }
     }
   }
   if (g.show) {
@@ -3039,6 +3742,9 @@ function termCopySel() {
 }
 
 function termKey(e) {
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "f") { e.preventDefault(); termSearchOpen(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "k") { e.preventDefault(); termClear(); return; }
+  if (e.key === "Escape" && TERM.query) { e.preventDefault(); TERM.query = ""; termDraw(); return; }
   if (e.key === "Control" || e.key === "Shift" || e.key === "Alt" || e.key === "Meta") return;
   e.preventDefault();
   const k = e.key, ctrl = e.ctrlKey || e.metaKey, alt = e.altKey;
@@ -3071,6 +3777,53 @@ function termKey(e) {
   termSend(new TextEncoder().encode(s));
 }
 
+function termSearchOpen() {
+  if (!TERM.holder) return;
+  const old = TERM.holder.querySelector(".term-search");
+  if (old) { old.querySelector("input").focus(); return; }
+  const wrap = document.createElement("div");
+  wrap.className = "term-search";
+  const input = document.createElement("input");
+  input.className = "kinput";
+  input.placeholder = "Find in terminal";
+  input.value = TERM.query;
+  const close = document.createElement("button");
+  close.className = "kicon";
+  close.innerHTML = icon("x");
+  close.title = "Close terminal search";
+  close.onclick = () => { wrap.remove(); TERM.query = ""; termDraw(); };
+  input.oninput = () => { TERM.query = input.value; termDraw(); };
+  input.onkeydown = e => {
+    e.stopPropagation();
+    if (e.key === "Escape") { close.onclick(); }
+    if (e.key === "Enter") {
+      const s = termActive();
+      if (s && s.grid) termDraw();
+    }
+  };
+  wrap.appendChild(input);
+  wrap.appendChild(close);
+  TERM.holder.appendChild(wrap);
+  input.focus();
+}
+function termClear() { termSend(new TextEncoder().encode("\x0c")); }
+function termReconnect() {
+  const s = termActive();
+  if (!s) return;
+  const index = TERM.sessions.indexOf(s);
+  try { if (s.socket) s.socket.close(); } catch (e) {}
+  if (s.canvas && s.canvas.parentNode) s.canvas.parentNode.removeChild(s.canvas);
+  if (index >= 0) TERM.sessions.splice(index, 1);
+  if (TERM.active >= TERM.sessions.length) TERM.active = TERM.sessions.length - 1;
+  connectTerminal();
+}
+async function termSetCwd() {
+  const value = await askInput({ title: "Terminal working directory", placeholder: "workspace-relative path", value: S.settings.terminalCwd || "" });
+  if (value === null) return;
+  S.settings.terminalCwd = value.trim();
+  saveSettings();
+  termReconnect();
+}
 function showTerminal() {
   const body = document.getElementById("bbody");
   body.innerHTML = "";
@@ -3078,11 +3831,34 @@ function showTerminal() {
   strip.id = "termstrip";
   strip.style.cssText = "display:flex;gap:4px;align-items:center;padding:2px 4px;flex:none;overflow-x:auto;";
   body.appendChild(strip);
+  const tools = document.createElement("div");
+  tools.className = "term-tools";
+  const tool = (name, label, action) => {
+    const b = document.createElement("button");
+    b.className = "kicon";
+    b.innerHTML = icon(name);
+    b.title = label;
+    b.setAttribute("data-tip", label);
+    b.setAttribute("aria-label", label);
+    b.onclick = action;
+    tools.appendChild(b);
+    return b;
+  };
+  tool("search", "Find in terminal · Ctrl+Shift+F", termSearchOpen);
+  tool("refresh", "Reconnect terminal", termReconnect);
+  tool("activity", "Set working directory", termSetCwd);
+  tool("trash", "Clear terminal", () => termSend(new TextEncoder().encode("\x0c")));
+  const cwd = document.createElement("span");
+  cwd.className = "term-cwd";
+  cwd.textContent = S.settings.terminalCwd || "workspace";
+  tools.appendChild(cwd);
+  body.appendChild(tools);
   const holder = document.createElement("div");
   holder.id = "termholder";
   holder.style.cssText = "flex:1;min-height:0;overflow:auto;position:relative;padding:12px;";
   body.appendChild(holder);
   TERM.strip = strip;
+  TERM.toolbar = tools;
   TERM.holder = holder;
   if (window.matchMedia("(pointer:coarse)").matches && !document.getElementById("termkeys")) {
     const kb = document.createElement("div");
@@ -3183,6 +3959,7 @@ function connectTerminal() {
   const d = termDims();
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
   let wsUrl = proto + "//" + location.host + "/terms/ws?cols=" + d.cols + "&rows=" + d.rows;
+  if (S.settings.terminalCwd) wsUrl += "&cwd=" + encodeURIComponent(S.settings.terminalCwd);
   if (token) wsUrl += "&token=" + encodeURIComponent(token);
   TERM.n += 1;
   const cv = document.createElement("canvas");
@@ -3192,6 +3969,30 @@ function connectTerminal() {
     e.preventDefault();
     const t = (e.clipboardData || window.clipboardData).getData("text");
     if (t) termSend(new TextEncoder().encode(t));
+  };
+  cv.oncontextmenu = e => {
+    e.preventDefault();
+    showMenu(e.clientX, e.clientY, [
+      { label: "Copy selection", icon: "copy", shortcut: "Ctrl+Shift+C", run: termCopySel },
+      { label: "Paste", icon: "copy", shortcut: "Ctrl+Shift+V", run: async () => {
+        try {
+          const text = await navigator.clipboard.readText();
+          if (text) termSend(new TextEncoder().encode(text));
+        } catch (err) { msg("clipboard permission denied", true); }
+      }},
+      { sep: true },
+      { label: "Find in terminal", icon: "search", shortcut: "Ctrl+Shift+F", run: termSearchOpen },
+      { label: "Reconnect shell", icon: "refresh", run: termReconnect },
+      { label: "Clear screen", icon: "trash", run: termClear },
+      { sep: true },
+      { label: "Close terminal", icon: "x", danger: true, run: () => closeTerm(TERM.active) },
+    ]);
+  };
+  cv.onwheel = e => {
+    e.preventDefault();
+    const max = Math.max(0, (s.history || []).length - 1);
+    s.scrollOffset = Math.max(0, Math.min(max, s.scrollOffset - Math.sign(e.deltaY)));
+    if (TERM.sessions[TERM.active] === s) termDraw();
   };
   cv.onmousedown = e => {
     cv.focus();
@@ -3222,7 +4023,7 @@ function connectTerminal() {
   const s = {
     id: "t" + Date.now() + "_" + TERM.n,
     name: "term " + TERM.n,
-    socket: null, grid: null, canvas: cv, ctx: cv.getContext("2d"), ready: false
+    socket: null, grid: null, history: [], scrollOffset: 0, canvas: cv, ctx: cv.getContext("2d"), ready: false
   };
   TERM.sessions.push(s);
   if (TERM.holder) { cv.style.display = "none"; TERM.holder.appendChild(cv); }
@@ -3242,9 +4043,10 @@ function connectTerminal() {
   sock.onopen = () => { s.ready = true; renderTermTabs(); cv.focus(); };
   sock.onmessage = ev => {
     try {
-      const frame = JSON.parse(ev.data);
-      s.grid = frame;
-      if (TERM.sessions[TERM.active] === s) termDraw();
+       const frame = JSON.parse(ev.data);
+       s.grid = frame;
+       s.history = Array.isArray(frame.history) ? frame.history : [];
+       if (TERM.sessions[TERM.active] === s) termDraw();
     } catch (e) {}
   };
   const dead = () => {
@@ -3567,7 +4369,7 @@ function showSerial() {
   }
 }
 
-function setBottomTab(t, silent) {
+function setBottomTab(t, silent, keepDock) {
   S.bottomTab = t;
   document.querySelectorAll("#bottom .docktabs button").forEach(b => {
     b.classList.toggle("sel", b.dataset.btab === t);
@@ -3585,6 +4387,17 @@ function setBottomTab(t, silent) {
 /* ============ docks ============ */
 function toggleDock(which, force) {
   const on = force !== undefined ? force : !S.docks[which];
+  if (S.paneReady) {
+    try { S.paneLayout = PaneLayout.setLeafVisible(S.paneLayout, which, on); }
+    catch (e) { msg(String(e), true); return; }
+    S.docks[which] = on;
+    saveLayout();
+    renderPaneLayout();
+    const tb = document.getElementById("t-" + which);
+    if (tb) { tb.classList.toggle("on", on); tb.classList.toggle("off", !on); }
+    moveDockIndicator();
+    return;
+  }
   S.docks[which] = on;
   const small = window.matchMedia("(max-width: 720px)").matches;
   if (which === "left" && small) {
@@ -3754,7 +4567,7 @@ function showMenu(x, y, items) {
   m.style.top = Math.max(8, Math.min(y, window.innerHeight - h - 8)) + "px";
 }
 document.addEventListener("click", e => {
-  if (!e.target.closest("#ctxmenu")) hideMenu();
+  if (!e.target.closest("#ctxmenu") && !e.target.closest("#layout-menu")) hideMenu();
   if (!e.target.closest("#suggest") && !e.target.closest(".cm-content")) hideSuggest();
 });
 document.addEventListener("keydown", e => {
@@ -3945,6 +4758,16 @@ function fileMenu(x, y, absPath, isDir) {
     }
   }});
   items.push({ sep: true });
+  if (!isDir) {
+    items.push({ label: "Open to the Side", icon: "panel", run: async () => {
+      await openFile(absPath, 0, false);
+      if (A()) await openToSide(A());
+    }});
+    if (S.paneReady) items.push({ label: "Open in New Layout Pane", icon: "plus", run: async () => {
+      await paneSplitActive("vertical");
+      await openFile(absPath, 0, false);
+    }});
+  }
   items.push({ label: "Copy Path", run: () => copyText(absPath) });
   items.push({ label: "Copy Relative Path", run: () => copyText(r) });
   if (!isDir) {
@@ -4691,6 +5514,9 @@ const COMMANDS = [
   ["keyboard shortcuts", () => shortcutsSheet(), "help"],
   ["about keplr", () => aboutSheet(), "help"],
   ["split right", () => toggleSplit(), "view"],
+  ["split down", () => paneSplitActive("vertical"), "view"],
+  ["add chat card", () => paneAddCard("chat"), "view"],
+  ["reset layout", () => paneResetLayout(), "view"],
   ["focus left pane", () => focusGroup(0), "view"],
   ["focus right pane", () => focusGroup(1), "view"],
 ];
@@ -5442,13 +6268,8 @@ function wireShell() {
 
 /* ============ wiring ============ */
 window.addEventListener("resize", () => moveDockIndicator());
-document.getElementById("finder").addEventListener("focus", e => {
-  e.target.select();
-  palOpen(true);
-});
-document.getElementById("finder").addEventListener("keydown", e => {
-  if (e.key === "Enter") palOpen(true);
-});
+document.getElementById("finder").addEventListener("click", () => palOpen(true));
+document.getElementById("layout-menu").onclick = e => paneLayoutMenu(e);
 document.getElementById("t-left").onclick = () => toggleDock("left");
 document.getElementById("t-right").onclick = () => toggleDock("right");
 document.getElementById("t-bottom").onclick = () => toggleDock("bottom");
@@ -5494,7 +6315,7 @@ document.addEventListener("keydown", e => {
   } else if (mod && e.key === "\\") { e.preventDefault(); toggleSplit(); }
   else if (S.settings.keymap === "zed" && mod && e.key === "`") {
     e.preventDefault();
-    if (!S.docks.bottom) toggleDock("bottom", true);
+  if (!keepDock && !S.docks.bottom) toggleDock("bottom", true);
     setBottomTab("terminal");
   } else if (e.altKey && !mod && e.key === " ") {
     const ae = document.activeElement;
@@ -5515,6 +6336,18 @@ document.addEventListener("keydown", e => {
 
 /* ============ splits ============ */
 async function toggleSplit() {
+  if (S.paneReady) {
+    for (const leaf of Object.values(S.paneLayout.tree.leaves)) {
+      if (leaf.cards.some(card => S.paneHostCards.get(card.id) === "col1")) {
+        S.paneLayout = PaneLayout.focusLeaf(S.paneLayout, leaf.id);
+        renderPaneLayout();
+        await panePrimeSecondEditor();
+        return;
+      }
+    }
+    paneSplitActive("horizontal");
+    return;
+  }
   const col1 = document.getElementById("col1");
   const split = !col1.classList.contains("hidden");
   if (split) {
@@ -5533,6 +6366,13 @@ async function toggleSplit() {
   }
 }
 function focusGroup(i) {
+  if (S.paneReady) {
+    const leaf = i === 0 ? "left" : "editor";
+    S.paneLayout = PaneLayout.focusLeaf(S.paneLayout, leaf);
+    saveLayout();
+    renderPaneLayout();
+    return;
+  }
   S.focus = i;
   ED = ED_ALL[i] || ED_ALL[0];
   document.getElementById("col0").classList.toggle("focus", i === 0);
@@ -5546,6 +6386,7 @@ function focusGroup(i) {
 /* ============ boot ============ */
 (async function boot() {
   loadLayout();
+  initDynamicWorkbench();
   toggleDock("left", S.docks.left);
   toggleDock("right", S.docks.right);
   toggleDock("bottom", S.docks.bottom);

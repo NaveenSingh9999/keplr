@@ -44,6 +44,90 @@ pub fn render_scene(canvas_id: &str, scene_json: &str) -> Result<(), JsValue> {
     paint(&ctx, &canvas, &scene)
 }
 
+#[derive(Clone, Copy)]
+struct LayoutRect {
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+}
+
+fn layout_leaf_value(node: &serde_json::Value) -> Option<&serde_json::Value> {
+    node.get("Leaf").or_else(|| {
+        if node.get("type").and_then(|v| v.as_str()) == Some("leaf") {
+            Some(node)
+        } else {
+            None
+        }
+    })
+}
+
+fn layout_split_value(node: &serde_json::Value) -> Option<&serde_json::Value> {
+    node.get("Split").or_else(|| {
+        if node.get("type").and_then(|v| v.as_str()) == Some("split") {
+            Some(node)
+        } else {
+            None
+        }
+    })
+}
+
+fn collect_layout_rects(
+    node: &serde_json::Value,
+    rect: LayoutRect,
+    out: &mut Vec<(LayoutRect, bool)>,
+) -> bool {
+    if let Some(leaf) = layout_leaf_value(node) {
+        out.push((
+            rect,
+            leaf.get("visible").and_then(|v| v.as_bool()).unwrap_or(true),
+        ));
+        return true;
+    }
+    let Some(split) = layout_split_value(node) else {
+        return false;
+    };
+    let ratio = split
+        .get("ratio")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(0.5)
+        .clamp(0.05, 0.95) as f32;
+    if split.get("axis").and_then(|v| v.as_str()) == Some("vertical") {
+        let first_h = rect.h * ratio;
+        if let Some(first) = split.get("first") {
+            collect_layout_rects(first, LayoutRect { h: first_h, ..rect }, out);
+        }
+        if let Some(second) = split.get("second") {
+            collect_layout_rects(
+                second,
+                LayoutRect {
+                    y: rect.y + first_h,
+                    h: rect.h - first_h,
+                    ..rect
+                },
+                out,
+            );
+        }
+    } else {
+        let first_w = rect.w * ratio;
+        if let Some(first) = split.get("first") {
+            collect_layout_rects(first, LayoutRect { w: first_w, ..rect }, out);
+        }
+        if let Some(second) = split.get("second") {
+            collect_layout_rects(
+                second,
+                LayoutRect {
+                    x: rect.x + first_w,
+                    w: rect.w - first_w,
+                    ..rect
+                },
+                out,
+            );
+        }
+    }
+    true
+}
+
 fn paint(
     ctx: &CanvasRenderingContext2d,
     canvas: &HtmlCanvasElement,
@@ -59,9 +143,31 @@ fn paint(
     ctx.fill_rect(0.0, 0.0, w, 30.0);
     ctx.set_fill_style_str(&theme.text);
     ctx.fill_text(&scene.titlebar.root, 12.0, 20.0)?;
+    let mut dynamic = false;
+    if let Some(root) = scene
+        .layout
+        .as_ref()
+        .and_then(|value| value.get("tree"))
+        .and_then(|tree| tree.get("root"))
+    {
+        let mut rects = Vec::new();
+        dynamic = collect_layout_rects(
+            root,
+            LayoutRect { x: 0.0, y: 30.0, w: w as f32, h: h as f32 - 56.0 },
+            &mut rects,
+        );
+        ctx.set_fill_style_str(&theme.surface);
+        for (rect, visible) in rects {
+            if visible {
+                ctx.fill_rect(rect.x as f64, rect.y as f64, rect.w as f64, rect.h as f64);
+            }
+        }
+    }
     let lw = w * 0.22;
-    ctx.set_fill_style_str(&theme.surface);
-    ctx.fill_rect(0.0, 30.0, lw, h - 56.0);
+    if !dynamic {
+        ctx.set_fill_style_str(&theme.surface);
+        ctx.fill_rect(0.0, 30.0, lw, h - 56.0);
+    }
     ctx.set_fill_style_str(&theme.text_dim);
     let mut y = 48.0;
     for line in scene.left.lines.iter().take(30) {

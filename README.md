@@ -39,6 +39,10 @@ vim mode, diagnostics, symbols, Markdown/PDF/image previews.
 
 ![editor](docs/showcase/shots/shot-editor.png)
 
+**Fluid workbench** — drag cards into any pane, split vertically or horizontally, save presets, and switch layouts from the compact header.
+
+![fluid workbench](docs/showcase/shots/shot-layout.png)
+
 **Source control** — commit box, branch picker, stage/unstage/discard, stash,
 and the blue **Push** button. No terminal required.
 
@@ -95,7 +99,7 @@ Reproduce: `cargo run --release -p keplr-cli -- --root /tmp/benchroot bench --fi
 ## Install
 
 Prebuilt binaries live on the [releases page](https://github.com/NaveenSingh9999/keplr/releases)
-(first release: `v0.1.0`):
+(current release: `v0.1.1`):
 
 | OS | Arch | Download |
 |---|---|---|
@@ -106,10 +110,12 @@ Prebuilt binaries live on the [releases page](https://github.com/NaveenSingh9999
 
 ```bash
 # Debian/Ubuntu:
-sudo dpkg -i keplr_0.1.0_amd64.deb
+sudo dpkg -i keplr_0.1.1_amd64.deb
+# ARM64:
+sudo dpkg -i keplr_0.1.1_arm64.deb
 # Fedora/RHEL:
-sudo rpm -i keplr-0.1.0-1.x86_64.rpm
-# Any Linux: chmod +x keplr-0.1.0-x86_64.AppImage && ./keplr-0.1.0-x86_64.AppImage
+sudo rpm -i keplr-0.1.1-1.x86_64.rpm
+# Any Linux: chmod +x keplr-0.1.1-x86_64.AppImage && ./keplr-0.1.1-x86_64.AppImage
 
 # From source (Rust stable):
 cargo install --git https://github.com/NaveenSingh9999/keplr.git keplr-cli

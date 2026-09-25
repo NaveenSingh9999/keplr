@@ -17,6 +17,7 @@ jobs:
           components: clippy
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace --all-targets
+      - run: node --test crates/keplr-serve/tests/ui_layout.test.mjs
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo build --workspace
 

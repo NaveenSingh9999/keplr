@@ -1,3 +1,9 @@
+mod workbench;
+
+pub use workbench::{
+    LayoutError, PaneAxis, PaneCard, PaneKind, PaneLeaf, PaneNode, PaneTree, WorkbenchLayout,
+};
+
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
@@ -37,6 +43,7 @@ pub struct UiState {
     pub diagnostics: Vec<keplr_lang::Diagnostic>,
     pub tasks: Vec<keplr_render::TaskEntry>,
     pub vim_mode: bool,
+    pub workbench: WorkbenchLayout,
 }
 
 impl UiState {
@@ -59,6 +66,7 @@ impl UiState {
             diagnostics: Vec::new(),
             tasks: Vec::new(),
             vim_mode: false,
+            workbench: WorkbenchLayout::current_default(),
         }
     }
 
@@ -74,6 +82,39 @@ impl UiState {
             soft_wrap: false,
         });
         self.active = self.tabs.len() - 1;
+    }
+
+    pub fn workbench_layout(&self) -> &WorkbenchLayout {
+        &self.workbench
+    }
+
+    pub fn workbench_layout_mut(&mut self) -> &mut WorkbenchLayout {
+        &mut self.workbench
+    }
+
+    pub fn split_workbench_leaf(
+        &mut self,
+        leaf_id: &str,
+        axis: PaneAxis,
+        card: PaneCard,
+    ) -> Result<String, LayoutError> {
+        self.workbench.tree.split_leaf(leaf_id, axis, card)
+    }
+
+    pub fn move_workbench_card(&mut self, card_id: &str, leaf_id: &str) -> Result<(), LayoutError> {
+        self.workbench.tree.move_card(card_id, leaf_id)
+    }
+
+    pub fn focus_workbench_leaf(&mut self, leaf_id: &str) -> Result<(), LayoutError> {
+        self.workbench.focus(leaf_id)
+    }
+
+    pub fn set_workbench_leaf_visible(
+        &mut self,
+        leaf_id: &str,
+        visible: bool,
+    ) -> Result<(), LayoutError> {
+        self.workbench.tree.set_leaf_visible(leaf_id, visible)
     }
 
     pub fn toggle(&mut self, dock: Dock) {
@@ -266,6 +307,17 @@ impl UiState {
             width,
         };
         let mut scene = keplr_render::build_scene(&spec);
+        let mut workbench = self.workbench.clone();
+        let _ = workbench
+            .tree
+            .set_leaf_visible("left", self.left_visible);
+        let _ = workbench
+            .tree
+            .set_leaf_visible("right", self.right_visible);
+        let _ = workbench
+            .tree
+            .set_leaf_visible("bottom", self.bottom_visible);
+        scene.layout = serde_json::to_value(&workbench).ok();
         if !self.left_visible {
             scene.left.lines = vec![String::from("(hidden)")];
         }

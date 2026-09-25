@@ -1,0 +1,47 @@
+name: showcase
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: npm install --no-save playwright@1.52.0
+      - run: npx playwright install --with-deps chromium
+      - run: cargo build --release -p keplr-cli
+      - name: Start showcase server
+        run: |
+          ./target/release/keplr --root . serve --port 7137 > /tmp/keplr-showcase.log 2>&1 &
+          echo $! > /tmp/keplr-showcase.pid
+          for i in $(seq 1 60); do
+            curl -fsS http://127.0.0.1:7137/health >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/keplr-showcase.log
+          exit 1
+      - run: node .github/scripts/showcase.mjs
+        env:
+          KEPLR_URL: http://127.0.0.1:7137
+          SHOWCASE_OUTPUT: showcase-output
+      - name: Stop showcase server
+        if: always()
+        run: |
+          test -f /tmp/keplr-showcase.pid && kill "$(cat /tmp/keplr-showcase.pid)" 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: keplr-showcase
+          path: showcase-output/*.png

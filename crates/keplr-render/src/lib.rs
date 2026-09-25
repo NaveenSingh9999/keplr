@@ -144,6 +144,8 @@ pub struct Scene {
     pub palette_query: String,
     pub palette_mode: String,
     pub palette_hits: Vec<String>,
+    #[serde(default)]
+    pub layout: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -459,9 +461,10 @@ pub fn build_scene(spec: &SceneSpec) -> Scene {
         },
         palette_open,
         palette_query: palette_query_str,
-        palette_mode: spec.palette_mode.to_string(),
-        palette_hits,
-    }
+         palette_mode: spec.palette_mode.to_string(),
+         palette_hits,
+         layout: None,
+     }
 }
 
 fn push_op(ops: &mut Vec<SceneOp>, path: &str, before: String, after: String) {
@@ -476,6 +479,12 @@ fn push_op(ops: &mut Vec<SceneOp>, path: &str, before: String, after: String) {
 
 pub fn diff_scenes(a: &Scene, b: &Scene) -> Vec<SceneOp> {
     let mut ops = Vec::new();
+    push_op(
+        &mut ops,
+        "layout",
+        a.layout.as_ref().map(|v| v.to_string()).unwrap_or_default(),
+        b.layout.as_ref().map(|v| v.to_string()).unwrap_or_default(),
+    );
     push_op(
         &mut ops,
         "titlebar.root",

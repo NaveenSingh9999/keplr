@@ -57,7 +57,79 @@ fn push_quad(v: &mut Vec<f32>, x: f32, y: f32, w: f32, h: f32, c: [f32; 3]) {
     }
 }
 
-fn layout_quads(_scene: &Scene, w: u32, h: u32) -> Vec<f32> {
+#[derive(Clone, Copy)]
+struct LayoutRect {
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+}
+
+fn layout_split_value(node: &serde_json::Value) -> Option<(String, &serde_json::Value)> {
+    node.get("Split")
+        .and_then(|v| Some((v.get("id")?.as_str()?.to_string(), v)))
+}
+
+fn layout_leaf_value(node: &serde_json::Value) -> Option<&serde_json::Value> {
+    node.get("Leaf").or_else(|| {
+        if node.get("type").and_then(|v| v.as_str()) == Some("leaf") {
+            Some(node)
+        } else {
+            None
+        }
+    })
+}
+
+fn collect_layout_rects(node: &serde_json::Value, rect: LayoutRect, out: &mut Vec<(LayoutRect, bool)>) -> bool {
+    if let Some(leaf) = layout_leaf_value(node) {
+        let visible = leaf.get("visible").and_then(|v| v.as_bool()).unwrap_or(true);
+        out.push((rect, visible));
+        return true;
+    }
+    let split = if let Some((_, value)) = layout_split_value(node) {
+        value
+    } else if node.get("type").and_then(|v| v.as_str()) == Some("split") {
+        node
+    } else {
+        return false;
+    };
+    let first = split.get("first");
+    let second = split.get("second");
+    let ratio = split
+        .get("ratio")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(0.5)
+        .clamp(0.05, 0.95) as f32;
+    let axis = split.get("axis").and_then(|v| v.as_str()).unwrap_or("horizontal");
+    if axis == "vertical" {
+        let first_h = rect.h * ratio;
+        if let Some(first) = first {
+            collect_layout_rects(first, LayoutRect { h: first_h, ..rect }, out);
+        }
+        if let Some(second) = second {
+            collect_layout_rects(
+                second,
+                LayoutRect { y: rect.y + first_h, h: rect.h - first_h, ..rect },
+                out,
+            );
+        }
+    } else {
+        let first_w = rect.w * ratio;
+        if let Some(first) = first {
+            collect_layout_rects(first, LayoutRect { w: first_w, ..rect }, out);
+        }
+        if let Some(second) = second {
+            collect_layout_rects(
+                second,
+                LayoutRect { x: rect.x + first_w, w: rect.w - first_w, ..rect },
+                out,
+            );
+        }
+    }
+    true
+}
+
+fn layout_quads(scene: &Scene, w: u32, h: u32) -> Vec<f32> {
     let theme = Theme::amoled();
     let bg = parse_hex(&theme.bg);
     let surface = parse_hex(&theme.surface);
@@ -77,10 +149,34 @@ fn layout_quads(_scene: &Scene, w: u32, h: u32) -> Vec<f32> {
     quad(0.0, 0.0, w, h, bg);
     quad(0.0, 0.0, w, 30.0, surface);
     quad(0.0, 30.0, w, 2.0, accent);
-    quad(0.0, 32.0, w * 0.22, h - 58.0, surface);
-    quad(w * 0.82, 32.0, w * 0.18, h - 58.0, surface);
+    let mut dynamic = false;
+    if let Some(root) = scene
+        .layout
+        .as_ref()
+        .and_then(|value| value.get("tree"))
+        .and_then(|tree| tree.get("root"))
+    {
+        let mut rects = Vec::new();
+        dynamic = collect_layout_rects(
+            root,
+            LayoutRect { x: 0.0, y: 32.0, w, h: h - 58.0 },
+            &mut rects,
+        );
+        if dynamic {
+            for (rect, visible) in rects {
+                if visible {
+                    quad(rect.x, rect.y, rect.w, rect.h, surface);
+                    quad(rect.x, rect.y, rect.w, 1.0, bg);
+                }
+            }
+        }
+    }
+    if !dynamic {
+        quad(0.0, 32.0, w * 0.22, h - 58.0, surface);
+        quad(w * 0.82, 32.0, w * 0.18, h - 58.0, surface);
+        quad(0.0, h - 120.0, w, 94.0, surface);
+    }
     quad(0.0, h - 26.0, w, 26.0, surface);
-    quad(0.0, h - 120.0, w, 94.0, surface);
     v
 }
 

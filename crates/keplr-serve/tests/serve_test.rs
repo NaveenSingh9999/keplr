@@ -28,4 +28,18 @@ async fn health_and_search_respond() {
         .await
         .unwrap();
     assert!(search.contains("a.txt"));
+    let module = reqwest::get(format!("http://127.0.0.1:{port}/ui-layout.js"))
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+    assert!(module.contains("export function currentLayout"));
+    let font = reqwest::get(format!(
+        "http://127.0.0.1:{port}/fonts/JetBrainsMono-Regular.ttf"
+    ))
+    .await
+    .unwrap();
+    assert_eq!(font.status(), 200);
+    assert!(font.content_length().unwrap_or(0) > 1000);
 }
