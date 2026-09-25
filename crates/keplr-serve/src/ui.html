@@ -1412,6 +1412,7 @@ const S = {
   paneReady: false,
   paneSurface: null,
   paneHostCards: new Map(),
+  paneHosts: new Map(),
   paneDrag: null,
   panePresets: {},
 };
@@ -1495,7 +1496,7 @@ const PANE_FALLBACK_HOSTS = {
 };
 function paneCardHost(card) {
   const id = S.paneHostCards.get(card.id) || PANE_CARD_HOSTS[card.id] || PANE_FALLBACK_HOSTS[card.kind];
-  return id ? document.getElementById(id) : null;
+  return id ? S.paneHosts.get(id) || document.getElementById(id) : null;
 }
 function paneCardIcon(kind) { return icon(PANE_CARD_ICONS[kind] || "file"); }
 function paneCardTitle(card) { return card.title || card.kind; }
@@ -1871,6 +1872,11 @@ function initDynamicWorkbench() {
   surface.appendChild(right);
   surface.appendChild(bottom);
   S.paneSurface = surface;
+  S.paneHosts.clear();
+  S.paneHosts.set("left", left);
+  S.paneHosts.set("center", center);
+  S.paneHosts.set("right", right);
+  S.paneHosts.set("bottom", bottom);
   S.paneReady = true;
   try { S.panePresets = JSON.parse(localStorage.getItem("keplr-layout-presets") || "{}"); } catch (e) {}
   if (!S.paneLayout) S.paneLayout = PaneLayout.migrateLegacyLayout({ docks: S.docks });
