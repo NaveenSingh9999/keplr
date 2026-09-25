@@ -98,7 +98,7 @@ impl Workspace {
     }
 
     #[cfg(target_arch = "wasm32")]
-    pub fn grep(&self, _ws: &Workspace, _needle: &str, _limit: usize) -> Vec<SearchHit> {
+    pub fn grep(&self, _needle: &str, _limit: usize) -> Vec<SearchHit> {
         Vec::new()
     }
 
@@ -131,11 +131,6 @@ impl Workspace {
             }
         }
         hits
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    pub fn grep(&self, _needle: &str, _limit: usize) -> Vec<SearchHit> {
-        Vec::new()
     }
 }
 
@@ -347,7 +342,7 @@ impl Index {
     }
 
     #[cfg(target_arch = "wasm32")]
-    pub fn grep(&self, _needle: &str, _limit: usize) -> Vec<SearchHit> {
+    pub fn grep(&self, _ws: &Workspace, _needle: &str, _limit: usize) -> Vec<SearchHit> {
         Vec::new()
     }
 }
