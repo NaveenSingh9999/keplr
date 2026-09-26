@@ -557,9 +557,20 @@ mod tests {
     fn control_tab_cycles_tabs_and_control_w_closes_one() {
         let mut state = state(std::path::Path::new("/tmp"));
         state.client.open(Pane::SourceControl);
-        let before = state.client.active_index();
+        assert_eq!(state.client.active_index(), 1, "the new tab is focused");
         assert!(state.key(&chord(RKey::Tab, true, false)));
-        assert_ne!(state.client.active_index(), before);
+        assert_eq!(
+            state.client.active_index(),
+            1,
+            "cycling forwards from the last tab stays there"
+        );
+        state.client.focus(0);
+        assert!(state.key(&chord(RKey::Tab, true, false)));
+        assert_eq!(
+            state.client.active_index(),
+            1,
+            "and from the first it moves on"
+        );
         let tabs = state.client.tabs().len();
         assert!(state.key(&chord(RKey::Character("w".into()), true, false)));
         assert_eq!(state.client.tabs().len(), tabs - 1);

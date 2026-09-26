@@ -762,7 +762,11 @@ mod tests {
         let second = node(&app, "edit-row-1");
         assert_eq!(text_of(&app, "edit-num-0"), "1");
         assert_eq!(text_of(&app, "edit-num-1"), "2");
-        assert_eq!(text_of(&app, "edit-text-0"), "first");
+        // The cursor starts at the top of the file, so line 0 is drawn as an
+        // empty run, the caret, and then the rest of the line.
+        assert_eq!(text_of(&app, "edit-text-0"), "");
+        assert_eq!(text_of(&app, "edit-caret-0"), "\u{2588}");
+        assert_eq!(text_of(&app, "edit-tail-0"), "first");
         assert_eq!(text_of(&app, "edit-text-1"), "second");
         assert_eq!(
             text_of(&app, "edit-caret-1"),
