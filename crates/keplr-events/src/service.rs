@@ -180,10 +180,14 @@ impl Subscriber {
     }
 }
 
+/// A websocket failure, boxed because the upstream error is large and this
+/// function's caller only logs it.
+type SocketError = Box<tokio_tungstenite::tungstenite::Error>;
+
 async fn stream_websocket(
     stream: tokio::net::TcpStream,
     service: Service,
-) -> Result<(), tokio_tungstenite::tungstenite::Error> {
+) -> Result<(), SocketError> {
     let socket = tokio_tungstenite::accept_async(stream).await?;
     let (mut writer, mut reader) = socket.split();
 
