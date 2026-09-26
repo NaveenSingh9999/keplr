@@ -154,11 +154,12 @@ impl App {
             pane,
             focused: true,
         });
+        let opened = self.tabs.len() - 1;
         for (index, tab) in self.tabs.iter_mut().enumerate() {
-            tab.focused = index == self.tabs.len() - 1;
+            tab.focused = index == opened;
         }
-        self.active = self.tabs.len() - 1;
-        self.tabs.len() - 1
+        self.active = opened;
+        opened
     }
 
     /// Focuses a tab, which is also how a pane becomes the room to subscribe to.
