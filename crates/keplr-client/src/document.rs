@@ -119,11 +119,10 @@ impl Document {
         // Line 0 always starts at 0, so at least the first start survives.
         let keep = self.starts.partition_point(|&start| start <= from).max(1);
         self.starts.truncate(keep);
-        let mut offset = self.starts[keep - 1];
-        for (index, byte) in self.text.as_bytes()[offset..].iter().enumerate() {
+        let base = self.starts[keep - 1];
+        for (index, byte) in self.text.as_bytes()[base..].iter().enumerate() {
             if *byte == b'\n' {
-                offset += index + 1;
-                self.starts.push(offset);
+                self.starts.push(base + index + 1);
             }
         }
     }
@@ -289,15 +288,16 @@ mod tests {
     #[test]
     fn pasting_a_newline_moves_every_line_after_it() {
         let mut document = document("l0\nl1\nl2\nl3");
-        document.goto(1, 1);
-        document.insert("X\nY");
-        assert_eq!(document.text(), "l0\nl1X\nYl2\nl3");
+        document.goto(1, 2);
+        document.insert("\nX");
+        assert_eq!(document.text(), "l0\nl1\nX\nl2\nl3");
         assert_eq!(document.lines(), 5);
         assert_eq!(document.line_text(0), "l0");
-        assert_eq!(document.line_text(1), "l1X");
-        assert_eq!(document.line_text(2), "Yl2");
-        assert_eq!(document.line_text(3), "l3");
-        assert_eq!(document.line_start(3), document.text().find("l3").unwrap());
+        assert_eq!(document.line_text(1), "l1");
+        assert_eq!(document.line_text(2), "X");
+        assert_eq!(document.line_text(3), "l2");
+        assert_eq!(document.line_text(4), "l3");
+        assert_eq!(document.line_start(3), document.text().find("l2").unwrap());
         assert_eq!(
             document.cursor_line(),
             2,
@@ -308,11 +308,12 @@ mod tests {
     #[test]
     fn deleting_a_newline_pulls_the_lines_back_together() {
         let mut document = document("l0\nl1\nl2");
-        document.goto(1, 2);
+        // The start of line 2 is just past the newline that joins it to line 1.
+        document.goto(2, 0);
         document.backspace();
-        assert_eq!(document.text(), "l0\nl2");
+        assert_eq!(document.text(), "l0\nl1l2");
         assert_eq!(document.lines(), 2);
-        assert_eq!(document.line_text(1), "l2");
+        assert_eq!(document.line_text(1), "l1l2");
         assert_eq!(document.cursor_line(), 1);
     }
 
@@ -326,17 +327,27 @@ mod tests {
 
     #[test]
     fn the_line_index_is_kept_in_step_over_many_edits() {
-        let mut document = document(&"line\n".repeat(500));
+        let mut document = document(&"line\n".repeat(200));
+        // A file ending in a newline ends with an empty line, which is what an
+        // editor shows, so 200 newlines are 201 lines.
+        assert_eq!(document.lines(), 201);
         for round in 0..50 {
             document.goto(round, 0);
-            document.insert("x");
+            document.insert("\n");
         }
-        assert_eq!(document.lines(), 550, "every pasted line is a line");
-        assert_eq!(document.line_text(0), "xline");
-        assert_eq!(document.line_text(49), "xline");
-        assert_eq!(document.line_text(50), "line");
-        assert_eq!(document.cursor_line(), 49);
-        assert_eq!(document.line_start(550), document.text().len());
+        assert_eq!(document.lines(), 251, "every pasted newline is a line");
+        // Every paste went in at the top, so the empty lines come first and the
+        // original text is pushed down rather than split.
+        assert_eq!(document.line_text(0), "");
+        assert_eq!(document.line_text(49), "");
+        assert_eq!(document.line_text(50), "line", "the first line survived");
+        assert_eq!(document.line_text(250), "", "the tail did not drift");
+        assert_eq!(document.line_start(250), document.text().len());
+        assert_eq!(
+            document.cursor_line(),
+            50,
+            "the cursor is on the line the last paste pushed down"
+        );
     }
 
     #[test]
