@@ -1,0 +1,17 @@
+[package]
+name = "keplr-client"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "State behind the Keplr native client: panes, tabs, documents, and terminals"
+
+[lib]
+name = "keplr_client"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow.workspace = true
+keplr-events = { path = "../keplr-events" }
+keplr-term = { path = "../keplr-term" }
+serde.workspace = true
+serde_json.workspace = true
