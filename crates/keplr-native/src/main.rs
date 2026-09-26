@@ -14,7 +14,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use rcus::desktop::Redraw;
 use rcus::{App as RcusApp, DesktopApp, InputEvent};
 
