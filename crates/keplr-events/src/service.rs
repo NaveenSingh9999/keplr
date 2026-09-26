@@ -14,7 +14,7 @@ use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 use tokio_tungstenite::tungstenite::Message;
 
-use crate::protocol::{encode_event, parse_command, Command, Event};
+use crate::protocol::{encode_event, Command, Event};
 
 /// The room every subscriber joins, and the prefix for per-kind rooms.
 const BASE_ROOM: &str = "keplr";
@@ -63,7 +63,7 @@ impl Service {
     pub fn publish(&self, event: &Event) -> Vec<Command> {
         let kind = event_kind(event);
         let frame = encode_event(event);
-        self.broadcast(&room_for(kind), &frame);
+        self.broadcast(&room_for(kind), frame.as_str());
         match event {
             Event::Ping { id } => vec![Command::Pong { id: *id }],
             other => {
@@ -201,10 +201,9 @@ async fn stream_websocket(
         ))
         .await;
 
-    let pump = service.clone();
-    let pump_task = tokio::spawn(async move {
+    let writer_task = tokio::spawn(async move {
         while let Some(frame) = outbox.recv().await {
-            if pump.handle_frame(id, &frame, &pump).is_err() {
+            if writer.send(Message::Text(frame.into())).await.is_err() {
                 break;
             }
         }
@@ -230,28 +229,8 @@ async fn stream_websocket(
     }
     service.unsubscribe(id);
     drop(outbox);
-    pump_task.abort();
+    writer_task.abort();
     Ok(())
-}
-
-impl Service {
-    /// Turns an outbound frame into the message to write, keeping the protocol
-    /// decisions in one place.
-    fn handle_frame(&self, id: u64, frame: &str, service: &Service) -> Result<(), ()> {
-        let command = parse_command(frame);
-        match command {
-            Command::Invalidate { reason } => {
-                // The subscriber's own room decides whether it cares; a window
-                // that switched panes left that room when it sent `watch`.
-                if service.watchers(&reason) == 0 {
-                    return Err(());
-                }
-                let _ = id;
-                Ok(())
-            }
-            _ => Ok(()),
-        }
-    }
 }
 
 /// The kind an event belongs to, which is also its room suffix.
@@ -278,8 +257,8 @@ mod tests {
     #[test]
     fn an_event_reaches_only_the_windows_watching_it() {
         let service = Service::new();
-        let terminal = subscribe(&service, "terminal.frame");
-        let problems = subscribe(&service, "diagnostics.update");
+        let mut terminal = subscribe(&service, "terminal.frame");
+        let mut problems = subscribe(&service, "diagnostics.update");
         service.publish(&Event::TerminalFrame {
             session: "t1".into(),
             rows: 24,
@@ -315,7 +294,7 @@ mod tests {
     #[test]
     fn a_ping_is_answered_with_a_pong() {
         let service = Service::new();
-        let pong = subscribe(&service, "terminal.frame");
+        let mut pong = subscribe(&service, "terminal.frame");
         let commands = service.publish(&Event::Ping { id: 42 });
         assert_eq!(commands, vec![Command::Pong { id: 42 }]);
         // The reply goes to the subscriber through the same inbox.
@@ -353,11 +332,7 @@ mod tests {
             .expect("connects");
         let (mut writer, mut reader) = socket.split();
 
-        let hello = reader.next().await.expect("a frame").expect("no error");
-        let hello: Command = match hello.expect("text frame") {
-            Message::Text(text) => serde_json::from_str(&text).expect("a command"),
-            other => panic!("unexpected frame {other:?}"),
-        };
+        let hello: Command = command_frame(&mut reader).await;
         assert!(matches!(hello, Command::Hello { .. }), "{hello:?}");
 
         let ping = serde_json::json!({ "kind": "ping", "id": 9 }).to_string();
@@ -365,11 +340,23 @@ mod tests {
             .send(Message::Text(ping.into()))
             .await
             .expect("ping sends");
-        let reply = reader.next().await.expect("a frame").expect("no error");
-        let reply: Command = match reply.expect("text frame") {
-            Message::Text(text) => serde_json::from_str(&text).expect("a command"),
-            other => panic!("unexpected frame {other:?}"),
-        };
-        assert_eq!(reply, Command::Pong { id: 9 });
+        assert_eq!(command_frame(&mut reader).await, Command::Pong { id: 9 });
+    }
+
+    /// Reads until a text frame that decodes as a command.
+    async fn command_frame<S>(reader: &mut S) -> Command
+    where
+        S: futures_util::Stream<Item = Result<Message, tokio_tungstenite::tungstenite::Error>>
+            + Unpin,
+    {
+        use futures_util::StreamExt;
+        while let Some(Ok(message)) = reader.next().await {
+            if let Message::Text(text) = message {
+                if let Ok(command) = serde_json::from_str::<Command>(&text) {
+                    return command;
+                }
+            }
+        }
+        panic!("the service closed before answering");
     }
 }

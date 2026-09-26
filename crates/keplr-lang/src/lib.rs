@@ -540,40 +540,6 @@ pub struct Diagnostic {
     pub severity: String,
 }
 
-fn parse_diag_line(raw: &str, fallback_path: &str) -> Option<Diagnostic> {
-    let parts: Vec<&str> = raw.splitn(4, ':').collect();
-    if parts.len() < 3 {
-        return None;
-    }
-    let line: u64 = parts[1].trim().parse().ok()?;
-    if line == 0 {
-        return None;
-    }
-    let (col, message) = if parts.len() == 4 {
-        match parts[2].trim().parse::<u64>() {
-            Ok(c) if c > 0 => (c, parts[3].trim().to_string()),
-            _ => (1, format!("{}: {}", parts[2].trim(), parts[3].trim())),
-        }
-    } else {
-        (1, parts[2].trim().to_string())
-    };
-    if message.is_empty() {
-        return None;
-    }
-    let path = if parts[0].trim().is_empty() {
-        fallback_path.to_string()
-    } else {
-        parts[0].trim().to_string()
-    };
-    Some(Diagnostic {
-        path,
-        line,
-        col,
-        message,
-        severity: String::from("error"),
-    })
-}
-
 const LAML_KEYWORDS: &[&str] = &[
     "serve",
     "on",
