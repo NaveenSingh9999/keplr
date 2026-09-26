@@ -201,7 +201,7 @@ mod integration {
     #[tokio::test]
     async fn the_laml_service_answers_a_ping() {
         let config = SupervisorConfig::discover();
-        if !config.program.exists() && which(&config.program).is_none() {
+        if !config.program.is_file() {
             eprintln!(
                 "skipping: no laml interpreter at {}",
                 config.program.display()

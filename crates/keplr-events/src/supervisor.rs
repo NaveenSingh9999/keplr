@@ -162,8 +162,8 @@ impl Supervisor {
     /// elsewhere or in tests.
     pub fn disabled() -> Self {
         Self::new(SupervisorConfig {
-            program: PathBuf::new("laml"),
-            script: PathBuf::new("events.lm"),
+            program: PathBuf::from("laml"),
+            script: PathBuf::from("events.lm"),
             min_backoff: Duration::from_millis(250),
             max_backoff: Duration::from_secs(10),
         })
