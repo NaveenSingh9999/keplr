@@ -1790,8 +1790,6 @@ async fn sync_status(State(state): State<AppState>) -> Json<serde_json::Value> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[tokio::test]
     async fn terminal_frames_carry_a_cursor_and_cells() {
         let mut grid = keplr_term::TerminalGrid::new(8, 2);
