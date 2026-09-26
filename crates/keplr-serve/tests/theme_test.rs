@@ -3,7 +3,10 @@
 
 fn root_block(html: &str) -> String {
     let start = html.find(":root {").expect("no :root block in ui.html");
-    let end = html[start..].find('}').map(|i| start + i + 1).expect("unclosed :root");
+    let end = html[start..]
+        .find('}')
+        .map(|i| start + i + 1)
+        .expect("unclosed :root");
     html[start..end].to_string()
 }
 

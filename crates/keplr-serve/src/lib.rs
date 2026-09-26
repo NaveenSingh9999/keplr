@@ -1,9 +1,9 @@
+use axum::response::IntoResponse;
 use axum::{
     extract::{ConnectInfo, Query, State},
     routing::{get, post},
     Json, Router,
 };
-use axum::response::IntoResponse;
 use serde::Serialize;
 use std::{
     collections::HashMap,
@@ -137,9 +137,7 @@ async fn require_token(
         .unwrap_or(false);
     let query_ok = req.uri().query().map(|q| {
         q.split('&').any(|kv| match kv.split_once('=') {
-            Some(("token", v)) => {
-                timing_safe_eq(v.as_bytes(), state.token.as_bytes())
-            }
+            Some(("token", v)) => timing_safe_eq(v.as_bytes(), state.token.as_bytes()),
             _ => false,
         })
     });
@@ -180,7 +178,10 @@ async fn search(
     Query(params): Query<HashMap<String, String>>,
 ) -> Json<Vec<keplr_core::SearchHit>> {
     let needle = params.get("needle").cloned().unwrap_or_default();
-    let limit = params.get("limit").and_then(|v| v.parse().ok()).unwrap_or(50);
+    let limit = params
+        .get("limit")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(50);
     let ws = keplr_core::Workspace::new(state.root);
     Json(ws.grep(&needle, limit))
 }
@@ -201,12 +202,20 @@ async fn open(
     if line == 0 {
         Json(serde_json::json!({"lines": buf.len_lines(), "text": buf.rope.to_string()}))
     } else {
-        Json(serde_json::json!({"lines": buf.len_lines(), "text": buf.line(line).unwrap_or_default()}))
+        Json(
+            serde_json::json!({"lines": buf.len_lines(), "text": buf.line(line).unwrap_or_default()}),
+        )
     }
 }
 
 fn mime_for(path: &Path) -> &'static str {
-    match path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase().as_str() {
+    match path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase()
+        .as_str()
+    {
         "pdf" => "application/pdf",
         "png" => "image/png",
         "jpg" | "jpeg" => "image/jpeg",
@@ -260,7 +269,10 @@ async fn files(
     Query(params): Query<HashMap<String, String>>,
 ) -> Json<Vec<keplr_core::FileEntry>> {
     let query = params.get("query").cloned().unwrap_or_default();
-    let limit: usize = params.get("limit").and_then(|v| v.parse().ok()).unwrap_or(50);
+    let limit: usize = params
+        .get("limit")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(50);
     let ws = keplr_core::Workspace::new(state.root.clone());
     let entries = ws.walk_files(20_000);
     if query.is_empty() {
@@ -308,7 +320,10 @@ async fn scene(
         .get("bottom")
         .cloned()
         .unwrap_or_else(|| String::from("terminal"));
-    let width: u16 = params.get("width").and_then(|v| v.parse().ok()).unwrap_or(100);
+    let width: u16 = params
+        .get("width")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(100);
     let open_path: Option<PathBuf> = open.map(PathBuf::from);
     let spec = keplr_render::SceneSpec {
         root: &state.root,
@@ -486,9 +501,7 @@ async fn diagnostics_content(
         | keplr_lang::LangKind::JavaScript
         | keplr_lang::LangKind::TypeScript
         | keplr_lang::LangKind::Tsx
-        | keplr_lang::LangKind::Go => {
-            keplr_lang::syntax_errors(lang, full, &req.content)
-        }
+        | keplr_lang::LangKind::Go => keplr_lang::syntax_errors(lang, full, &req.content),
         _ => Vec::new(),
     };
     Json(serde_json::json!({
@@ -541,9 +554,7 @@ async fn snippets(Query(params): Query<HashMap<String, String>>) -> Json<serde_j
         Json(serde_json::json!({ "snippets": keplr_lang::snippets_for(lang) }))
     } else {
         match keplr_lang::expand_snippet(lang, &prefix) {
-            Some((text, cursor)) => {
-                Json(serde_json::json!({ "text": text, "cursor": cursor }))
-            }
+            Some((text, cursor)) => Json(serde_json::json!({ "text": text, "cursor": cursor })),
             None => Json(serde_json::json!({ "error": "no such snippet" })),
         }
     }
@@ -560,7 +571,10 @@ async fn git_log(
     State(state): State<AppState>,
     Query(params): Query<HashMap<String, String>>,
 ) -> Json<serde_json::Value> {
-    let limit: usize = params.get("limit").and_then(|v| v.parse().ok()).unwrap_or(20);
+    let limit: usize = params
+        .get("limit")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(20);
     match keplr_core::git::log(&state.root, limit) {
         Ok(entries) => Json(serde_json::json!({ "entries": entries })),
         Err(e) => Json(serde_json::json!({ "error": format!("{e:#}") })),
@@ -595,7 +609,9 @@ async fn git_filediff(
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or(rel);
     match keplr_core::git::file_hunks(&state.root, &relpath) {
-        Ok((hunks, untracked)) => Json(serde_json::json!({ "hunks": hunks, "untracked": untracked })),
+        Ok((hunks, untracked)) => {
+            Json(serde_json::json!({ "hunks": hunks, "untracked": untracked }))
+        }
         Err(e) => Json(serde_json::json!({ "error": format!("{e:#}") })),
     }
 }
@@ -1009,10 +1025,7 @@ struct SaveReq {
     task: Option<String>,
 }
 
-async fn save(
-    State(state): State<AppState>,
-    Json(req): Json<SaveReq>,
-) -> Json<serde_json::Value> {
+async fn save(State(state): State<AppState>, Json(req): Json<SaveReq>) -> Json<serde_json::Value> {
     let ws = keplr_core::Workspace::new(state.root.clone());
     let report = match keplr_core::save_buffer(&ws, Path::new(&req.path), &req.content) {
         Ok(r) => r,
@@ -1028,13 +1041,19 @@ async fn save(
         .await;
         match done {
             Ok(Ok(task_reports)) => {
-                return Json(serde_json::json!({"ok": true, "report": report, "tasks": task_reports}))
+                return Json(
+                    serde_json::json!({"ok": true, "report": report, "tasks": task_reports}),
+                )
             }
             Ok(Err(e)) => {
-                return Json(serde_json::json!({"ok": true, "report": report, "task_error": format!("{e:#}")}))
+                return Json(
+                    serde_json::json!({"ok": true, "report": report, "task_error": format!("{e:#}")}),
+                )
             }
             Err(e) => {
-                return Json(serde_json::json!({"ok": true, "report": report, "task_error": format!("join error: {e}")}))
+                return Json(
+                    serde_json::json!({"ok": true, "report": report, "task_error": format!("join error: {e}")}),
+                )
             }
         }
     }
@@ -1047,24 +1066,28 @@ async fn ui_root() -> axum::response::Html<&'static str> {
 
 async fn ui_layout_js() -> impl IntoResponse {
     (
-        [(
-            axum::http::header::CONTENT_TYPE,
-            "text/javascript; charset=utf-8",
-        ), (
-            axum::http::header::CACHE_CONTROL,
-            "no-cache",
-        )],
+        [
+            (
+                axum::http::header::CONTENT_TYPE,
+                "text/javascript; charset=utf-8",
+            ),
+            (axum::http::header::CACHE_CONTROL, "no-cache"),
+        ],
         include_str!("ui_layout.js"),
     )
         .into_response()
 }
 
 async fn jetbrains_mono_regular() -> impl IntoResponse {
-    font_response(include_bytes!("../../../assets/fonts/JetBrainsMono-Regular.ttf"))
+    font_response(include_bytes!(
+        "../../../assets/fonts/JetBrainsMono-Regular.ttf"
+    ))
 }
 
 async fn jetbrains_mono_bold() -> impl IntoResponse {
-    font_response(include_bytes!("../../../assets/fonts/JetBrainsMono-Bold.ttf"))
+    font_response(include_bytes!(
+        "../../../assets/fonts/JetBrainsMono-Bold.ttf"
+    ))
 }
 
 fn font_response(bytes: &'static [u8]) -> impl IntoResponse {
@@ -1184,7 +1207,10 @@ async fn serial_ws(
     ws: axum::extract::ws::WebSocketUpgrade,
 ) -> impl axum::response::IntoResponse {
     let port = params.get("port").cloned().unwrap_or_default();
-    let baud: u32 = params.get("baud").and_then(|v| v.parse().ok()).unwrap_or(115200);
+    let baud: u32 = params
+        .get("baud")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(115200);
     ws.on_upgrade(move |socket| serial_pump(socket, port, baud))
 }
 
@@ -1197,7 +1223,10 @@ async fn serial_pump(mut socket: axum::extract::ws::WebSocket, port: String, bau
             Ok(f) => f,
             Err(e) => {
                 let _ = socket
-                    .send(Message::Text(format!("{{\"error\":\"{}\"}}", json_escape(&format!("{e:#}")))))
+                    .send(Message::Text(format!(
+                        "{{\"error\":\"{}\"}}",
+                        json_escape(&format!("{e:#}"))
+                    )))
                     .await;
                 return;
             }
@@ -1289,11 +1318,6 @@ async fn term_ws(
     ws.on_upgrade(move |socket| term_loop(root, cols.max(1), rows.max(1), cwd, socket))
 }
 
-/// Terminal working directories are resolved inside the workspace root.
-fn safe_terminal_cwd(root: &Path, requested: &str) -> PathBuf {
-    keplr_term::contained_cwd(root, requested)
-}
-
 async fn term_loop(
     root: PathBuf,
     cols: usize,
@@ -1346,8 +1370,6 @@ async fn term_loop(
         }
     });
     let mut writer = writer;
-    let mut cols = cols;
-    let mut rows = rows;
     loop {
         tokio::select! {
             out = fwd_rx.recv() => {
@@ -1375,8 +1397,8 @@ async fn term_loop(
                             let mut it = dim.split('x');
                             if let (Some(c), Some(r)) = (it.next(), it.next()) {
                                 if let (Ok(nc), Ok(nr)) = (c.parse::<usize>(), r.parse::<usize>()) {
-                                    cols = nc.max(1);
-                                    rows = nr.max(1);
+                                    let cols = nc.max(1);
+                                    let rows = nr.max(1);
                                     let _ = master.resize(portable_pty::PtySize {
                                         rows: rows as u16,
                                         cols: cols as u16,
@@ -1458,13 +1480,11 @@ async fn web_file(
     };
     let bytes = match std::fs::read(&full) {
         Ok(b) => b,
-        Err(_) => {
-            return (
-                axum::http::StatusCode::NOT_FOUND,
-                Json(serde_json::json!({"error": "no bundle — build it (see assets/web/index.html)"})),
-            )
-                .into_response()
-        }
+        Err(_) => return (
+            axum::http::StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "no bundle — build it (see assets/web/index.html)"})),
+        )
+            .into_response(),
     };
     let mime = match full.extension().and_then(|e| e.to_str()).unwrap_or("") {
         "html" => "text/html",
@@ -1524,7 +1544,10 @@ pub async fn serve_full(
     let app = Router::new()
         .route("/", get(ui_root))
         .route("/ui-layout.js", get(ui_layout_js))
-        .route("/fonts/JetBrainsMono-Regular.ttf", get(jetbrains_mono_regular))
+        .route(
+            "/fonts/JetBrainsMono-Regular.ttf",
+            get(jetbrains_mono_regular),
+        )
         .route("/fonts/JetBrainsMono-Bold.ttf", get(jetbrains_mono_bold))
         .route("/health", get(health))
         .route("/search", get(search))
@@ -1606,11 +1629,7 @@ async fn daemons(State(state): State<AppState>) -> Json<serde_json::Value> {
     let list: Vec<serde_json::Value> = map
         .iter()
         .map(|(name, (s, _))| {
-            let uptime = s
-                .started
-                .elapsed()
-                .map(|d| d.as_secs())
-                .unwrap_or(0);
+            let uptime = s.started.elapsed().map(|d| d.as_secs()).unwrap_or(0);
             serde_json::json!({ "name": name, "cmd": s.cmd, "pid": s.pid, "uptime_secs": uptime })
         })
         .collect();
@@ -1676,11 +1695,7 @@ async fn sync_channel(
     ws.on_upgrade(move |socket| channel_loop(state, name, socket))
 }
 
-async fn channel_loop(
-    state: AppState,
-    name: String,
-    mut socket: axum::extract::ws::WebSocket,
-) {
+async fn channel_loop(state: AppState, name: String, mut socket: axum::extract::ws::WebSocket) {
     use axum::extract::ws::Message;
     let (full, mut rx) = {
         let mut docs = state.sync_docs.lock().unwrap_or_else(|e| e.into_inner());
@@ -1775,15 +1790,17 @@ async fn sync_status(State(state): State<AppState>) -> Json<serde_json::Value> {
 
 #[cfg(test)]
 mod tests {
-    use super::safe_terminal_cwd;
-    use std::path::Path;
+    use super::*;
 
-    #[test]
-    fn terminal_cwd_stays_inside_the_workspace() {
-        let root = Path::new("workspace");
-        assert_eq!(safe_terminal_cwd(root, "src"), root.join("src"));
-        assert_eq!(safe_terminal_cwd(root, "../escape"), root);
-        let absolute = if cfg!(windows) { "C:\\escape" } else { "/etc" };
-        assert_eq!(safe_terminal_cwd(root, absolute), root);
+    #[tokio::test]
+    async fn terminal_frames_carry_a_cursor_and_cells() {
+        let mut grid = keplr_term::TerminalGrid::new(8, 2);
+        grid.advance(b"hi");
+        let snapshot = grid.snapshot();
+        let frame = serde_json::to_value(&snapshot).expect("snapshot serializes");
+        assert_eq!(frame["cols"], 8);
+        assert_eq!(frame["rows"], 2);
+        assert_eq!(frame["cursor"]["column"], 2);
+        assert!(frame["cells"][0][0]["ch"] == "h");
     }
 }

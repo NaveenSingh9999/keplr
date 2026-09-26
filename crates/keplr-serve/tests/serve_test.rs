@@ -21,12 +21,14 @@ async fn health_and_search_respond() {
         .await
         .unwrap();
     assert!(health.contains("ok"));
-    let search = reqwest::get(format!("http://127.0.0.1:{port}/search?needle=hello&limit=5"))
-        .await
-        .unwrap()
-        .text()
-        .await
-        .unwrap();
+    let search = reqwest::get(format!(
+        "http://127.0.0.1:{port}/search?needle=hello&limit=5"
+    ))
+    .await
+    .unwrap()
+    .text()
+    .await
+    .unwrap();
     assert!(search.contains("a.txt"));
     let module = reqwest::get(format!("http://127.0.0.1:{port}/ui-layout.js"))
         .await
