@@ -241,7 +241,11 @@ pub fn run(args: &[String]) -> Result<()> {
         let mut app = RcusApp::new(tree, rcus::fonts::MONO);
         app.resize(options.size.0 as f32, options.size.1 as f32);
         app.relayout();
-        println!("{}", layout_report(&app));
+        let report = layout_report(&app);
+        // Written to a file as well as stdout: CI keeps the log, but an
+        // artifact is easier to read next to the screenshots.
+        std::fs::write("/tmp/layout.txt", &report).ok();
+        println!("{report}");
         return Ok(());
     }
     for pane in &options.panes {
