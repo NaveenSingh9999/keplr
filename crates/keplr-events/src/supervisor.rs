@@ -10,10 +10,70 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+/// Finds the LAML interpreter a Keplr install ships with.
+///
+/// A packaged Keplr carries the binary next to its executable, so the search
+/// starts there and falls back to a developer's own build. Returning `None` is
+/// normal: Keplr runs without the event service.
+pub fn find_laml() -> Option<PathBuf> {
+    if let Some(explicit) = std::env::var_os("KEPLR_LAML") {
+        let path = PathBuf::from(explicit);
+        if path.is_file() {
+            return Some(path);
+        }
+    }
+    let exe = std::env::current_exe().ok()?;
+    let dir = exe.parent()?;
+    let candidates = [
+        dir.join("laml"),
+        dir.join("lib").join("keplr").join("laml"),
+        dir.join("..").join("lib").join("keplr").join("laml"),
+        dir.join("..")
+            .join("..")
+            .join("assets")
+            .join("laml")
+            .join(platform_asset()),
+        dir.join("..")
+            .join("..")
+            .join("..")
+            .join("assets")
+            .join("laml")
+            .join(platform_asset()),
+    ];
+    for candidate in candidates {
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    which("laml")
+}
+
+/// The release asset name for this machine, used inside a source checkout.
+pub fn platform_asset() -> String {
+    let arch = match std::env::consts::ARCH {
+        "aarch64" => "aarch64",
+        "x86_64" => "x86_64",
+        other => other,
+    };
+    let os = match std::env::consts::OS {
+        "macos" => "macos",
+        "windows" => "windows",
+        _ => "linux",
+    };
+    format!("laml-{os}-{arch}")
+}
+
+fn which(name: &str) -> Option<PathBuf> {
+    let path = std::env::var_os("PATH")?;
+    std::env::split_paths(&path)
+        .map(|dir| dir.join(name))
+        .find(|candidate| candidate.is_file())
+}
+
 /// How to launch and restart the event service.
 #[derive(Clone, Debug)]
 pub struct SupervisorConfig {
-    /// The LAML interpreter, resolved from `KEPLR_LAML` or `laml` on `PATH`.
+    /// The LAML interpreter, resolved by [`find_laml`].
     pub program: PathBuf,
     /// The service program, shipped with this crate.
     pub script: PathBuf,
@@ -23,14 +83,11 @@ pub struct SupervisorConfig {
 }
 
 impl SupervisorConfig {
-    /// Finds the interpreter and the bundled service program.
+    /// Uses the interpreter this install ships with.
     pub fn discover() -> Self {
-        let program = std::env::var_os("KEPLR_LAML")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from("laml"));
         Self {
-            program,
-            script: PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/events.lm"),
+            program: find_laml().unwrap_or_else(|| PathBuf::from("laml")),
+            script: default_script(),
             min_backoff: Duration::from_millis(250),
             max_backoff: Duration::from_secs(10),
         }
@@ -46,6 +103,24 @@ impl SupervisorConfig {
             .stderr(Stdio::inherit());
         command
     }
+}
+
+/// The service program shipped with this crate, which is the source tree in a
+/// checkout and the packaged copy in an install.
+pub fn default_script() -> PathBuf {
+    let packaged = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/events.lm");
+    if packaged.is_file() {
+        return packaged;
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let candidate = dir.join("events.lm");
+            if candidate.is_file() {
+                return candidate;
+            }
+        }
+    }
+    packaged
 }
 
 /// What the supervisor is doing, for a status line or a log.

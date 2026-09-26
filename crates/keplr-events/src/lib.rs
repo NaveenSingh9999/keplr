@@ -236,12 +236,4 @@ mod integration {
         assert_eq!(pong, Command::Pong { id: 7 });
         supervisor.stop();
     }
-
-    fn which(program: &std::path::Path) -> Option<std::path::PathBuf> {
-        let name = program.file_name()?.to_str()?;
-        let path = std::env::var_os("PATH")?;
-        std::env::split_paths(&path)
-            .map(|dir| dir.join(name))
-            .find(|candidate| candidate.is_file())
-    }
 }

@@ -2,3 +2,6 @@
 .keplr/
 .bench-corpus/
 *.log
+# Fetched by scripts/fetch-laml.sh, never committed.
+assets/laml/laml-*
+!assets/laml/README.md
