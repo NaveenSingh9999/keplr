@@ -1,9 +1,9 @@
 [workspace]
+resolver = "2"
 members = ["crates/keplr-client", "crates/keplr-events", "crates/keplr-term", "crates/keplr-core", "crates/keplr-sync", "crates/keplr-build", "crates/keplr-lang", "crates/keplr-serve", "crates/keplr-cli", "crates/keplr-render", "crates/keplr-ui", "crates/keplr-web", "crates/keplr-theme", "crates/keplr-native"]
 
 [profile.release]
 strip = "symbols"
-resolver = "2"
 
 [workspace.dependencies]
 anyhow = "1.0.95"

@@ -143,6 +143,8 @@ impl State {
     }
 
     /// Applies one event frame, ignoring anything this window does not watch.
+    /// Tests drive this directly; the window goes through `drain_events`.
+    #[cfg(test)]
     pub fn apply_frame(&mut self, frame: &str) -> bool {
         apply_frame(frame, &mut self.diagnostics, &mut self.tasks)
     }
