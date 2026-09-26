@@ -255,20 +255,24 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn a_host_is_told_when_the_shell_exits() {
-        struct Exits(Arc<Mutex<()>>);
+        struct Exits(Arc<AtomicUsize>);
+
         impl TerminalHost for Exits {
             fn on_frame(&mut self, _grid: &TerminalGrid) {}
-            fn on_exit(&mut self) {}
+            fn on_exit(&mut self) {
+                self.0.fetch_add(1, Ordering::SeqCst);
+            }
         }
-        let marker = Arc::new(Mutex::new(()));
-        let terminal = Terminal::spawn("sh", Path::new("/tmp"), 20, 4, Exits(Arc::clone(&marker)))
+
+        let exits = Arc::new(AtomicUsize::new(0));
+        let terminal = Terminal::spawn("sh", Path::new("/tmp"), 20, 4, Exits(Arc::clone(&exits)))
             .expect("shell starts");
         terminal.paste("exit\n").expect("writes");
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
-        while terminal.is_running() {
+        while exits.load(Ordering::SeqCst) == 0 {
             assert!(
                 std::time::Instant::now() < deadline,
-                "the shell never exited"
+                "the host was never told the shell exited"
             );
             std::thread::sleep(std::time::Duration::from_millis(20));
         }
