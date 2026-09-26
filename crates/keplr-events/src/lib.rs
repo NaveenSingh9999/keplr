@@ -46,7 +46,7 @@ mod tests {
 
     #[test]
     fn a_drain_reports_whether_any_frame_changed_something() {
-        let (mut sender, mut receiver) = channel();
+        let (sender, mut receiver) = channel();
         assert!(
             !drain(&mut receiver, |_| true),
             "an empty room changes nothing"
@@ -64,7 +64,7 @@ mod tests {
 
     #[test]
     fn a_frame_the_window_ignores_does_not_count_as_a_change() {
-        let (mut sender, mut receiver) = channel();
+        let (sender, mut receiver) = channel();
         sender
             .send(encode_event(&Event::Ping { id: 1 }))
             .expect("queued");
