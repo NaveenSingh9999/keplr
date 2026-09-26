@@ -56,9 +56,15 @@ fn lifecycle_start_list_status_stop() {
     let port = free_port().to_string();
     let root_s = root.display().to_string();
 
-    let (ok, out) = run(&home, &["--root", &root_s, "start", "--name", "e2e", "--port", &port]);
+    let (ok, out) = run(
+        &home,
+        &["--root", &root_s, "start", "--name", "e2e", "--port", &port],
+    );
     assert!(ok, "start failed: {out}");
-    assert!(out.contains("started 'e2e'"), "unexpected start output: {out}");
+    assert!(
+        out.contains("started 'e2e'"),
+        "unexpected start output: {out}"
+    );
 
     let port_n: u16 = port.parse().unwrap();
     assert!(wait_serving(port_n), "serve never opened port {port_n}");
@@ -73,7 +79,10 @@ fn lifecycle_start_list_status_stop() {
 
     let (ok, out) = run(&home, &["stop", "--name", "e2e"]);
     assert!(ok, "stop failed: {out}");
-    assert!(out.contains("stopped 'e2e'"), "unexpected stop output: {out}");
+    assert!(
+        out.contains("stopped 'e2e'"),
+        "unexpected stop output: {out}"
+    );
 
     let (ok, out) = run(&home, &["list"]);
     assert!(ok, "list failed: {out}");
@@ -88,9 +97,15 @@ fn double_start_is_rejected() {
     let port = free_port().to_string();
     let root_s = root.display().to_string();
 
-    let (ok, _) = run(&home, &["--root", &root_s, "start", "--name", "dup", "--port", &port]);
+    let (ok, _) = run(
+        &home,
+        &["--root", &root_s, "start", "--name", "dup", "--port", &port],
+    );
     assert!(ok);
-    let (ok, out) = run(&home, &["--root", &root_s, "start", "--name", "dup", "--port", &port]);
+    let (ok, out) = run(
+        &home,
+        &["--root", &root_s, "start", "--name", "dup", "--port", &port],
+    );
     assert!(!ok, "second start should fail");
     assert!(out.contains("already running"), "unexpected output: {out}");
 
@@ -103,7 +118,16 @@ fn help_lists_lifecycle_commands() {
     let (home, _root) = scratch("help");
     let (ok, out) = run(&home, &["--help"]);
     assert!(ok);
-    for cmd in ["start", "stop", "list", "status", "install", "update", "downgrade", "uninstall"] {
+    for cmd in [
+        "start",
+        "stop",
+        "list",
+        "status",
+        "install",
+        "update",
+        "downgrade",
+        "uninstall",
+    ] {
         assert!(out.contains(cmd), "help missing `{cmd}`");
     }
     let _ = std::fs::remove_dir_all(home.parent().unwrap());

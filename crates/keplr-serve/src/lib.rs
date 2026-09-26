@@ -458,8 +458,10 @@ async fn diagnostics(
         Err(e) => return Json(serde_json::json!({"error": format!("{e:#}")})),
     };
     let lang = keplr_lang::LangKind::from_path(&full);
+    // LAML has no tree-sitter grammar and no runtime to ask, so a .lm file
+    // gets highlighting and no diagnostics.
     let diags = if lang == keplr_lang::LangKind::Laml {
-        keplr_lang::laml_diagnostics(&full)
+        Vec::new()
     } else {
         match lang {
             keplr_lang::LangKind::Rust

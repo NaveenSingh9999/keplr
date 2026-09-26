@@ -364,20 +364,9 @@ pub fn build_scene(spec: &SceneSpec) -> Scene {
         _ => project_lines,
     };
 
-    let squiggles: Vec<Squiggle> = match (&resolved_open, center_lang.as_str()) {
-        (Some(full), "laml") => keplr_lang::laml_diagnostics(full)
-            .into_iter()
-            .filter(|d| d.severity == "error")
-            .map(|d| Squiggle {
-                line: d.line,
-                col: d.col,
-                len: 1,
-                message: d.message,
-                severity: d.severity,
-            })
-            .collect(),
-        _ => Vec::new(),
-    };
+    // Only tree-sitter languages carry diagnostics. A .lm file is highlighted
+    // without squiggles rather than asking a runtime that Keplr does not ship.
+    let squiggles: Vec<Squiggle> = Vec::new();
 
     let (palette_open, palette_query_str, palette_hits) = match spec.palette_query {
         Some(q) => {
@@ -461,10 +450,10 @@ pub fn build_scene(spec: &SceneSpec) -> Scene {
         },
         palette_open,
         palette_query: palette_query_str,
-         palette_mode: spec.palette_mode.to_string(),
-         palette_hits,
-         layout: None,
-     }
+        palette_mode: spec.palette_mode.to_string(),
+        palette_hits,
+        layout: None,
+    }
 }
 
 fn push_op(ops: &mut Vec<SceneOp>, path: &str, before: String, after: String) {
@@ -497,8 +486,18 @@ pub fn diff_scenes(a: &Scene, b: &Scene) -> Vec<SceneOp> {
         a.titlebar.query.clone(),
         b.titlebar.query.clone(),
     );
-    push_op(&mut ops, "left.title", a.left.title.clone(), b.left.title.clone());
-    push_op(&mut ops, "left.active_tab", a.left.active_tab.clone(), b.left.active_tab.clone());
+    push_op(
+        &mut ops,
+        "left.title",
+        a.left.title.clone(),
+        b.left.title.clone(),
+    );
+    push_op(
+        &mut ops,
+        "left.active_tab",
+        a.left.active_tab.clone(),
+        b.left.active_tab.clone(),
+    );
     push_op(
         &mut ops,
         "left.lines",
@@ -559,14 +558,24 @@ pub fn diff_scenes(a: &Scene, b: &Scene) -> Vec<SceneOp> {
         a.center.viewport_top.to_string(),
         b.center.viewport_top.to_string(),
     );
-    push_op(&mut ops, "right.active_tab", a.right.active_tab.clone(), b.right.active_tab.clone());
+    push_op(
+        &mut ops,
+        "right.active_tab",
+        a.right.active_tab.clone(),
+        b.right.active_tab.clone(),
+    );
     push_op(
         &mut ops,
         "right.lines",
         a.right.lines.join("\n"),
         b.right.lines.join("\n"),
     );
-    push_op(&mut ops, "bottom.active_tab", a.bottom.active_tab.clone(), b.bottom.active_tab.clone());
+    push_op(
+        &mut ops,
+        "bottom.active_tab",
+        a.bottom.active_tab.clone(),
+        b.bottom.active_tab.clone(),
+    );
     push_op(
         &mut ops,
         "bottom.lines",
@@ -685,7 +694,8 @@ impl PaintBackend for AnsiBackend {
             "\x1b[1mleft:{}/{}\x1b[0m {}\n",
             scene.left.active_tab,
             scene.left.tabs.join("|"),
-            scene.left
+            scene
+                .left
                 .lines
                 .iter()
                 .take(5)
@@ -696,7 +706,8 @@ impl PaintBackend for AnsiBackend {
         out.push_str(&format!(
             "\x1b[1mright:{}\x1b[0m {}\n",
             scene.right.active_tab,
-            scene.right
+            scene
+                .right
                 .lines
                 .iter()
                 .take(5)

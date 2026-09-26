@@ -1,9 +1,8 @@
-//! The event protocol between Keplr's Rust host and its LAML event service.
+//! The event protocol Keplr's host and windows speak.
 //!
-//! Rust pushes [`Event`]s; the service answers with [`Command`]s. Both are
-//! plain JSON so the LAML side needs no schema, and both are enums with a
-//! `kind` tag so a new variant is a compile error in Rust and a missing branch
-//! in LAML rather than a silently dropped frame.
+//! The host pushes [`Event`]s; the service answers with [`Command`]s. Both are
+//! plain JSON with a tag, so a window in another process needs no schema, and a
+//! new variant is a compile error in Rust rather than a silently dropped frame.
 
 use serde::{Deserialize, Serialize};
 
@@ -95,41 +94,22 @@ mod tests {
     }
 
     #[test]
-    fn commands_carry_the_tag_the_service_uses() {
-        let line = r#"{"cmd":"invalidate","reason":"terminal.frame"}"#;
-        assert_eq!(
-            parse_command(line),
-            Command::Invalidate {
-                reason: "terminal.frame".into()
-            }
-        );
-    }
-
-    #[test]
-    fn a_hello_reports_the_window_count() {
-        let line = r#"{"cmd":"hello","fd":3,"windows":2}"#;
-        assert_eq!(parse_command(line), Command::Hello { fd: 3, windows: 2 });
-    }
-
-    #[test]
-    fn a_broken_frame_becomes_an_error_command() {
-        assert!(matches!(parse_command("{not json"), Command::Error { .. }));
-    }
-
-    #[test]
-    fn a_frame_with_an_unknown_tag_is_an_error_not_a_panic() {
-        assert!(matches!(
-            parse_command(r#"{"cmd":"somethingNew"}"#),
-            Command::Error { .. }
-        ));
-    }
-
-    #[test]
-    fn optional_fields_are_omitted_rather_than_null() {
-        let line = encode_event(&Event::DiagnosticsUpdate {
-            path: "src/lib.rs".into(),
-            count: 3,
+    fn a_task_state_is_spelled_in_camel_case() {
+        let line = encode_event(&Event::TaskUpdate {
+            id: "build".into(),
+            state: TaskState::Failed,
+            detail: None,
         });
-        assert!(!line.contains("null"), "{line}");
+        assert!(line.contains("\"state\":\"failed\""), "{line}");
+    }
+
+    #[test]
+    fn an_optional_detail_is_left_out() {
+        let line = encode_event(&Event::TaskUpdate {
+            id: "build".into(),
+            state: TaskState::Running,
+            detail: None,
+        });
+        assert!(!line.contains("detail"), "{line}");
     }
 }

@@ -1,4 +1,4 @@
-use keplr_render::{AnsiBackend, PaintBackend, Theme, build_scene, diff_scenes};
+use keplr_render::{build_scene, diff_scenes, AnsiBackend, PaintBackend, Theme};
 use std::path::Path;
 
 #[test]

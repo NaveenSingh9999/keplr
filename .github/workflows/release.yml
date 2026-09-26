@@ -47,9 +47,6 @@ jobs:
           done
           cp target/release/keplr "$P/usr/bin/keplr"
           chmod 755 "$P/usr/bin/keplr"
-          mkdir -p "$P/usr/lib/keplr"
-          cp assets/laml/laml-linux-x86_64 "$P/usr/lib/keplr/laml"
-          chmod 755 "$P/usr/lib/keplr/laml"
           cp packaging/linux/keplr.desktop "$P/usr/share/applications/keplr.desktop"
           cat > "$P/DEBIAN/control" <<EOF
           Package: keplr
@@ -75,9 +72,8 @@ jobs:
         run: |
           curl -sSfL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod +x appimagetool
-          rm -rf Keplr.AppDir && mkdir -p Keplr.AppDir/usr/bin Keplr.AppDir/usr/lib/keplr
+          rm -rf Keplr.AppDir && mkdir -p Keplr.AppDir/usr/bin
           cp target/release/keplr Keplr.AppDir/usr/bin/
-          cp assets/laml/laml-linux-x86_64 Keplr.AppDir/usr/lib/keplr/laml
           cp packaging/linux/keplr.desktop Keplr.AppDir/
           cp assets/icon/keplr-256.png Keplr.AppDir/keplr.png
           printf '#!/bin/sh\nexec "$APPDIR/usr/bin/keplr" "$@"\n' > Keplr.AppDir/AppRun
@@ -107,7 +103,6 @@ jobs:
         run: |
           mkdir -p dist
           cp target/aarch64-unknown-linux-gnu/release/keplr "dist/keplr-aarch64-unknown-linux-gnu"
-          cp assets/laml/laml-linux-aarch64 "dist/laml-linux-aarch64"
       - name: deb
         run: |
           P="deb/keplr_${VER}_arm64"
@@ -118,9 +113,6 @@ jobs:
           done
           cp target/aarch64-unknown-linux-gnu/release/keplr "$P/usr/bin/keplr"
           chmod 755 "$P/usr/bin/keplr"
-          mkdir -p "$P/usr/lib/keplr"
-          cp assets/laml/laml-linux-aarch64 "$P/usr/lib/keplr/laml"
-          chmod 755 "$P/usr/lib/keplr/laml"
           cp packaging/linux/keplr.desktop "$P/usr/share/applications/keplr.desktop"
           cat > "$P/DEBIAN/control" <<EOF
           Package: keplr
@@ -139,9 +131,8 @@ jobs:
           curl -sSfL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod +x appimagetool
           curl -sSfL -o runtime-aarch64 https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-aarch64
-          rm -rf Keplr.AppDir && mkdir -p Keplr.AppDir/usr/bin Keplr.AppDir/usr/lib/keplr
+          rm -rf Keplr.AppDir && mkdir -p Keplr.AppDir/usr/bin
           cp target/aarch64-unknown-linux-gnu/release/keplr Keplr.AppDir/usr/bin/
-          cp assets/laml/laml-linux-aarch64 Keplr.AppDir/usr/lib/keplr/laml
           cp packaging/linux/keplr.desktop Keplr.AppDir/
           cp assets/icon/keplr-256.png Keplr.AppDir/keplr.png
           printf '#!/bin/sh\nexec "$APPDIR/usr/bin/keplr" "$@"\n' > Keplr.AppDir/AppRun

@@ -43,28 +43,6 @@ jobs:
           name: render-snapshot
           path: /tmp/shot.png
 
-  laml-bridge:
-    name: laml event bridge
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Install a C++20 compiler for the source fallback
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq clang make
-      - name: Fetch the LAML interpreter Keplr ships with
-        run: ./scripts/fetch-laml.sh
-      - name: The service program starts and announces its port
-        run: |
-          set -euo pipefail
-          LAM=$(ls assets/laml/laml-linux-* | head -1)
-          chmod +x "$LAM"
-          output=$(timeout 5 "$LAM" run crates/keplr-events/src/events.lm 2>&1 || true)
-          echo "$output"
-          echo "$output" | grep -q "keplr events on 18787"
-      - name: The bridge talks to the real service
-        run: cargo test -p keplr-events -- --nocapture
-
   wasm-check:
     runs-on: ubuntu-latest
     steps:

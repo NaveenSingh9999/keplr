@@ -4,9 +4,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-mod tui;
 mod pm;
 mod self_update;
+mod tui;
 
 #[derive(Parser)]
 #[command(name = "keplr", version, about = "Keplr personal IDE")]
@@ -415,7 +415,13 @@ async fn main() -> anyhow::Result<()> {
                 _ => ws.grep(&needle, limit),
             };
             for hit in hits {
-                println!("{}:{}:{}: {}", hit.path.display(), hit.line, hit.col, hit.preview);
+                println!(
+                    "{}:{}:{}: {}",
+                    hit.path.display(),
+                    hit.line,
+                    hit.col,
+                    hit.preview
+                );
             }
         }
         Cmd::Index { refresh } => {
@@ -479,7 +485,9 @@ async fn main() -> anyhow::Result<()> {
             }
             let t0 = std::time::Instant::now();
             let made = if reuse && corpus.exists() {
-                keplr_core::Workspace::new(corpus.clone()).walk_files(100_000).len()
+                keplr_core::Workspace::new(corpus.clone())
+                    .walk_files(100_000)
+                    .len()
             } else {
                 keplr_core::synth_tree(&corpus, files, lines)?.len()
             };
@@ -613,7 +621,10 @@ async fn main() -> anyhow::Result<()> {
                 report.git_committed
             );
             if !report.git_output.trim().is_empty() {
-                println!("git: {}", report.git_output.lines().next().unwrap_or_default());
+                println!(
+                    "git: {}",
+                    report.git_output.lines().next().unwrap_or_default()
+                );
             }
             if let Some(t) = task {
                 let tasks = keplr_build::load_tasks(&cli.root.join("keplr.json"))?;
@@ -687,12 +698,11 @@ async fn main() -> anyhow::Result<()> {
         Cmd::Doctor => {
             println!("root={}", cli.root.display());
             println!("files={}", ws.walk_files(1000).len());
-            println!("laml={:?}", keplr_lang::LamlProbe::binary());
         }
         Cmd::Diagnostics { file } => {
             let lang = keplr_lang::LangKind::from_path(&file);
             let diagnostics = if lang == keplr_lang::LangKind::Laml {
-                keplr_lang::laml_diagnostics(&file)
+                Vec::new()
             } else {
                 match lang {
                     keplr_lang::LangKind::Rust
@@ -732,7 +742,10 @@ async fn main() -> anyhow::Result<()> {
                 println!("installed to {}", bin.display());
             } else {
                 let present = keplr_lang::command_present(&name);
-                println!("present={present} hint: {}", keplr_lang::install_hint(&name));
+                println!(
+                    "present={present} hint: {}",
+                    keplr_lang::install_hint(&name)
+                );
             }
         }
         Cmd::Snippets { lang, prefix } => {
@@ -762,7 +775,13 @@ async fn main() -> anyhow::Result<()> {
             }
             GitCmd::Log { limit } => {
                 for e in keplr_core::git::log(&cli.root, limit)? {
-                    println!("{} {} {} {}", &e.hash[..8.min(e.hash.len())], e.date, e.author, e.message);
+                    println!(
+                        "{} {} {} {}",
+                        &e.hash[..8.min(e.hash.len())],
+                        e.date,
+                        e.author,
+                        e.message
+                    );
                 }
             }
             GitCmd::Branches => {
@@ -777,23 +796,37 @@ async fn main() -> anyhow::Result<()> {
             GitCmd::Commit { message } => {
                 print!("{}", keplr_core::git::commit(&cli.root, &message)?);
             }
-            GitCmd::Push { remote, set_upstream } => {
-                print!("{}", keplr_core::git::push(&cli.root, remote.as_deref(), set_upstream)?);
+            GitCmd::Push {
+                remote,
+                set_upstream,
+            } => {
+                print!(
+                    "{}",
+                    keplr_core::git::push(&cli.root, remote.as_deref(), set_upstream)?
+                );
             }
         },
         Cmd::Lfs { cmd } => match cmd {
             LfsCmd::Pull { include } => {
-                print!("{}", keplr_core::git::lfs_pull(&cli.root, include.as_deref())?);
+                print!(
+                    "{}",
+                    keplr_core::git::lfs_pull(&cli.root, include.as_deref())?
+                );
             }
             LfsCmd::Fetch { include } => {
-                print!("{}", keplr_core::git::lfs_fetch(&cli.root, include.as_deref())?);
+                print!(
+                    "{}",
+                    keplr_core::git::lfs_fetch(&cli.root, include.as_deref())?
+                );
             }
             LfsCmd::LsFiles => {
                 for f in keplr_core::git::lfs_files(&cli.root)? {
                     println!(
                         "{} {} {}",
                         f.oid.as_deref().unwrap_or("-"),
-                        f.size.map(|s| s.to_string()).unwrap_or_else(|| String::from("-")),
+                        f.size
+                            .map(|s| s.to_string())
+                            .unwrap_or_else(|| String::from("-")),
                         f.path
                     );
                 }
@@ -873,10 +906,7 @@ async fn main() -> anyhow::Result<()> {
                 #[cfg(unix)]
                 {
                     use std::os::unix::fs::PermissionsExt;
-                    let _ = std::fs::set_permissions(
-                        &path,
-                        std::fs::Permissions::from_mode(0o600),
-                    );
+                    let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
                 }
                 if rotate {
                     println!("rotated: {}", path.display());
@@ -984,8 +1014,7 @@ async fn main() -> anyhow::Result<()> {
         }
         #[cfg(feature = "desktop")]
         Cmd::Desktop { open, query } => {
-            match keplr_render::gpu::run_desktop(cli.root.clone(), open.clone(), query.clone())
-            {
+            match keplr_render::gpu::run_desktop(cli.root.clone(), open.clone(), query.clone()) {
                 Ok(()) => {}
                 Err(e) => {
                     eprintln!("keplr: gpu unavailable ({e:#}); software fallback");
@@ -999,11 +1028,7 @@ async fn main() -> anyhow::Result<()> {
                     let scene = ui.to_scene(100);
                     print!(
                         "{}",
-                        keplr_render::PaintBackend::paint(
-                            &keplr_render::AnsiBackend,
-                            &scene,
-                            100
-                        )
+                        keplr_render::PaintBackend::paint(&keplr_render::AnsiBackend, &scene, 100)
                     );
                 }
             }

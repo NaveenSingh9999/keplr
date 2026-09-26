@@ -361,7 +361,10 @@ pub fn stop(name: &str) -> Result<()> {
             std::thread::sleep(std::time::Duration::from_millis(300));
         }
         if alive(inst.pid) {
-            bail!("could not kill pid {} — remove it by hand, then `keplr stop` again", inst.pid);
+            bail!(
+                "could not kill pid {} — remove it by hand, then `keplr stop` again",
+                inst.pid
+            );
         }
     }
     reg.remove(name);
@@ -434,7 +437,10 @@ pub fn list() -> Result<()> {
         println!("no keplr instances running — `keplr start --help`");
         return Ok(());
     }
-    println!("{:<12} {:<6} {:<8} {:<9} ROOT", "NAME", "PORT", "PID", "UPTIME");
+    println!(
+        "{:<12} {:<6} {:<8} {:<9} ROOT",
+        "NAME", "PORT", "PID", "UPTIME"
+    );
     for (name, inst) in &reg {
         let gate = if inst.token_gate { " [token]" } else { "" };
         println!(
@@ -504,7 +510,10 @@ pub fn status(name: Option<&str>) -> Result<()> {
         "token:     {}",
         if inst.token_gate { "enabled" } else { "off" }
     );
-    println!("rss:       {}", rss(inst.pid).unwrap_or_else(|| "n/a".to_string()));
+    println!(
+        "rss:       {}",
+        rss(inst.pid).unwrap_or_else(|| "n/a".to_string())
+    );
     println!("log:       {}", log_path(&name)?.display());
     Ok(())
 }

@@ -61,405 +61,6 @@ impl LangKind {
     }
 }
 
-pub struct LamlProbe;
-
-impl LamlProbe {
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn binary() -> Option<PathBuf> {
-        for candidate in [
-            PathBuf::from("/data/data/com.termux/files/home/LAML/laml"),
-            PathBuf::from("/data/data/com.termux/files/usr/bin/laml"),
-            PathBuf::from("/usr/local/bin/laml"),
-        ] {
-            if candidate.exists() {
-                return Some(candidate);
-            }
-        }
-        std::env::var_os("PATH").and_then(|paths| {
-            std::env::split_paths(&paths).find_map(|dir| {
-                let p = dir.join("laml");
-                p.exists().then_some(p)
-            })
-        })
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    pub fn binary() -> Option<PathBuf> {
-        None
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn check(source: &Path) -> anyhow::Result<String> {
-        let bin = Self::binary().ok_or_else(|| anyhow::anyhow!("laml binary not found"))?;
-        let output = std::process::Command::new(bin).arg("check").arg(source).output()?;
-        let mut s = String::from_utf8_lossy(&output.stdout).to_string();
-        s.push_str(&String::from_utf8_lossy(&output.stderr));
-        if !output.status.success() {
-            anyhow::bail!("laml check failed: {s}");
-        }
-        Ok(s)
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    pub fn check(_source: &Path) -> anyhow::Result<String> {
-        anyhow::bail!("laml binary unavailable on wasm")
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum TokenKind {
-    Keyword,
-    Str,
-    Comment,
-    Number,
-    Type,
-    Function,
-    Macro,
-    Attribute,
-    Constant,
-    Parameter,
-    Punctuation,
-    Other,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct Span {
-    pub start: usize,
-    pub len: usize,
-    pub kind: TokenKind,
-}
-
-fn keywords(lang: LangKind) -> &'static [&'static str] {
-    match lang {
-        LangKind::Rust => &[
-            "fn", "let", "mut", "pub", "struct", "enum", "impl", "trait", "use",
-            "mod", "crate", "self", "Self", "return", "if", "else", "match",
-            "for", "while", "loop", "in", "where", "const", "static", "ref",
-            "move", "async", "await", "dyn", "unsafe", "extern", "as", "break",
-            "continue", "true", "false", "Some", "None", "Ok", "Err", "type",
-        ],
-        LangKind::TypeScript | LangKind::Tsx | LangKind::JavaScript => &[
-            "function", "const", "let", "var", "return", "if", "else", "for",
-            "while", "import", "export", "from", "class", "extends", "new",
-            "typeof", "interface", "type", "enum", "async", "await", "try",
-            "catch", "throw", "switch", "case", "break", "continue", "this",
-            "true", "false", "null", "undefined",
-        ],
-        LangKind::Cpp => &[
-            "int", "float", "double", "char", "bool", "void", "class",
-            "struct", "public", "private", "protected", "virtual", "override",
-            "final", "template", "typename", "namespace", "using", "return",
-            "if", "else", "for", "while", "new", "delete", "const", "static",
-            "auto", "true", "false", "nullptr", "include",
-        ],
-        LangKind::Go => &[
-            "func", "var", "const", "type", "struct", "interface", "map",
-            "chan", "go", "select", "return", "if", "else", "for", "range",
-            "switch", "case", "break", "continue", "package", "import",
-            "true", "false", "nil",
-        ],
-        LangKind::Laml => &[
-            "serve", "on", "send", "broadcast", "joinRoom", "members",
-            "async", "waitFor", "closc", "sort", "pop", "join", "upper",
-            "lower", "keys", "has", "assert", "jsonParse", "jsonStringify",
-            "setTimeout", "return", "if", "else", "for", "true", "false",
-            "null",
-        ],
-        LangKind::Python => &[
-            "def", "class", "return", "if", "else", "elif", "for", "while",
-            "import", "from", "as", "try", "except", "finally", "raise",
-            "with", "lambda", "pass", "break", "continue", "in", "is",
-            "not", "and", "or", "None", "True", "False", "self", "async",
-            "await",
-        ],
-        LangKind::C => &[
-            "int", "float", "double", "char", "bool", "void", "struct",
-            "enum", "typedef", "union", "static", "const", "extern",
-            "return", "if", "else", "for", "while", "do", "switch",
-            "case", "break", "continue", "sizeof", "true", "false",
-            "NULL", "include",
-        ],
-        LangKind::CSharp => &[
-            "class", "interface", "enum", "struct", "namespace", "using",
-            "public", "private", "protected", "internal", "static",
-            "virtual", "override", "abstract", "sealed", "return", "if",
-            "else", "for", "foreach", "while", "new", "var", "async",
-            "await", "try", "catch", "finally", "throw", "true", "false",
-            "null", "this",
-        ],
-        LangKind::Java => &[
-            "class", "interface", "enum", "package", "import", "public",
-            "private", "protected", "static", "final", "abstract",
-            "extends", "implements", "return", "if", "else", "for",
-            "while", "new", "try", "catch", "finally", "throw",
-            "throws", "true", "false", "null", "this", "void", "int",
-        ],
-        LangKind::Swift => &[
-            "func", "class", "struct", "enum", "protocol", "extension",
-            "import", "let", "var", "return", "if", "else", "for",
-            "while", "guard", "switch", "case", "break", "continue",
-            "in", "as", "is", "try", "catch", "throw", "throws",
-            "async", "await", "true", "false", "nil", "self",
-        ],
-        LangKind::Kotlin => &[
-            "fun", "class", "interface", "object", "val", "var", "return",
-            "if", "else", "for", "while", "when", "import", "package",
-            "try", "catch", "finally", "throw", "true", "false", "null",
-            "this", "is", "in", "as",
-        ],
-        LangKind::Ruby => &[
-            "def", "class", "module", "end", "return", "if", "else",
-            "elsif", "for", "while", "do", "require", "include",
-            "yield", "break", "next", "true", "false", "nil", "self",
-            "begin", "rescue", "ensure", "raise",
-        ],
-        LangKind::Php => &[
-            "function", "class", "interface", "trait", "namespace",
-            "use", "return", "if", "else", "elseif", "for", "foreach",
-            "while", "new", "echo", "try", "catch", "finally", "throw",
-            "true", "false", "null", "this",
-        ],
-        LangKind::Html => &[
-            "html", "head", "body", "div", "span", "script", "style",
-            "table", "form", "input", "button", "class", "href",
-        ],
-        LangKind::Css => &[
-            "color", "background", "margin", "padding", "border",
-            "display", "position", "width", "height", "font",
-        ],
-        LangKind::Json => &["true", "false", "null"],
-        LangKind::Toml => &["true", "false"],
-        LangKind::Yaml => &["true", "false", "null"],
-        LangKind::Markdown => &[],
-        LangKind::Shell => &[
-            "if", "then", "else", "elif", "fi", "for", "while", "do",
-            "done", "case", "esac", "function", "return", "break",
-            "continue", "in", "export", "local", "echo", "true",
-            "false",
-        ],
-        LangKind::Sql => &[
-            "select", "from", "where", "join", "left", "right",
-            "inner", "outer", "on", "group", "order", "by", "having",
-            "insert", "into", "values", "update", "set", "delete",
-            "create", "table", "alter", "drop", "and", "or", "not",
-            "null", "as", "limit",
-        ],
-        LangKind::Lua => &[
-            "function", "local", "return", "if", "then", "else",
-            "elseif", "end", "for", "while", "do", "break", "in",
-            "true", "false", "nil",
-        ],
-        LangKind::Other => &[],
-    }
-}
-
-pub fn line_comment(lang: LangKind) -> Option<&'static str> {
-    match lang {
-        LangKind::Laml => Some("~"),
-        LangKind::Html => Some("<!--"),
-        LangKind::Python
-        | LangKind::Ruby
-        | LangKind::Shell
-        | LangKind::Toml
-        | LangKind::Yaml => Some("#"),
-        LangKind::Lua | LangKind::Sql => Some("--"),
-        LangKind::Markdown | LangKind::Json | LangKind::Css => None,
-        _ => Some("//"),
-    }
-}
-
-fn push_other(spans: &mut Vec<Span>, other_start: &mut Option<usize>, end: usize) {
-    if let Some(s) = other_start.take() {
-        if end > s {
-            spans.push(Span {
-                start: s,
-                len: end - s,
-                kind: TokenKind::Other,
-            });
-        }
-    }
-}
-
-pub fn highlight(lang: LangKind, line: &str) -> Vec<Span> {
-    let bytes = line.as_bytes();
-    let mut spans: Vec<Span> = Vec::new();
-    let mut other_start: Option<usize> = None;
-    let mut i = 0;
-    while i < bytes.len() {
-        let b = bytes[i];
-        if let Some(marker) = line_comment(lang) {
-            let mb = marker.as_bytes();
-            if i + mb.len() <= bytes.len() && &bytes[i..i + mb.len()] == mb {
-                push_other(&mut spans, &mut other_start, i);
-                spans.push(Span {
-                    start: i,
-                    len: bytes.len() - i,
-                    kind: TokenKind::Comment,
-                });
-                break;
-            }
-        }
-        if b == b'"' {
-            push_other(&mut spans, &mut other_start, i);
-            let mut j = i + 1;
-            while j < bytes.len() {
-                if bytes[j] == b'\\' {
-                    j += 2;
-                    continue;
-                }
-                if bytes[j] == b'"' {
-                    j += 1;
-                    break;
-                }
-                j += 1;
-            }
-            spans.push(Span {
-                start: i,
-                len: j - i,
-                kind: TokenKind::Str,
-            });
-            i = j;
-            continue;
-        }
-        if b.is_ascii_digit() {
-            push_other(&mut spans, &mut other_start, i);
-            let mut j = i;
-            while j < bytes.len()
-                && (bytes[j].is_ascii_alphanumeric() || bytes[j] == b'.')
-            {
-                j += 1;
-            }
-            spans.push(Span {
-                start: i,
-                len: j - i,
-                kind: TokenKind::Number,
-            });
-            i = j;
-            continue;
-        }
-        if b.is_ascii_alphabetic() || b == b'_' {
-            push_other(&mut spans, &mut other_start, i);
-            let mut j = i;
-            while j < bytes.len()
-                && (bytes[j].is_ascii_alphanumeric() || bytes[j] == b'_')
-            {
-                j += 1;
-            }
-            let word = &line[i..j];
-            let kind = if keywords(lang).contains(&word) {
-                TokenKind::Keyword
-            } else {
-                TokenKind::Other
-            };
-            spans.push(Span {
-                start: i,
-                len: j - i,
-                kind,
-            });
-            i = j;
-            continue;
-        }
-        if other_start.is_none() {
-            other_start = Some(i);
-        }
-        i += 1;
-    }
-    push_other(&mut spans, &mut other_start, bytes.len());
-    spans
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct Diagnostic {
-    pub path: String,
-    pub line: u64,
-    pub col: u64,
-    pub message: String,
-    pub severity: String,
-}
-
-fn hint_diagnostic(source: &Path, message: &str) -> Diagnostic {
-    Diagnostic {
-        path: source.display().to_string(),
-        line: 1,
-        col: 1,
-        message: message.to_string(),
-        severity: String::from("hint"),
-    }
-}
-
-fn parse_diag_line(raw: &str, fallback_path: &str) -> Option<Diagnostic> {
-    let parts: Vec<&str> = raw.splitn(4, ':').collect();
-    if parts.len() < 3 {
-        return None;
-    }
-    let line: u64 = parts[1].trim().parse().ok()?;
-    if line == 0 {
-        return None;
-    }
-    let (col, message) = if parts.len() == 4 {
-        match parts[2].trim().parse::<u64>() {
-            Ok(c) if c > 0 => (c, parts[3].trim().to_string()),
-            _ => (1, format!("{}: {}", parts[2].trim(), parts[3].trim())),
-        }
-    } else {
-        (1, parts[2].trim().to_string())
-    };
-    if message.is_empty() {
-        return None;
-    }
-    let path = if parts[0].trim().is_empty() {
-        fallback_path.to_string()
-    } else {
-        parts[0].trim().to_string()
-    };
-    Some(Diagnostic {
-        path,
-        line,
-        col,
-        message,
-        severity: String::from("error"),
-    })
-}
-
-pub fn laml_diagnostics(source: &Path) -> Vec<Diagnostic> {
-    let label = source.display().to_string();
-    let Some(bin) = LamlProbe::binary() else {
-        return vec![hint_diagnostic(
-            source,
-            "laml binary not found on PATH; install it for check/run diagnostics",
-        )];
-    };
-    let out = std::process::Command::new(&bin)
-        .arg("check")
-        .arg(source)
-        .output();
-    let Ok(out) = out else {
-        return vec![hint_diagnostic(source, "laml binary could not be spawned")];
-    };
-    if out.status.success() {
-        return Vec::new();
-    }
-    let text = format!(
-        "{}{}",
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr)
-    );
-    let mut diags: Vec<Diagnostic> = text
-        .lines()
-        .filter_map(|raw| parse_diag_line(raw, &label))
-        .collect();
-    if diags.is_empty() {
-        diags.push(Diagnostic {
-            path: label,
-            line: 1,
-            col: 1,
-            message: text.chars().take(500).collect(),
-            severity: String::from("error"),
-        });
-    }
-    diags
-}
-
 const LAML_KEYWORDS: &[&str] = &[
     "serve",
     "on",
@@ -512,9 +113,7 @@ pub fn command_present(cmd: &str) -> bool {
         return Path::new(cmd).exists();
     }
     std::env::var_os("PATH")
-        .map(|paths| {
-            std::env::split_paths(&paths).any(|dir| dir.join(cmd).exists())
-        })
+        .map(|paths| std::env::split_paths(&paths).any(|dir| dir.join(cmd).exists()))
         .unwrap_or(false)
 }
 
@@ -538,50 +137,22 @@ pub fn lsp_servers(lang: LangKind) -> Vec<LspServer> {
         LangKind::CSharp => &[("csharp-ls", "csharp-language-server", &[])],
         LangKind::Java => &[("jdtls", "jdtls", &[])],
         LangKind::Swift => &[("sourcekit-lsp", "sourcekit-lsp", &[])],
-        LangKind::Kotlin => &[(
-            "kotlin-language-server",
-            "kotlin-language-server",
-            &[],
-        )],
+        LangKind::Kotlin => &[("kotlin-language-server", "kotlin-language-server", &[])],
         LangKind::Ruby => &[("solargraph", "solargraph", &["stdio"])],
         LangKind::Php => &[("phpactor", "phpactor", &["language-server"])],
-        LangKind::Html => &[(
-            "html-ls",
-            "vscode-html-language-server",
-            &["--stdio"],
-        )],
-        LangKind::Css => &[(
-            "css-ls",
-            "vscode-css-language-server",
-            &["--stdio"],
-        )],
-        LangKind::Json => &[(
-            "json-ls",
-            "vscode-json-language-server",
-            &["--stdio"],
-        )],
+        LangKind::Html => &[("html-ls", "vscode-html-language-server", &["--stdio"])],
+        LangKind::Css => &[("css-ls", "vscode-css-language-server", &["--stdio"])],
+        LangKind::Json => &[("json-ls", "vscode-json-language-server", &["--stdio"])],
         LangKind::Toml => &[("taplo", "taplo", &["lsp", "stdio"])],
-        LangKind::Yaml => &[(
-            "yaml-ls",
-            "yaml-language-server",
-            &["--stdio"],
-        )],
+        LangKind::Yaml => &[("yaml-ls", "yaml-language-server", &["--stdio"])],
         LangKind::Markdown => &[("marksman", "marksman", &["server"])],
-        LangKind::Shell => &[(
-            "bash-ls",
-            "bash-language-server",
-            &["start"],
-        )],
+        LangKind::Shell => &[("bash-ls", "bash-language-server", &["start"])],
         LangKind::Sql => &[(
             "sql-ls",
             "sql-language-server",
             &["up", "--method", "stdio"],
         )],
-        LangKind::Lua => &[(
-            "lua-ls",
-            "lua-language-server",
-            &["--stdio"],
-        )],
+        LangKind::Lua => &[("lua-ls", "lua-language-server", &["--stdio"])],
         LangKind::Laml | LangKind::Other => &[],
     };
     defs.iter()
@@ -735,9 +306,7 @@ pub fn install_hint(name: &str) -> String {
         }
         "taplo" => String::from("cargo install taplo-cli --locked"),
         "marksman" => String::from("pkg install marksman  # or brew/apt"),
-        "bash-language-server" | "bash-ls" => {
-            String::from("npm install -g bash-language-server")
-        }
+        "bash-language-server" | "bash-ls" => String::from("npm install -g bash-language-server"),
         _ => format!("no managed recipe for `{name}`; install it and ensure it is on PATH"),
     }
 }
@@ -745,9 +314,7 @@ pub fn install_hint(name: &str) -> String {
 #[cfg(not(target_arch = "wasm32"))]
 fn rust_analyzer_asset() -> Option<&'static str> {
     match (std::env::consts::OS, std::env::consts::ARCH) {
-        ("linux", "aarch64") => {
-            Some("rust-analyzer-aarch64-unknown-linux-gnu.gz")
-        }
+        ("linux", "aarch64") => Some("rust-analyzer-aarch64-unknown-linux-gnu.gz"),
         ("linux", "x86_64") => Some("rust-analyzer-x86_64-unknown-linux-gnu.gz"),
         ("macos", "aarch64") => Some("rust-analyzer-aarch64-apple-darwin.gz"),
         ("macos", "x86_64") => Some("rust-analyzer-x86_64-apple-darwin.gz"),
@@ -759,9 +326,8 @@ fn rust_analyzer_asset() -> Option<&'static str> {
 pub fn install_rust_analyzer(dest_dir: &Path) -> anyhow::Result<PathBuf> {
     let asset = rust_analyzer_asset()
         .ok_or_else(|| anyhow::anyhow!("no rust-analyzer build for this platform"))?;
-    let url = format!(
-        "https://github.com/rust-lang/rust-analyzer/releases/latest/download/{asset}"
-    );
+    let url =
+        format!("https://github.com/rust-lang/rust-analyzer/releases/latest/download/{asset}");
     std::fs::create_dir_all(dest_dir)?;
     let gz = dest_dir.join(asset);
     let out = std::process::Command::new("curl")
@@ -773,10 +339,7 @@ pub fn install_rust_analyzer(dest_dir: &Path) -> anyhow::Result<PathBuf> {
         .map_err(|e| anyhow::anyhow!("curl missing or failed to spawn: {e}"))?;
     if !out.status.success() {
         let _ = std::fs::remove_file(&gz);
-        anyhow::bail!(
-            "download failed: {}",
-            String::from_utf8_lossy(&out.stderr)
-        );
+        anyhow::bail!("download failed: {}", String::from_utf8_lossy(&out.stderr));
     }
     let bin = dest_dir.join("rust-analyzer");
     let unzip = std::process::Command::new("gunzip")
@@ -785,10 +348,7 @@ pub fn install_rust_analyzer(dest_dir: &Path) -> anyhow::Result<PathBuf> {
         .output()
         .map_err(|e| anyhow::anyhow!("gunzip missing or failed to spawn: {e}"))?;
     if !unzip.status.success() {
-        anyhow::bail!(
-            "gunzip failed: {}",
-            String::from_utf8_lossy(&unzip.stderr)
-        );
+        anyhow::bail!("gunzip failed: {}", String::from_utf8_lossy(&unzip.stderr));
     }
     let downloaded = dest_dir.join(asset.trim_end_matches(".gz"));
     std::fs::rename(&downloaded, &bin)?;
@@ -824,23 +384,53 @@ fn snippet(lang: LangKind, prefix: &str, body: &str, description: &str) -> Snipp
 pub fn snippets_for(lang: LangKind) -> Vec<Snippet> {
     match lang {
         LangKind::Rust => vec![
-            snippet(lang, "fn", "fn ${1:name}(${2:args}) {\n    $0\n}", "function"),
+            snippet(
+                lang,
+                "fn",
+                "fn ${1:name}(${2:args}) {\n    $0\n}",
+                "function",
+            ),
             snippet(lang, "struct", "struct ${1:Name} {\n    $0\n}", "struct"),
-            snippet(lang, "match", "match ${1:value} {\n    Ok(v) => $0,\n    Err(e) => return Err(e.into()),\n}", "match result"),
-            snippet(lang, "test", "#[test]\nfn ${1:name}() {\n    $0\n}", "unit test"),
+            snippet(
+                lang,
+                "match",
+                "match ${1:value} {\n    Ok(v) => $0,\n    Err(e) => return Err(e.into()),\n}",
+                "match result",
+            ),
+            snippet(
+                lang,
+                "test",
+                "#[test]\nfn ${1:name}() {\n    $0\n}",
+                "unit test",
+            ),
         ],
         LangKind::TypeScript | LangKind::Tsx | LangKind::JavaScript => vec![
-            snippet(lang, "fn", "function ${1:name}(${2:args}) {\n  $0\n}", "function"),
+            snippet(
+                lang,
+                "fn",
+                "function ${1:name}(${2:args}) {\n  $0\n}",
+                "function",
+            ),
             snippet(lang, "af", "(${1:args}) => {\n  $0\n}", "arrow function"),
             snippet(lang, "imp", "import { $0 } from \"${1:mod}\";", "import"),
         ],
         LangKind::Python => vec![
             snippet(lang, "def", "def ${1:name}(${2:args}):\n    $0", "function"),
             snippet(lang, "class", "class ${1:Name}:\n    $0", "class"),
-            snippet(lang, "ifmain", "if __name__ == \"__main__\":\n    $0", "main guard"),
+            snippet(
+                lang,
+                "ifmain",
+                "if __name__ == \"__main__\":\n    $0",
+                "main guard",
+            ),
         ],
         LangKind::Go => vec![
-            snippet(lang, "func", "func ${1:name}(${2:args}) {\n\t$0\n}", "function"),
+            snippet(
+                lang,
+                "func",
+                "func ${1:name}(${2:args}) {\n\t$0\n}",
+                "function",
+            ),
             snippet(lang, "struct", "type ${1:Name} struct {\n\t$0\n}", "struct"),
         ],
         LangKind::Laml => vec![
@@ -850,11 +440,14 @@ pub fn snippets_for(lang: LangKind) -> Vec<Snippet> {
         ],
         LangKind::Shell => vec![
             snippet(lang, "if", "if ${1:cond}; then\n  $0\nfi", "if block"),
-            snippet(lang, "for", "for ${1:x} in ${2:list}; do\n  $0\ndone", "for loop"),
+            snippet(
+                lang,
+                "for",
+                "for ${1:x} in ${2:list}; do\n  $0\ndone",
+                "for loop",
+            ),
         ],
-        _ => vec![
-            snippet(lang, "todo", "// TODO: $0", "todo marker"),
-        ],
+        _ => vec![snippet(lang, "todo", "// TODO: $0", "todo marker")],
     }
 }
 
@@ -1098,10 +691,7 @@ pub fn ts_highlight(lang: LangKind, text: &str) -> Vec<TsSpan> {
             break;
         }
     }
-    out.sort_by(|a, b| {
-        (a.line, a.col, b.len)
-            .cmp(&(b.line, b.col, a.len))
-    });
+    out.sort_by(|a, b| (a.line, a.col, b.len).cmp(&(b.line, b.col, a.len)));
     let mut clean: Vec<TsSpan> = Vec::new();
     let mut end_line = 0u64;
     let mut end_col = 0u64;

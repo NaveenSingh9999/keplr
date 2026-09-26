@@ -3,7 +3,7 @@ name = "keplr-events"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-description = "Typed event bridge between the Keplr host and its supervised LAML realtime service"
+description = "Typed event fan-out for Keplr: rooms per pane kind, in process or over a loopback websocket"
 
 [lib]
 name = "keplr_events"

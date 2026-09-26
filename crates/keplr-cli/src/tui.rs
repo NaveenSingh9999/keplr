@@ -101,10 +101,8 @@ fn ts_lang_supported(lang: keplr_lang::LangKind) -> bool {
 
 fn colored_spans_ts(line: &str, line_no: u64, spans: &[keplr_lang::TsSpan], max: usize) -> String {
     let text: String = line.chars().take(max).collect();
-    let mut relevant: Vec<&keplr_lang::TsSpan> = spans
-        .iter()
-        .filter(|s| s.line == line_no)
-        .collect();
+    let mut relevant: Vec<&keplr_lang::TsSpan> =
+        spans.iter().filter(|s| s.line == line_no).collect();
     if relevant.is_empty() {
         return text;
     }
@@ -147,7 +145,9 @@ fn colored_spans_ts(line: &str, line_no: u64, spans: &[keplr_lang::TsSpan], max:
             keplr_lang::TokenKind::Constant => {
                 out.push_str(&format!("\x1b[95m{piece}\x1b[0m"));
             }
-            keplr_lang::TokenKind::Parameter | keplr_lang::TokenKind::Punctuation | keplr_lang::TokenKind::Other => {
+            keplr_lang::TokenKind::Parameter
+            | keplr_lang::TokenKind::Punctuation
+            | keplr_lang::TokenKind::Other => {
                 out.push_str(piece);
             }
         }
@@ -170,11 +170,7 @@ fn open_tab(root: &Path, rel_or_abs: &Path) -> TabState {
         .to_string();
     let lang = keplr_lang::LangKind::from_path(&full);
     let doc = Doc::load(&full);
-    let diags = if lang == keplr_lang::LangKind::Laml {
-        keplr_lang::laml_diagnostics(&full)
-    } else {
-        Vec::new()
-    };
+    let diags = Vec::new();
     TabState {
         path: full,
         label,
@@ -191,11 +187,8 @@ fn open_tab(root: &Path, rel_or_abs: &Path) -> TabState {
 }
 
 fn refresh_diags(tab: &mut TabState) {
-    tab.diags = if tab.lang == keplr_lang::LangKind::Laml {
-        keplr_lang::laml_diagnostics(&tab.path)
-    } else {
-        Vec::new()
-    };
+    // Only tree-sitter languages have diagnostics; .lm is highlighting only.
+    tab.diags = Vec::new();
 }
 
 fn byte_slice(text: &str, start: usize, len: usize) -> &str {
@@ -248,7 +241,9 @@ fn colored_spans(lang: keplr_lang::LangKind, line: &str, max: usize) -> String {
             keplr_lang::TokenKind::Constant => {
                 out.push_str(&format!("\x1b[95m{piece}\x1b[0m"));
             }
-            keplr_lang::TokenKind::Parameter | keplr_lang::TokenKind::Punctuation | keplr_lang::TokenKind::Other => {
+            keplr_lang::TokenKind::Parameter
+            | keplr_lang::TokenKind::Punctuation
+            | keplr_lang::TokenKind::Other => {
                 out.push_str(piece);
             }
         }
@@ -324,7 +319,12 @@ fn draw(f: &Frame) -> anyhow::Result<()> {
             let idx = f.top_render + i;
             if let Some(line) = f.doc.lines.get(idx) {
                 let shown = if f.ts_on {
-                    colored_spans_ts(line, (idx + 1) as u64, f.ts_spans, cols.saturating_sub(7) as usize)
+                    colored_spans_ts(
+                        line,
+                        (idx + 1) as u64,
+                        f.ts_spans,
+                        cols.saturating_sub(7) as usize,
+                    )
                 } else {
                     colored_spans(f.lang, line, cols.saturating_sub(7) as usize)
                 };
@@ -341,7 +341,10 @@ fn draw(f: &Frame) -> anyhow::Result<()> {
                     let msg = truncate_cells(&d.message, cols.saturating_sub(12) as usize);
                     execute!(
                         out,
-                        Print(format!("\x1b[31m    ~ {}:{}\x1b[0m {msg}\r\n", d.line, d.col))
+                        Print(format!(
+                            "\x1b[31m    ~ {}:{}\x1b[0m {msg}\r\n",
+                            d.line, d.col
+                        ))
                     )?;
                 }
             } else {
@@ -418,7 +421,10 @@ fn word_before(doc: &Doc, cursor: (usize, usize)) -> (usize, String) {
     while start > 0 && (chars[start - 1].is_alphanumeric() || chars[start - 1] == '_') {
         start -= 1;
     }
-    (start, chars[start..cursor.1.min(chars.len())].iter().collect())
+    (
+        start,
+        chars[start..cursor.1.min(chars.len())].iter().collect(),
+    )
 }
 
 fn is_word_char(c: char) -> bool {
@@ -465,11 +471,7 @@ fn word_end(line: &[char], col: usize) -> usize {
     i.min(n)
 }
 
-fn save_active_tab(
-    ws: &keplr_core::Workspace,
-    tabs: &mut [TabState],
-    active: usize,
-) -> String {
+fn save_active_tab(ws: &keplr_core::Workspace, tabs: &mut [TabState], active: usize) -> String {
     let content = tabs[active].doc.content();
     let full = tabs[active].path.clone();
     match keplr_core::save_buffer(ws, &full, &content) {
@@ -525,22 +527,12 @@ pub fn edit_file(
             return index
                 .iter()
                 .take(20)
-                .map(|p| {
-                    p.strip_prefix(root)
-                        .unwrap_or(p)
-                        .display()
-                        .to_string()
-                })
+                .map(|p| p.strip_prefix(root).unwrap_or(p).display().to_string())
                 .collect();
         }
         keplr_core::search::fuzzy_paths(index, query, 20)
             .into_iter()
-            .map(|p| {
-                p.strip_prefix(root)
-                    .unwrap_or(&p)
-                    .display()
-                    .to_string()
-            })
+            .map(|p| p.strip_prefix(root).unwrap_or(&p).display().to_string())
             .collect()
     };
 
@@ -701,9 +693,8 @@ pub fn edit_file(
                                 return None;
                             }
                             let hay: String = cs[from..].iter().collect();
-                            hay.find(word.as_str()).map(|pos| {
-                                (ln, from + hay[..pos].chars().count())
-                            })
+                            hay.find(word.as_str())
+                                .map(|pos| (ln, from + hay[..pos].chars().count()))
                         };
                         let mut found = None;
                         for ln in tab.cursor.0..tab.doc.lines.len() {
@@ -721,8 +712,7 @@ pub fn edit_file(
                                     None => continue,
                                 };
                                 let cs: Vec<char> = l.chars().collect();
-                                let hay: String =
-                                    cs[..end.min(cs.len())].iter().collect();
+                                let hay: String = cs[..end.min(cs.len())].iter().collect();
                                 if let Some(pos) = hay.find(word.as_str()) {
                                     found = Some((ln, hay[..pos].chars().count()));
                                     break;
@@ -800,10 +790,7 @@ pub fn edit_file(
                 let chars: Vec<char> = line.chars().collect();
                 let n = chars.len();
                 let cur = (tab.cursor.0, tab.cursor.1.min(n));
-                let indent = line
-                    .chars()
-                    .take_while(|c| *c == ' ' || *c == '\t')
-                    .count();
+                let indent = line.chars().take_while(|c| *c == ' ' || *c == '\t').count();
                 (cur, n, indent)
             };
             let ((ln, col), n, indent) = first;
@@ -981,10 +968,9 @@ pub fn edit_file(
                 (None, Some(KeyCode::Char('P'))) => {
                     let tab = &mut tabs[active];
                     if clip_line {
-                        tab.doc.lines.insert(
-                            tab.cursor.0,
-                            clipboard.trim_end_matches('\n').to_string(),
-                        );
+                        tab.doc
+                            .lines
+                            .insert(tab.cursor.0, clipboard.trim_end_matches('\n').to_string());
                         tab.cursor.1 = 0;
                     } else {
                         let byte = tab.doc.byte_col(tab.cursor.0, tab.cursor.1);
@@ -1255,21 +1241,15 @@ pub fn edit_file(
                 let tab = &mut tabs[active];
                 let (start, word) = word_before(&tab.doc, tab.cursor);
                 if !word.is_empty() {
-                    if let Some((expanded, at)) =
-                        keplr_lang::expand_snippet(tab.lang, &word)
-                    {
+                    if let Some((expanded, at)) = keplr_lang::expand_snippet(tab.lang, &word) {
                         let line = tab.doc.lines[tab.cursor.0].clone();
                         let schars: Vec<char> = line.chars().collect();
-                        let mut newline =
-                            String::from_iter(&schars[..start]) + &expanded;
+                        let mut newline = String::from_iter(&schars[..start]) + &expanded;
                         let rest: String =
                             schars[tab.cursor.1.min(schars.len())..].iter().collect();
                         newline.push_str(&rest);
                         tab.doc.lines[tab.cursor.0] = newline;
-                        tab.cursor.1 = start
-                            + at.unwrap_or_else(|| {
-                                expanded.chars().count()
-                            });
+                        tab.cursor.1 = start + at.unwrap_or_else(|| expanded.chars().count());
                         tab.dirty = true;
                         status = String::from("expanded snippet");
                         continue;

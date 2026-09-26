@@ -43,7 +43,10 @@ pub fn normalize_version(v: &str) -> String {
     if v.is_empty() || v.eq_ignore_ascii_case("latest") {
         return "latest".to_string();
     }
-    let v = v.strip_prefix('v').or_else(|| v.strip_prefix('V')).unwrap_or(v);
+    let v = v
+        .strip_prefix('v')
+        .or_else(|| v.strip_prefix('V'))
+        .unwrap_or(v);
     format!("v{v}")
 }
 
@@ -129,7 +132,10 @@ fn link_into_path(dest: &Path) -> Result<()> {
     }
     match std::fs::symlink_metadata(&link) {
         Ok(md) if md.file_type().is_symlink() => {
-            if std::fs::read_link(&link).map(|p| p == dest).unwrap_or(false) {
+            if std::fs::read_link(&link)
+                .map(|p| p == dest)
+                .unwrap_or(false)
+            {
                 return Ok(());
             }
             std::fs::remove_file(&link)?;
@@ -247,7 +253,9 @@ pub fn downgrade(version: &str) -> Result<()> {
 /// the whole `~/.keplr` state dir.
 pub fn uninstall(confirmed: bool) -> Result<()> {
     if !confirmed {
-        eprint!("uninstall keplr (stop all instances, delete ~/.keplr and the launcher link)? [y/N] ");
+        eprint!(
+            "uninstall keplr (stop all instances, delete ~/.keplr and the launcher link)? [y/N] "
+        );
         use std::io::Write as _;
         std::io::stdout().flush()?;
         let mut line = String::new();
@@ -274,7 +282,10 @@ pub fn uninstall(confirmed: bool) -> Result<()> {
     if dir.exists() {
         // The running binary cannot delete itself on Windows: if we live
         // inside the managed dir, remove state only and say so honestly.
-        let self_managed = std::env::current_exe().ok().map(|e| e.starts_with(&dir)).unwrap_or(false);
+        let self_managed = std::env::current_exe()
+            .ok()
+            .map(|e| e.starts_with(&dir))
+            .unwrap_or(false);
         if self_managed {
             let _ = std::fs::remove_file(dir.join("instances.json"));
             let _ = std::fs::remove_dir_all(dir.join("logs"));

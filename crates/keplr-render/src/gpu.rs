@@ -80,9 +80,16 @@ fn layout_leaf_value(node: &serde_json::Value) -> Option<&serde_json::Value> {
     })
 }
 
-fn collect_layout_rects(node: &serde_json::Value, rect: LayoutRect, out: &mut Vec<(LayoutRect, bool)>) -> bool {
+fn collect_layout_rects(
+    node: &serde_json::Value,
+    rect: LayoutRect,
+    out: &mut Vec<(LayoutRect, bool)>,
+) -> bool {
     if let Some(leaf) = layout_leaf_value(node) {
-        let visible = leaf.get("visible").and_then(|v| v.as_bool()).unwrap_or(true);
+        let visible = leaf
+            .get("visible")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true);
         out.push((rect, visible));
         return true;
     }
@@ -100,7 +107,10 @@ fn collect_layout_rects(node: &serde_json::Value, rect: LayoutRect, out: &mut Ve
         .and_then(|v| v.as_f64())
         .unwrap_or(0.5)
         .clamp(0.05, 0.95) as f32;
-    let axis = split.get("axis").and_then(|v| v.as_str()).unwrap_or("horizontal");
+    let axis = split
+        .get("axis")
+        .and_then(|v| v.as_str())
+        .unwrap_or("horizontal");
     if axis == "vertical" {
         let first_h = rect.h * ratio;
         if let Some(first) = first {
@@ -109,7 +119,11 @@ fn collect_layout_rects(node: &serde_json::Value, rect: LayoutRect, out: &mut Ve
         if let Some(second) = second {
             collect_layout_rects(
                 second,
-                LayoutRect { y: rect.y + first_h, h: rect.h - first_h, ..rect },
+                LayoutRect {
+                    y: rect.y + first_h,
+                    h: rect.h - first_h,
+                    ..rect
+                },
                 out,
             );
         }
@@ -121,7 +135,11 @@ fn collect_layout_rects(node: &serde_json::Value, rect: LayoutRect, out: &mut Ve
         if let Some(second) = second {
             collect_layout_rects(
                 second,
-                LayoutRect { x: rect.x + first_w, w: rect.w - first_w, ..rect },
+                LayoutRect {
+                    x: rect.x + first_w,
+                    w: rect.w - first_w,
+                    ..rect
+                },
                 out,
             );
         }
@@ -159,7 +177,12 @@ fn layout_quads(scene: &Scene, w: u32, h: u32) -> Vec<f32> {
         let mut rects = Vec::new();
         dynamic = collect_layout_rects(
             root,
-            LayoutRect { x: 0.0, y: 32.0, w, h: h - 58.0 },
+            LayoutRect {
+                x: 0.0,
+                y: 32.0,
+                w,
+                h: h - 58.0,
+            },
             &mut rects,
         );
         if dynamic {
@@ -589,15 +612,15 @@ impl ApplicationHandler for App {
         if self.window.is_some() {
             return;
         }
-        let window =
-            match event_loop.create_window(WindowAttributes::default().with_title("keplr")) {
-                Ok(w) => Arc::new(w),
-                Err(e) => {
-                    self.init_err = Some(format!("no window: {e:?}"));
-                    event_loop.exit();
-                    return;
-                }
-            };
+        let window = match event_loop.create_window(WindowAttributes::default().with_title("keplr"))
+        {
+            Ok(w) => Arc::new(w),
+            Err(e) => {
+                self.init_err = Some(format!("no window: {e:?}"));
+                event_loop.exit();
+                return;
+            }
+        };
         match pollster::block_on(Gpu::new(window.clone())) {
             Ok(g) => {
                 self.window = Some(window);
@@ -611,17 +634,11 @@ impl ApplicationHandler for App {
         }
     }
 
-    fn window_event(
-        &mut self,
-        event_loop: &ActiveEventLoop,
-        _id: WindowId,
-        event: WindowEvent,
-    ) {
+    fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::Resized(size) => {
-                if let (Some(gpu), Some(window)) = (self.gpu.as_mut(), self.window.as_ref())
-                {
+                if let (Some(gpu), Some(window)) = (self.gpu.as_mut(), self.window.as_ref()) {
                     let w = size.width.max(1);
                     let h = size.height.max(1);
                     gpu.config.width = w;
@@ -637,9 +654,7 @@ impl ApplicationHandler for App {
                     self.rebuild();
                 }
                 let mut failed: Option<String> = None;
-                if let (Some(gpu), Some(window)) =
-                    (self.gpu.as_mut(), self.window.as_ref())
-                {
+                if let (Some(gpu), Some(window)) = (self.gpu.as_mut(), self.window.as_ref()) {
                     if let Some(scene) = &self.scene {
                         let mut quads = layout_quads(scene, gpu.size.0, gpu.size.1);
                         let key = text_cache_key(scene, gpu.size.0, gpu.size.1);
@@ -662,13 +677,7 @@ impl ApplicationHandler for App {
                         if let Some([x, y, w, h]) = cursor_rect {
                             let accent = parse_hex(&Theme::amoled().accent);
                             quads.extend(cursor_px_to_ndc(
-                                x,
-                                y,
-                                w,
-                                h,
-                                gpu.size.0,
-                                gpu.size.1,
-                                accent,
+                                x, y, w, h, gpu.size.0, gpu.size.1, accent,
                             ));
                         }
                         let n = quads.len() / 6;
@@ -686,8 +695,7 @@ impl ApplicationHandler for App {
                     }
                     self.frames += 1;
                     if self.since.elapsed().as_millis() >= 500 {
-                        let fps =
-                            self.frames as f64 / self.since.elapsed().as_secs_f64();
+                        let fps = self.frames as f64 / self.since.elapsed().as_secs_f64();
                         let label = self
                             .open
                             .as_ref()
@@ -725,13 +733,8 @@ impl ApplicationHandler for App {
     }
 }
 
-pub fn run_desktop(
-    root: PathBuf,
-    open: Option<PathBuf>,
-    query: String,
-) -> anyhow::Result<()> {
-    let event_loop =
-        EventLoop::new().map_err(|e| anyhow::anyhow!("no event loop: {e:?}"))?;
+pub fn run_desktop(root: PathBuf, open: Option<PathBuf>, query: String) -> anyhow::Result<()> {
+    let event_loop = EventLoop::new().map_err(|e| anyhow::anyhow!("no event loop: {e:?}"))?;
     event_loop.set_control_flow(ControlFlow::Wait);
     let mut app = App {
         window: None,
@@ -831,8 +834,7 @@ pub fn build_atlas(font_bytes: &[u8], px: f32) -> anyhow::Result<GlyphAtlas> {
         outlined.draw(|x, y, v| {
             let gx = pen_x + x;
             let gy = pen_y + y;
-            atlas.pixels[(gy * atlas.width + gx) as usize] =
-                (v.clamp(0.0, 1.0) * 255.0) as u8;
+            atlas.pixels[(gy * atlas.width + gx) as usize] = (v.clamp(0.0, 1.0) * 255.0) as u8;
         });
         let adv = scaled.h_advance(outlined.glyph().id);
         atlas.glyphs.insert(
@@ -968,7 +970,11 @@ pub fn layout_colored_line(
         len: line.len(),
         kind: keplr_lang::TokenKind::Other,
     }];
-    let spans = if spans.is_empty() { &fallback[..] } else { spans };
+    let spans = if spans.is_empty() {
+        &fallback[..]
+    } else {
+        spans
+    };
     let mut pen = x_px;
     for s in spans {
         let col = token_rgb(s.kind);
@@ -1082,19 +1088,18 @@ pub fn scene_text_quads(
     (v, cursor_rect)
 }
 
-fn cursor_px_to_ndc(
-    x: f32,
-    y: f32,
-    w: f32,
-    h: f32,
-    vw: u32,
-    vh: u32,
-    c: [f32; 3],
-) -> Vec<f32> {
+fn cursor_px_to_ndc(x: f32, y: f32, w: f32, h: f32, vw: u32, vh: u32, c: [f32; 3]) -> Vec<f32> {
     let mut v = Vec::new();
     let nx = |px: f32| px / vw as f32 * 2.0 - 1.0;
     let ny = |py: f32| 1.0 - py / vh as f32 * 2.0;
-    push_quad(&mut v, nx(x), ny(y), nx(x + w) - nx(x), ny(y + h) - ny(y), c);
+    push_quad(
+        &mut v,
+        nx(x),
+        ny(y),
+        nx(x + w) - nx(x),
+        ny(y + h) - ny(y),
+        c,
+    );
     v
 }
 
@@ -1169,12 +1174,11 @@ fn text_stack(
     {
         Some(a) => a,
         None => {
-            let off_layout =
-                device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                    label: None,
-                    bind_group_layouts: &[],
-                    push_constant_ranges: &[],
-                });
+            let off_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: None,
+                bind_group_layouts: &[],
+                push_constant_ranges: &[],
+            });
             return (
                 off_pipeline(&off_layout),
                 empty_bg,
