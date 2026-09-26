@@ -33,12 +33,20 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
+      - name: Install a software Vulkan driver
+        # The runner has no GPU, and wgpu will not render a frame without an
+        # adapter. Mesa's lavapipe is a Vulkan device on the CPU, so the
+        # snapshot below draws the real pipeline output rather than skipping.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            mesa-vulkan-drivers libvulkan1
       - run: cargo check -p keplr-render --features gpu
       - run: cargo check -p keplr-cli --features desktop
       - run: cargo build -p keplr-cli --features desktop
-      - run: ./target/debug/keplr --root . snapshot --open Cargo.toml --width 800 --height 600 --out /tmp/shot.png || echo "no GPU on runner"
+      - name: Render a snapshot
+        run: ./target/debug/keplr --root . snapshot --open Cargo.toml --width 800 --height 600 --out /tmp/shot.png
       - uses: actions/upload-artifact@v4
-        if: hashFiles('/tmp/shot.png') != ''
         with:
           name: render-snapshot
           path: /tmp/shot.png
