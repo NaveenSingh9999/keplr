@@ -190,7 +190,7 @@ pub fn parse(args: &[String]) -> Result<Options> {
     let mut panes = Vec::new();
     let mut size = DEFAULT_SIZE;
     let mut root = None;
-    let layout;
+    let mut layout = false;
     let mut index = 0;
     while index < args.len() {
         let arg = args[index].as_str();
