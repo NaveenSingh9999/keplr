@@ -526,7 +526,7 @@ mod tests {
         App::new(ViewNode::column(nodes), rcus::fonts::MONO)
     }
 
-    fn node(app: &App, id: &str) -> &LayoutNode {
+    fn node<'a>(app: &'a App, id: &str) -> &'a LayoutNode {
         app.layout()
             .root
             .find(id)

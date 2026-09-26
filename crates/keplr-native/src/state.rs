@@ -7,11 +7,10 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::sync::{Arc, Mutex};
 
 use keplr_client::{App, Document, Key, Pane, Terminal, TerminalHost};
-use keplr_events::{Event, Service};
+use keplr_events::{channel, drain, Event, Service, UnboundedReceiver};
 use keplr_term::{Snapshot, TerminalGrid};
 use rcus::desktop::Redraw;
 use rcus::{InputEvent, Key as RKey, Modifiers};
@@ -61,7 +60,7 @@ pub struct State {
     /// slot is filled in before any key can arrive.
     redraw: Arc<Mutex<Option<Redraw>>>,
     /// Frames from the rooms this window watches.
-    events: Receiver<String>,
+    events: UnboundedReceiver<String>,
     /// Subscription ids, released when the window closes.
     _watch: Vec<u64>,
 }
@@ -75,7 +74,7 @@ impl State {
         redraw: Arc<Mutex<Option<Redraw>>>,
     ) -> Self {
         let client = App::new(root, Service::new());
-        let (sender, events) = mpsc::unbounded_channel();
+        let (sender, events) = channel();
         let _watch = vec![
             client.events().subscribe(DIAGNOSTICS_ROOM, sender.clone()),
             client.events().subscribe(TASKS_ROOM, sender),
@@ -132,18 +131,11 @@ impl State {
     /// Drains the event rooms into the panes that watch them, returning true if
     /// anything changed so the caller can skip a repaint.
     pub fn drain_events(&mut self) -> bool {
-        let mut changed = false;
-        loop {
-            match self.events.try_recv() {
-                Ok(frame) => changed |= self.apply_frame(&frame),
-                Err(TryRecvError::Empty) | Err(TryRecvError::Disconnected) => break,
-            }
-        }
-        changed
+        drain(&mut self.events, |frame| self.apply_frame(frame))
     }
 
     /// Applies one event frame, ignoring anything this window does not watch.
-    fn apply_frame(&mut self, frame: &str) -> bool {
+    pub fn apply_frame(&mut self, frame: &str) -> bool {
         let Ok(event) = serde_json::from_str::<Event>(frame) else {
             return false;
         };
@@ -173,6 +165,7 @@ impl State {
         let InputEvent::KeyDown { key, modifiers } = event else {
             return false;
         };
+        let modifiers = *modifiers;
         if self.shortcut(key, modifiers) {
             return true;
         }

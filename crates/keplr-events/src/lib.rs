@@ -12,9 +12,64 @@ pub mod service;
 pub use protocol::{encode_event, parse_command, Command, Event, TaskState, DEFAULT_PORT};
 pub use service::{event_kind, Service};
 
+/// The channel a subscription hands back. Re-exported so a window can subscribe
+/// without depending on the async runtime the service happens to use.
+pub use tokio::sync::mpsc::{error::TryRecvError, UnboundedReceiver, UnboundedSender};
+
+/// Creates the channel a subscription delivers frames on: the service holds the
+/// sender, the window drains the receiver.
+pub fn channel() -> (UnboundedSender<String>, UnboundedReceiver<String>) {
+    tokio::sync::mpsc::unbounded_channel()
+}
+
+/// Applies `apply` to every frame queued on a subscription, and reports whether
+/// any of them changed something.
+///
+/// The loop lives here so a window never names the runtime's error type: it
+/// drains frames and gets a yes or no.
+pub fn drain(
+    receiver: &mut UnboundedReceiver<String>,
+    mut apply: impl FnMut(&str) -> bool,
+) -> bool {
+    let mut changed = false;
+    loop {
+        match receiver.try_recv() {
+            Ok(frame) => changed |= apply(&frame),
+            Err(TryRecvError::Empty) | Err(TryRecvError::Disconnected) => return changed,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_drain_reports_whether_any_frame_changed_something() {
+        let (mut sender, mut receiver) = channel();
+        assert!(
+            !drain(&mut receiver, |_| true),
+            "an empty room changes nothing"
+        );
+        sender.send("one".to_string()).expect("queued");
+        sender.send("\"two\"".to_string()).expect("queued");
+        let mut seen = Vec::new();
+        assert!(drain(&mut receiver, |frame| {
+            seen.push(frame.to_string());
+            true
+        }));
+        assert_eq!(seen, ["one", "\"two\""]);
+        assert!(!drain(&mut receiver, |_| true), "drained twice is empty");
+    }
+
+    #[test]
+    fn a_frame_the_window_ignores_does_not_count_as_a_change() {
+        let (mut sender, mut receiver) = channel();
+        sender
+            .send(encode_event(&Event::Ping { id: 1 }))
+            .expect("queued");
+        assert!(!drain(&mut receiver, |_| false));
+    }
 
     #[test]
     fn events_round_trip_through_json() {
