@@ -45,6 +45,18 @@ impl Pane {
         }
     }
 
+    /// The pane this snapshot shows, in the client's own terms.
+    fn client_pane(self) -> keplr_client::Pane {
+        match self {
+            Pane::Problems => keplr_client::Pane::Problems,
+            Pane::Source => keplr_client::Pane::SourceControl,
+            Pane::Terminal => keplr_client::Pane::Terminal {
+                session: "terminal".to_string(),
+            },
+            Pane::Editor => keplr_client::Pane::Problems,
+        }
+    }
+
     fn parse(value: &str) -> Result<Self> {
         Ok(match value {
             "problems" => Pane::Problems,
@@ -83,9 +95,17 @@ fn state_for(pane: Pane, root: PathBuf) -> State {
     let redraw = Arc::new(Mutex::new(Some(Redraw::default())));
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "sh".to_string());
     let mut state = State::new(root, shell, redraw);
+    // The state opens on the problems pane, so showing another one means asking
+    // for it: publishing to a room fills a pane but does not switch to it.
     match pane {
-        Pane::Problems => state.publish_problems(),
-        Pane::Source => state.publish_tasks(),
+        Pane::Problems => {
+            state.publish_problems();
+            state.open(pane.client_pane());
+        }
+        Pane::Source => {
+            state.publish_tasks();
+            state.open(pane.client_pane());
+        }
         Pane::Terminal => {
             state.open_terminal();
             state.run_in_terminal(DEMO_COMMAND);

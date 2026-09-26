@@ -327,6 +327,13 @@ impl State {
             .is_ok()
     }
 
+    /// Shows a pane, which is how a snapshot or a test chooses what to draw.
+    /// Opening a pane that is already showing just focuses it.
+    pub fn open(&mut self, pane: Pane) -> bool {
+        self.client.open(pane);
+        true
+    }
+
     /// Fills the problems pane, for a snapshot: the window reads this room from
     /// the host, and a snapshot has no host to publish to it.
     pub fn publish_problems(&mut self) {
