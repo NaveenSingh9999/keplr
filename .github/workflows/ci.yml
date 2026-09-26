@@ -51,6 +51,33 @@ jobs:
           name: render-snapshot
           path: /tmp/shot.png
 
+  native-snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install the system libraries a window needs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libx11-dev libx11-xcb-dev libxcb1-dev libxcb-cursor-dev libxcb-shape0-dev \
+            libxcb-render0-dev libxcb-xfixes0-dev libxkbcommon-dev libwayland-dev
+      - name: Install a software Vulkan driver
+        # There is no GPU on a runner, and wgpu will not draw a frame without an
+        # adapter. Mesa's lavapipe is a Vulkan device on the CPU, so the window
+        # is really rendered rather than skipped.
+        run: |
+          sudo apt-get install -y --no-install-recommends \
+            mesa-vulkan-drivers libvulkan1
+      - run: cargo build -p keplr-native
+      - name: Draw every pane
+        run: ./target/debug/keplr-native --snapshot --out /tmp/shots/keplr.png .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-snapshots
+          path: /tmp/shots
+
   wasm-check:
     runs-on: ubuntu-latest
     steps:

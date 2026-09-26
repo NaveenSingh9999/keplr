@@ -11,7 +11,9 @@ keplr-client = { path = "../keplr-client" }
 keplr-events = { path = "../keplr-events" }
 keplr-term = { path = "../keplr-term" }
 keplr-theme = { path = "../keplr-theme" }
-rcus = "0.1.1"
+rcus = "0.1.2"
+wgpu = { workspace = true }
+pollster = { workspace = true }
 anyhow = { workspace = true }
 serde_json = { workspace = true }
 walkdir = { workspace = true }

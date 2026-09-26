@@ -143,8 +143,8 @@ impl State {
     }
 
     /// Applies one event frame, ignoring anything this window does not watch.
-    /// Tests drive this directly; the window goes through `drain_events`.
-    #[cfg(test)]
+    /// The window goes through `drain_events`; a snapshot drives this directly,
+    /// because it has no host publishing to the rooms.
     pub fn apply_frame(&mut self, frame: &str) -> bool {
         apply_frame(frame, &mut self.diagnostics, &mut self.tasks)
     }
@@ -308,6 +308,44 @@ impl State {
             self.status = "modified".to_string();
         }
         true
+    }
+
+    /// Sends a line to the terminal pane, so a snapshot or a test has a grid
+    /// with something in it rather than an empty prompt.
+    pub fn run_in_terminal(&mut self, line: &str) -> bool {
+        let Some(Pane::Terminal { session }) = self.client.active().map(|tab| &tab.pane) else {
+            return false;
+        };
+        let Some(terminal) = self.terminals.get(session) else {
+            return false;
+        };
+        terminal
+            .paste(line)
+            .map_err(|error| {
+                self.status = format!("the shell stopped accepting input: {error}");
+            })
+            .is_ok()
+    }
+
+    /// Fills the problems pane, for a snapshot: the window reads this room from
+    /// the host, and a snapshot has no host to publish to it.
+    pub fn publish_problems(&mut self) {
+        for frame in [
+            r#"{"kind":"diagnosticsUpdate","path":"crates/keplr-render/src/lib.rs","count":2}"#,
+            r#"{"kind":"diagnosticsUpdate","path":"crates/keplr-serve/src/lib.rs","count":1}"#,
+        ] {
+            self.apply_frame(frame);
+        }
+    }
+
+    /// Fills the source control pane, the same way.
+    pub fn publish_tasks(&mut self) {
+        for frame in [
+            r#"{"kind":"taskUpdate","id":"build","state":"passed","detail":"keplr-native"}"#,
+            r#"{"kind":"taskUpdate","id":"test","state":"running"}"#,
+        ] {
+            self.apply_frame(frame);
+        }
     }
 
     /// Resizes the showing terminal to the pane it was measured into.
