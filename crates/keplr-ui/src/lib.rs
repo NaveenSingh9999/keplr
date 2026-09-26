@@ -252,9 +252,7 @@ impl UiState {
             let mut error_file = None;
             let mut error_line = None;
             if r.failed {
-                if let Some((f, l)) =
-                    r.output.lines().filter_map(parse_file_line).next()
-                {
+                if let Some((f, l)) = r.output.lines().filter_map(parse_file_line).next() {
                     error_file = Some(f.clone());
                     error_line = Some(l);
                     self.diagnostics.push(keplr_lang::Diagnostic {
@@ -308,12 +306,8 @@ impl UiState {
         };
         let mut scene = keplr_render::build_scene(&spec);
         let mut workbench = self.workbench.clone();
-        let _ = workbench
-            .tree
-            .set_leaf_visible("left", self.left_visible);
-        let _ = workbench
-            .tree
-            .set_leaf_visible("right", self.right_visible);
+        let _ = workbench.tree.set_leaf_visible("left", self.left_visible);
+        let _ = workbench.tree.set_leaf_visible("right", self.right_visible);
         let _ = workbench
             .tree
             .set_leaf_visible("bottom", self.bottom_visible);
@@ -392,9 +386,11 @@ impl UiState {
         }
         for d in &self.diagnostics {
             if d.severity == "error"
-                && !scene.center.squiggles.iter().any(|s| {
-                    s.line == d.line && s.col == d.col && s.message == d.message
-                })
+                && !scene
+                    .center
+                    .squiggles
+                    .iter()
+                    .any(|s| s.line == d.line && s.col == d.col && s.message == d.message)
             {
                 scene.center.squiggles.push(keplr_render::Squiggle {
                     line: d.line,
@@ -423,20 +419,14 @@ fn parse_file_line(line: &str) -> Option<(String, u64)> {
         while let Some(i) = line[start..].find(ext) {
             let end = start + i + ext.len();
             if let Some(rest) = line[end..].strip_prefix(':') {
-                let digits: String =
-                    rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+                let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
                 if let Ok(n) = digits.parse::<u64>() {
                     if n > 0 {
                         let bytes = line.as_bytes();
                         let mut s = start + i;
                         while s > 0 {
                             let c = bytes[s - 1] as char;
-                            if c.is_whitespace()
-                                || c == '"'
-                                || c == '\''
-                                || c == '('
-                                || c == '['
-                            {
+                            if c.is_whitespace() || c == '"' || c == '\'' || c == '(' || c == '[' {
                                 break;
                             }
                             s -= 1;

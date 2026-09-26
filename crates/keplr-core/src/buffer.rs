@@ -39,7 +39,13 @@ impl Buffer {
         if n == 0 || n > self.rope.len_lines() {
             return None;
         }
-        Some(self.rope.line(n - 1).to_string().trim_end_matches(&['\n', '\r'][..]).to_string())
+        Some(
+            self.rope
+                .line(n - 1)
+                .to_string()
+                .trim_end_matches(&['\n', '\r'][..])
+                .to_string(),
+        )
     }
 
     pub fn len_lines(&self) -> usize {

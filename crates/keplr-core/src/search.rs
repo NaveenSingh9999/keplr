@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use nucleo_matcher::{Config, Matcher, Utf32Str};
+use std::path::PathBuf;
 
 pub fn fuzzy_paths(paths: &[PathBuf], query: &str, limit: usize) -> Vec<PathBuf> {
     let mut matcher = Matcher::new(Config::DEFAULT);

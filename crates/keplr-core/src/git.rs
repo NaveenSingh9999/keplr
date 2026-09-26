@@ -44,7 +44,10 @@ fn xy(pair: &str) -> (char, char) {
 }
 
 pub fn status(workdir: &Path) -> anyhow::Result<Vec<StatusEntry>> {
-    let out = git(workdir, &["status", "--porcelain=v1", "-z", "--untracked-files=normal"])?;
+    let out = git(
+        workdir,
+        &["status", "--porcelain=v1", "-z", "--untracked-files=normal"],
+    )?;
     let mut entries = Vec::new();
     for rec in out.split('\0') {
         if rec.len() < 4 {
@@ -199,12 +202,17 @@ pub fn push(workdir: &Path, remote: Option<&str>, set_upstream: bool) -> anyhow:
 }
 
 pub fn current_branch(workdir: &Path) -> anyhow::Result<String> {
-    Ok(git(workdir, &["branch", "--show-current"])?.trim().to_string())
+    Ok(git(workdir, &["branch", "--show-current"])?
+        .trim()
+        .to_string())
 }
 
 /// (ahead, behind) vs the upstream. Errors when no upstream is set.
 pub fn ahead_behind(workdir: &Path) -> anyhow::Result<(u64, u64)> {
-    let out = git(workdir, &["rev-list", "--left-right", "--count", "HEAD...@{upstream}"])?;
+    let out = git(
+        workdir,
+        &["rev-list", "--left-right", "--count", "HEAD...@{upstream}"],
+    )?;
     let mut it = out.split_whitespace();
     let ahead = it.next().unwrap_or("0").parse().unwrap_or(0);
     let behind = it.next().unwrap_or("0").parse().unwrap_or(0);
@@ -317,11 +325,7 @@ pub fn lfs_files(workdir: &Path) -> anyhow::Result<Vec<LfsTracked>> {
     Ok(list)
 }
 
-pub fn clone_partial(
-    url: &str,
-    dir: &Path,
-    depth: Option<u32>,
-) -> anyhow::Result<String> {
+pub fn clone_partial(url: &str, dir: &Path, depth: Option<u32>) -> anyhow::Result<String> {
     if url.trim().is_empty() {
         anyhow::bail!("empty url");
     }

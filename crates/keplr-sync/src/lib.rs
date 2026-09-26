@@ -53,9 +53,8 @@ impl Cas {
 }
 
 use yrs::{
-    Doc, GetString, ReadTxn, StateVector, Transact, Update,
     updates::{decoder::Decode, encoder::Encode},
-    Text,
+    Doc, GetString, ReadTxn, StateVector, Text, Transact, Update,
 };
 
 pub struct SyncDoc {
@@ -115,15 +114,14 @@ impl SyncDoc {
     }
 
     pub fn encode_update_since(&self, since: &[u8]) -> anyhow::Result<Vec<u8>> {
-        let sv = StateVector::decode_v1(since)
-            .map_err(|e| anyhow::anyhow!("bad state vector: {e}"))?;
+        let sv =
+            StateVector::decode_v1(since).map_err(|e| anyhow::anyhow!("bad state vector: {e}"))?;
         let txn = self.doc.transact();
         Ok(txn.encode_state_as_update_v1(&sv))
     }
 
     pub fn apply_update(&self, bytes: &[u8]) -> anyhow::Result<()> {
-        let update =
-            Update::decode_v1(bytes).map_err(|e| anyhow::anyhow!("bad update: {e}"))?;
+        let update = Update::decode_v1(bytes).map_err(|e| anyhow::anyhow!("bad update: {e}"))?;
         let mut txn = self.doc.transact_mut();
         txn.apply_update(update);
         Ok(())
@@ -180,7 +178,10 @@ pub struct LfsPointer {
 }
 
 pub fn is_lfs_pointer_text(text: &str) -> bool {
-    text.lines().next().map(|l| l.trim() == "version https://git-lfs.github.com/spec/v1").unwrap_or(false)
+    text.lines()
+        .next()
+        .map(|l| l.trim() == "version https://git-lfs.github.com/spec/v1")
+        .unwrap_or(false)
 }
 
 pub fn parse_lfs_pointer(text: &str) -> Option<LfsPointer> {

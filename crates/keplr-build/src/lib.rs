@@ -1,8 +1,8 @@
+use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
 };
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TaskDef {
@@ -103,7 +103,10 @@ fn topo_levels(
             }
             if wanted.contains(dep) {
                 count += 1;
-                dependents.entry(dep.clone()).or_default().push(name.clone());
+                dependents
+                    .entry(dep.clone())
+                    .or_default()
+                    .push(name.clone());
             }
         }
         indeg.insert(name.clone(), count);
@@ -148,7 +151,10 @@ pub fn topo_order(tasks: &BTreeMap<String, TaskDef>) -> anyhow::Result<Vec<Strin
     Ok(topo_levels(tasks, &all)?.into_iter().flatten().collect())
 }
 
-fn closure(tasks: &BTreeMap<String, TaskDef>, targets: &[String]) -> anyhow::Result<BTreeSet<String>> {
+fn closure(
+    tasks: &BTreeMap<String, TaskDef>,
+    targets: &[String],
+) -> anyhow::Result<BTreeSet<String>> {
     let mut wanted = BTreeSet::new();
     let mut stack: Vec<String> = targets.to_vec();
     while let Some(name) = stack.pop() {
@@ -350,7 +356,10 @@ pub fn load_journal(_workdir: &Path) -> BTreeMap<String, JournalEntry> {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn save_journal(workdir: &Path, journal: &BTreeMap<String, JournalEntry>) -> anyhow::Result<()> {
+pub fn save_journal(
+    workdir: &Path,
+    journal: &BTreeMap<String, JournalEntry>,
+) -> anyhow::Result<()> {
     let path = journal_path(workdir);
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
@@ -389,11 +398,7 @@ fn store_outputs(
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn restore_outputs(
-    cas: &keplr_sync::Cas,
-    workdir: &Path,
-    entry: &JournalEntry,
-) -> Vec<String> {
+fn restore_outputs(cas: &keplr_sync::Cas, workdir: &Path, entry: &JournalEntry) -> Vec<String> {
     let mut restored = Vec::new();
     for (rel, hash) in &entry.outputs {
         let full = resolve_under(workdir, rel);
@@ -514,8 +519,7 @@ pub fn run_graph_parallel(
         let mut dirty: Vec<String> = Vec::new();
         for name in &level {
             let fp = fps.get(name).cloned().unwrap_or_default();
-            let up_to_date =
-                !force && journal.get(name).map(|e| e.hash == fp).unwrap_or(false);
+            let up_to_date = !force && journal.get(name).map(|e| e.hash == fp).unwrap_or(false);
             if up_to_date {
                 let restored = restore_outputs(&cas, workdir, &journal[name]);
                 let mut output = String::from("up to date");
@@ -535,35 +539,33 @@ pub fn run_graph_parallel(
             }
         }
         for batch in dirty.chunks(jobs) {
-            let batch_out: BTreeMap<String, anyhow::Result<String>> =
-                std::thread::scope(|s| {
-                    let mut handles = Vec::new();
-                    let mut early: BTreeMap<String, anyhow::Result<String>> =
-                        BTreeMap::new();
-                    for name in batch {
-                        let Some(task) = tasks.get(name).cloned() else {
-                            early.insert(
+            let batch_out: BTreeMap<String, anyhow::Result<String>> = std::thread::scope(|s| {
+                let mut handles = Vec::new();
+                let mut early: BTreeMap<String, anyhow::Result<String>> = BTreeMap::new();
+                for name in batch {
+                    let Some(task) = tasks.get(name).cloned() else {
+                        early.insert(name.clone(), Err(anyhow::anyhow!("unknown task {name}")));
+                        continue;
+                    };
+                    let dir = workdir.to_path_buf();
+                    handles.push((name.clone(), s.spawn(move || run_task(&task, &dir))));
+                }
+                let mut out = early;
+                for (name, h) in handles {
+                    match h.join() {
+                        Ok(r) => {
+                            out.insert(name, r);
+                        }
+                        Err(_) => {
+                            out.insert(
                                 name.clone(),
-                                Err(anyhow::anyhow!("unknown task {name}")),
+                                Err(anyhow::anyhow!("task `{name}` panicked")),
                             );
-                            continue;
-                        };
-                        let dir = workdir.to_path_buf();
-                        handles.push((name.clone(), s.spawn(move || run_task(&task, &dir))));
-                    }
-                    let mut out = early;
-                    for (name, h) in handles {
-                        match h.join() {
-                            Ok(r) => {
-                                out.insert(name, r);
-                            }
-                            Err(_) => {
-                                out.insert(name.clone(), Err(anyhow::anyhow!("task `{name}` panicked")));
-                            }
                         }
                     }
-                    out
-                });
+                }
+                out
+            });
             for name in batch {
                 match batch_out.get(name) {
                     Some(Ok(text)) => {
@@ -740,38 +742,33 @@ pub fn run_graph_settled(
             }
         }
         for batch in dirty.chunks(jobs) {
-            let batch_out: BTreeMap<String, anyhow::Result<String>> =
-                std::thread::scope(|s| {
-                    let mut handles = Vec::new();
-                    let mut early: BTreeMap<String, anyhow::Result<String>> =
-                        BTreeMap::new();
-                    for name in batch {
-                        let Some(task) = tasks.get(name).cloned() else {
-                            early.insert(
+            let batch_out: BTreeMap<String, anyhow::Result<String>> = std::thread::scope(|s| {
+                let mut handles = Vec::new();
+                let mut early: BTreeMap<String, anyhow::Result<String>> = BTreeMap::new();
+                for name in batch {
+                    let Some(task) = tasks.get(name).cloned() else {
+                        early.insert(name.clone(), Err(anyhow::anyhow!("unknown task {name}")));
+                        continue;
+                    };
+                    let dir = workdir.to_path_buf();
+                    handles.push((name.clone(), s.spawn(move || run_task(&task, &dir))));
+                }
+                let mut out = early;
+                for (name, h) in handles {
+                    match h.join() {
+                        Ok(r) => {
+                            out.insert(name, r);
+                        }
+                        Err(_) => {
+                            out.insert(
                                 name.clone(),
-                                Err(anyhow::anyhow!("unknown task {name}")),
+                                Err(anyhow::anyhow!("task `{name}` panicked")),
                             );
-                            continue;
-                        };
-                        let dir = workdir.to_path_buf();
-                        handles.push((name.clone(), s.spawn(move || run_task(&task, &dir))));
-                    }
-                    let mut out = early;
-                    for (name, h) in handles {
-                        match h.join() {
-                            Ok(r) => {
-                                out.insert(name, r);
-                            }
-                            Err(_) => {
-                                out.insert(
-                                    name.clone(),
-                                    Err(anyhow::anyhow!("task `{name}` panicked")),
-                                );
-                            }
                         }
                     }
-                    out
-                });
+                }
+                out
+            });
             for name in batch {
                 let idx = level_index(&order, name);
                 match batch_out.get(name) {

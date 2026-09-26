@@ -166,7 +166,11 @@ mod tests {
         fn lum(hex: &str) -> f64 {
             let c = |i: usize| {
                 let v = u8::from_str_radix(&hex[i..i + 2], 16).unwrap() as f64 / 255.0;
-                if v <= 0.03928 { v / 12.92 } else { ((v + 0.055) / 1.055).powf(2.4) }
+                if v <= 0.03928 {
+                    v / 12.92
+                } else {
+                    ((v + 0.055) / 1.055).powf(2.4)
+                }
             };
             0.2126 * c(1) + 0.7152 * c(3) + 0.0722 * c(5)
         }

@@ -1,0 +1,17 @@
+[package]
+name = "keplr-native"
+version = "0.1.0"
+edition = "2021"
+description = "Keplr's native window: rcus draws the keplr-client model straight to the GPU"
+license = "MIT"
+publish = false
+
+[dependencies]
+keplr-client = { path = "../keplr-client" }
+keplr-events = { path = "../keplr-events" }
+keplr-term = { path = "../keplr-term" }
+keplr-theme = { path = "../keplr-theme" }
+rcus = "0.1.1"
+anyhow = { workspace = true }
+serde_json = { workspace = true }
+walkdir = { workspace = true }

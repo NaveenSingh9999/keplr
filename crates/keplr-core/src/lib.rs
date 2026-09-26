@@ -4,9 +4,9 @@ use std::{
 };
 
 pub mod buffer;
-pub mod search;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod git;
+pub mod search;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Workspace {
@@ -45,7 +45,9 @@ pub struct SearchHit {
 }
 
 pub fn is_tracked_path(path: &Path) -> bool {
-    !path.components().any(|c| c.as_os_str() == ".git" || c.as_os_str() == ".keplr" || c.as_os_str() == "target")
+    !path
+        .components()
+        .any(|c| c.as_os_str() == ".git" || c.as_os_str() == ".keplr" || c.as_os_str() == "target")
 }
 
 impl Workspace {
@@ -69,7 +71,9 @@ impl Workspace {
             if !is_tracked_path(&full) {
                 continue;
             }
-            let Ok(meta) = std::fs::metadata(&full) else { continue };
+            let Ok(meta) = std::fs::metadata(&full) else {
+                continue;
+            };
             let mtime = meta
                 .modified()
                 .ok()
@@ -120,7 +124,9 @@ impl Workspace {
             // entry.path is root-relative: re-anchor for filesystem reads so
             // grep works regardless of the process working directory.
             let full = self.root.join(&entry.path);
-            let Ok(text) = std::fs::read_to_string(&full) else { continue };
+            let Ok(text) = std::fs::read_to_string(&full) else {
+                continue;
+            };
             for (idx, line) in text.lines().enumerate() {
                 if hits.len() >= limit {
                     break;
@@ -214,7 +220,9 @@ impl Index {
                             .into_iter()
                             .map(|mut e| {
                                 if e.path.is_absolute() {
-                                    if let Ok(rel) = e.path.strip_prefix(&ws.root).map(|p| p.to_path_buf()) {
+                                    if let Ok(rel) =
+                                        e.path.strip_prefix(&ws.root).map(|p| p.to_path_buf())
+                                    {
                                         e.path = rel;
                                     }
                                 }
@@ -630,8 +638,8 @@ fn lcg_next(state: &mut u64) -> u64 {
 #[cfg(not(target_arch = "wasm32"))]
 pub fn synth_tree(root: &Path, files: usize, lines_per: usize) -> anyhow::Result<Vec<PathBuf>> {
     const WORDS: &[&str] = &[
-        "fn", "let", "mut", "config", "serve", "render", "index", "alpha", "beta",
-        "route", "query", "cache", "state", "value", "window", "buffer", "task",
+        "fn", "let", "mut", "config", "serve", "render", "index", "alpha", "beta", "route",
+        "query", "cache", "state", "value", "window", "buffer", "task",
     ];
     let files = files.clamp(1, 50_000);
     let lines_per = lines_per.clamp(1, 500);

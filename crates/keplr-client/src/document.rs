@@ -10,6 +10,10 @@ use std::path::{Path, PathBuf};
 pub struct Document {
     path: PathBuf,
     text: String,
+    /// Byte offset of the first character of every line, so `starts[line]` is
+    /// where line `line` begins. Always begins with 0, and a document ending
+    /// in a newline has a final empty line, which is what an editor shows.
+    starts: Vec<usize>,
     cursor: usize,
     top_line: usize,
     dirty: bool,
@@ -24,13 +28,16 @@ impl Document {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
             Err(error) => return Err(error),
         };
-        Ok(Self {
+        let mut document = Self {
             path,
             text,
+            starts: vec![0],
             cursor: 0,
             top_line: 0,
             dirty: false,
-        })
+        };
+        document.reindex(0);
+        Ok(document)
     }
 
     pub fn path(&self) -> &Path {
@@ -54,46 +61,71 @@ impl Document {
     }
 
     pub fn lines(&self) -> usize {
-        self.text.lines().count().max(1)
+        self.starts.len()
     }
 
     /// The visible window of lines, for a viewport `rows` tall.
     pub fn visible(&self, rows: usize) -> Vec<&str> {
-        let all: Vec<&str> = self.text.lines().collect();
-        let start = self.top_line.min(all.len().saturating_sub(1));
-        let end = (start + rows.max(1)).min(all.len());
-        all[start..end].to_vec()
+        let start = self.top_line.min(self.starts.len().saturating_sub(1));
+        let end = (start + rows.max(1)).min(self.starts.len());
+        (start..end).map(|line| self.line_text(line)).collect()
+    }
+
+    /// The text of one line, without its newline.
+    pub fn line_text(&self, line: usize) -> &str {
+        let start = self.line_start(line);
+        let end = self
+            .starts
+            .get(line + 1)
+            .copied()
+            .unwrap_or(self.text.len())
+            .max(start);
+        self.text[start..end].trim_end_matches('\n')
     }
 
     /// The line the cursor is on, zero-based.
     pub fn cursor_line(&self) -> usize {
-        self.text[..self.cursor.min(self.text.len())]
-            .matches('\n')
-            .count()
+        let cursor = self.cursor.min(self.text.len());
+        // Every line start at or before the cursor is on the cursor's line or
+        // above it, so the count is the line itself.
+        self.starts.partition_point(|&start| start <= cursor) - 1
     }
 
     /// The byte offset of the start of a line, clamped to the document.
     pub fn line_start(&self, line: usize) -> usize {
-        let mut offset = 0usize;
-        for (index, ch) in self.text.char_indices() {
-            if self.text[..index].matches('\n').count() == line {
-                return offset.max(index);
-            }
-            offset = index + ch.len_utf8();
-        }
-        self.text.len()
+        self.starts.get(line).copied().unwrap_or(self.text.len())
     }
 
     /// Moves the cursor to a line and column, keeping it inside the document and
     /// snapping the column to the line it lands on.
     pub fn goto(&mut self, line: usize, column: usize) {
         let start = self.line_start(line);
-        let end = self.text[start..]
-            .find('\n')
-            .map(|offset| start + offset)
-            .unwrap_or(self.text.len());
+        let end = self
+            .starts
+            .get(line + 1)
+            .map(|next| next.saturating_sub(1))
+            .unwrap_or(self.text.len())
+            .max(start);
         self.cursor = (start + column.min(end - start)).min(self.text.len());
         self.scroll_to_cursor();
+    }
+
+    /// Rebuilds the line index from the first line that can have changed.
+    ///
+    /// An edit at `from` only moves the starts at or after it, so the lines
+    /// before that are kept: pasting into a large file costs a scan of the
+    /// rest of the file, not of the whole file.
+    fn reindex(&mut self, from: usize) {
+        // Line 0 always starts at 0, so at least the first start survives.
+        let keep = self.starts.partition_point(|&start| start <= from).max(1);
+        self.starts.truncate(keep);
+        let mut offset = self.starts[keep - 1];
+        for (index, byte) in self.text.as_bytes()[offset..].iter().enumerate() {
+            if *byte == b'\n' {
+                offset += index + 1;
+                self.starts.push(offset);
+            }
+        }
     }
 
     /// Keeps the cursor line inside the viewport.
@@ -111,6 +143,7 @@ impl Document {
         let at = self.cursor.min(self.text.len());
         self.text.insert_str(at, text);
         self.cursor = at + text.len();
+        self.reindex(at);
         self.dirty = true;
     }
 
@@ -126,6 +159,7 @@ impl Document {
             .unwrap_or(0);
         self.text.replace_range(previous..self.cursor, "");
         self.cursor = previous;
+        self.reindex(previous);
         self.dirty = true;
     }
 
@@ -168,6 +202,7 @@ mod tests {
     fn document(text: &str) -> Document {
         let mut document = Document::open("/tmp/keplr-client-doc-test.rs").expect("opens");
         document.text = text.to_string();
+        document.reindex(0);
         document
     }
 
@@ -249,6 +284,59 @@ mod tests {
         assert_eq!(document.top_line(), 0);
         document.scroll(99);
         assert_eq!(document.top_line(), 3, "the last line is the floor");
+    }
+
+    #[test]
+    fn pasting_a_newline_moves_every_line_after_it() {
+        let mut document = document("l0\nl1\nl2\nl3");
+        document.goto(1, 1);
+        document.insert("X\nY");
+        assert_eq!(document.text(), "l0\nl1X\nYl2\nl3");
+        assert_eq!(document.lines(), 5);
+        assert_eq!(document.line_text(0), "l0");
+        assert_eq!(document.line_text(1), "l1X");
+        assert_eq!(document.line_text(2), "Yl2");
+        assert_eq!(document.line_text(3), "l3");
+        assert_eq!(document.line_start(3), document.text().find("l3").unwrap());
+        assert_eq!(
+            document.cursor_line(),
+            2,
+            "the cursor is on the pasted line"
+        );
+    }
+
+    #[test]
+    fn deleting_a_newline_pulls_the_lines_back_together() {
+        let mut document = document("l0\nl1\nl2");
+        document.goto(1, 2);
+        document.backspace();
+        assert_eq!(document.text(), "l0\nl2");
+        assert_eq!(document.lines(), 2);
+        assert_eq!(document.line_text(1), "l2");
+        assert_eq!(document.cursor_line(), 1);
+    }
+
+    #[test]
+    fn a_file_ending_in_a_newline_has_a_last_empty_line() {
+        let document = document("l0\n");
+        assert_eq!(document.lines(), 2);
+        assert_eq!(document.line_text(1), "");
+        assert_eq!(document.visible(4), vec!["l0", ""]);
+    }
+
+    #[test]
+    fn the_line_index_is_kept_in_step_over_many_edits() {
+        let mut document = document(&"line\n".repeat(500));
+        for round in 0..50 {
+            document.goto(round, 0);
+            document.insert("x");
+        }
+        assert_eq!(document.lines(), 550, "every pasted line is a line");
+        assert_eq!(document.line_text(0), "xline");
+        assert_eq!(document.line_text(49), "xline");
+        assert_eq!(document.line_text(50), "line");
+        assert_eq!(document.cursor_line(), 49);
+        assert_eq!(document.line_start(550), document.text().len());
     }
 
     #[test]

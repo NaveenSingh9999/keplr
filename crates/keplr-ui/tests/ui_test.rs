@@ -1,5 +1,5 @@
 use keplr_ui::{
-    Dock, LayoutError, PaneAxis, PaneCard, PaneKind, UiState, WorkbenchLayout, key_action,
+    key_action, Dock, LayoutError, PaneAxis, PaneCard, PaneKind, UiState, WorkbenchLayout,
 };
 use std::path::PathBuf;
 
@@ -32,7 +32,10 @@ fn ui_tabs_docks_palette_and_keymap_are_real() {
     assert_eq!(scene.status.files, 2);
     assert!(scene.layout.is_some());
 
-    assert!(matches!(key_action("ctrl+p"), keplr_ui::Action::OpenPalette));
+    assert!(matches!(
+        key_action("ctrl+p"),
+        keplr_ui::Action::OpenPalette
+    ));
     assert!(matches!(key_action("ctrl+b"), keplr_ui::Action::ToggleLeft));
     assert!(matches!(
         key_action("f12-unknown-xyz"),
@@ -40,13 +43,12 @@ fn ui_tabs_docks_palette_and_keymap_are_real() {
     ));
 
     ui.push_terminal(String::from("build ok"));
-    assert!(
-        ui.to_scene(100)
-            .bottom
-            .lines
-            .iter()
-            .any(|l| l.contains("build ok"))
-    );
+    assert!(ui
+        .to_scene(100)
+        .bottom
+        .lines
+        .iter()
+        .any(|l| l.contains("build ok")));
 }
 
 #[test]

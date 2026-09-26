@@ -29,8 +29,7 @@ pub fn version() -> String {
 
 #[wasm_bindgen]
 pub fn highlight_line(lang: &str, line: &str) -> String {
-    let kind =
-        keplr_lang::LangKind::from_path(std::path::Path::new(&format!("x.{lang}")));
+    let kind = keplr_lang::LangKind::from_path(std::path::Path::new(&format!("x.{lang}")));
     let spans = keplr_lang::highlight(kind, line);
     serde_json::to_string(&spans).unwrap_or_else(|_| String::from("[]"))
 }
@@ -80,7 +79,9 @@ fn collect_layout_rects(
     if let Some(leaf) = layout_leaf_value(node) {
         out.push((
             rect,
-            leaf.get("visible").and_then(|v| v.as_bool()).unwrap_or(true),
+            leaf.get("visible")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true),
         ));
         return true;
     }
@@ -153,7 +154,12 @@ fn paint(
         let mut rects = Vec::new();
         dynamic = collect_layout_rects(
             root,
-            LayoutRect { x: 0.0, y: 30.0, w: w as f32, h: h as f32 - 56.0 },
+            LayoutRect {
+                x: 0.0,
+                y: 30.0,
+                w: w as f32,
+                h: h as f32 - 56.0,
+            },
             &mut rects,
         );
         ctx.set_fill_style_str(&theme.surface);
