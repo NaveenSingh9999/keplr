@@ -163,7 +163,8 @@ impl App {
 
     /// Focuses a tab, which is also how a pane becomes the room to subscribe to.
     pub fn focus(&mut self, index: usize) -> bool {
-        if index >= self.tabs.len() {
+        let count = self.tabs.len();
+        if index >= count {
             return false;
         }
         self.active = index;
@@ -197,12 +198,12 @@ impl App {
             return;
         }
         let last = self.tabs.len() - 1;
-        self.active = if forward {
+        let next = if forward {
             (self.active + 1).min(last)
         } else {
             self.active.checked_sub(1).unwrap_or(last)
         };
-        self.focus(self.active);
+        self.focus(next);
     }
 
     /// Publishes the current pane kind, so every window watching that room

@@ -58,11 +58,11 @@ impl Document {
     }
 
     /// The visible window of lines, for a viewport `rows` tall.
-    pub fn visible(&self, rows: usize) -> &[&str] {
+    pub fn visible(&self, rows: usize) -> Vec<&str> {
         let all: Vec<&str> = self.text.lines().collect();
         let start = self.top_line.min(all.len().saturating_sub(1));
         let end = (start + rows.max(1)).min(all.len());
-        &all[start..end]
+        all[start..end].to_vec()
     }
 
     /// The line the cursor is on, zero-based.

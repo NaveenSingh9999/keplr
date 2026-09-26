@@ -227,7 +227,7 @@ mod tests {
     #[test]
     fn a_command_typed_into_the_terminal_shows_up() {
         let counter = Counter::default();
-        let mut terminal =
+        let terminal =
             Terminal::spawn("sh", Path::new("/tmp"), 60, 8, counter).expect("shell starts");
         terminal.key(Key::Char('e')).expect("writes");
         terminal.paste("cho keplr").expect("writes");
