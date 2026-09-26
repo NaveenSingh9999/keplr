@@ -61,6 +61,519 @@ impl LangKind {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum TokenKind {
+    Keyword,
+    Str,
+    Comment,
+    Number,
+    Type,
+    Function,
+    Macro,
+    Attribute,
+    Constant,
+    Parameter,
+    Punctuation,
+    Other,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Span {
+    pub start: usize,
+    pub len: usize,
+    pub kind: TokenKind,
+}
+
+fn keywords(lang: LangKind) -> &'static [&'static str] {
+    match lang {
+        LangKind::Rust => &[
+            "fn", "let", "mut", "pub", "struct", "enum", "impl", "trait", "use", "mod", "crate",
+            "self", "Self", "return", "if", "else", "match", "for", "while", "loop", "in", "where",
+            "const", "static", "ref", "move", "async", "await", "dyn", "unsafe", "extern", "as",
+            "break", "continue", "true", "false", "Some", "None", "Ok", "Err", "type",
+        ],
+        LangKind::TypeScript | LangKind::Tsx | LangKind::JavaScript => &[
+            "function",
+            "const",
+            "let",
+            "var",
+            "return",
+            "if",
+            "else",
+            "for",
+            "while",
+            "import",
+            "export",
+            "from",
+            "class",
+            "extends",
+            "new",
+            "typeof",
+            "interface",
+            "type",
+            "enum",
+            "async",
+            "await",
+            "try",
+            "catch",
+            "throw",
+            "switch",
+            "case",
+            "break",
+            "continue",
+            "this",
+            "true",
+            "false",
+            "null",
+            "undefined",
+        ],
+        LangKind::Cpp => &[
+            "int",
+            "float",
+            "double",
+            "char",
+            "bool",
+            "void",
+            "class",
+            "struct",
+            "public",
+            "private",
+            "protected",
+            "virtual",
+            "override",
+            "final",
+            "template",
+            "typename",
+            "namespace",
+            "using",
+            "return",
+            "if",
+            "else",
+            "for",
+            "while",
+            "new",
+            "delete",
+            "const",
+            "static",
+            "auto",
+            "true",
+            "false",
+            "nullptr",
+            "include",
+        ],
+        LangKind::Go => &[
+            "func",
+            "var",
+            "const",
+            "type",
+            "struct",
+            "interface",
+            "map",
+            "chan",
+            "go",
+            "select",
+            "return",
+            "if",
+            "else",
+            "for",
+            "range",
+            "switch",
+            "case",
+            "break",
+            "continue",
+            "package",
+            "import",
+            "true",
+            "false",
+            "nil",
+        ],
+        LangKind::Laml => &[
+            "serve",
+            "on",
+            "send",
+            "broadcast",
+            "joinRoom",
+            "members",
+            "async",
+            "waitFor",
+            "closc",
+            "sort",
+            "pop",
+            "join",
+            "upper",
+            "lower",
+            "keys",
+            "has",
+            "assert",
+            "jsonParse",
+            "jsonStringify",
+            "setTimeout",
+            "return",
+            "if",
+            "else",
+            "for",
+            "true",
+            "false",
+            "null",
+        ],
+        LangKind::Python => &[
+            "def", "class", "return", "if", "else", "elif", "for", "while", "import", "from", "as",
+            "try", "except", "finally", "raise", "with", "lambda", "pass", "break", "continue",
+            "in", "is", "not", "and", "or", "None", "True", "False", "self", "async", "await",
+        ],
+        LangKind::C => &[
+            "int", "float", "double", "char", "bool", "void", "struct", "enum", "typedef", "union",
+            "static", "const", "extern", "return", "if", "else", "for", "while", "do", "switch",
+            "case", "break", "continue", "sizeof", "true", "false", "NULL", "include",
+        ],
+        LangKind::CSharp => &[
+            "class",
+            "interface",
+            "enum",
+            "struct",
+            "namespace",
+            "using",
+            "public",
+            "private",
+            "protected",
+            "internal",
+            "static",
+            "virtual",
+            "override",
+            "abstract",
+            "sealed",
+            "return",
+            "if",
+            "else",
+            "for",
+            "foreach",
+            "while",
+            "new",
+            "var",
+            "async",
+            "await",
+            "try",
+            "catch",
+            "finally",
+            "throw",
+            "true",
+            "false",
+            "null",
+            "this",
+        ],
+        LangKind::Java => &[
+            "class",
+            "interface",
+            "enum",
+            "package",
+            "import",
+            "public",
+            "private",
+            "protected",
+            "static",
+            "final",
+            "abstract",
+            "extends",
+            "implements",
+            "return",
+            "if",
+            "else",
+            "for",
+            "while",
+            "new",
+            "try",
+            "catch",
+            "finally",
+            "throw",
+            "throws",
+            "true",
+            "false",
+            "null",
+            "this",
+            "void",
+            "int",
+        ],
+        LangKind::Swift => &[
+            "func",
+            "class",
+            "struct",
+            "enum",
+            "protocol",
+            "extension",
+            "import",
+            "let",
+            "var",
+            "return",
+            "if",
+            "else",
+            "for",
+            "while",
+            "guard",
+            "switch",
+            "case",
+            "break",
+            "continue",
+            "in",
+            "as",
+            "is",
+            "try",
+            "catch",
+            "throw",
+            "throws",
+            "async",
+            "await",
+            "true",
+            "false",
+            "nil",
+            "self",
+        ],
+        LangKind::Kotlin => &[
+            "fun",
+            "class",
+            "interface",
+            "object",
+            "val",
+            "var",
+            "return",
+            "if",
+            "else",
+            "for",
+            "while",
+            "when",
+            "import",
+            "package",
+            "try",
+            "catch",
+            "finally",
+            "throw",
+            "true",
+            "false",
+            "null",
+            "this",
+            "is",
+            "in",
+            "as",
+        ],
+        LangKind::Ruby => &[
+            "def", "class", "module", "end", "return", "if", "else", "elsif", "for", "while", "do",
+            "require", "include", "yield", "break", "next", "true", "false", "nil", "self",
+            "begin", "rescue", "ensure", "raise",
+        ],
+        LangKind::Php => &[
+            "function",
+            "class",
+            "interface",
+            "trait",
+            "namespace",
+            "use",
+            "return",
+            "if",
+            "else",
+            "elseif",
+            "for",
+            "foreach",
+            "while",
+            "new",
+            "echo",
+            "try",
+            "catch",
+            "finally",
+            "throw",
+            "true",
+            "false",
+            "null",
+            "this",
+        ],
+        LangKind::Html => &[
+            "html", "head", "body", "div", "span", "script", "style", "table", "form", "input",
+            "button", "class", "href",
+        ],
+        LangKind::Css => &[
+            "color",
+            "background",
+            "margin",
+            "padding",
+            "border",
+            "display",
+            "position",
+            "width",
+            "height",
+            "font",
+        ],
+        LangKind::Json => &["true", "false", "null"],
+        LangKind::Toml => &["true", "false"],
+        LangKind::Yaml => &["true", "false", "null"],
+        LangKind::Markdown => &[],
+        LangKind::Shell => &[
+            "if", "then", "else", "elif", "fi", "for", "while", "do", "done", "case", "esac",
+            "function", "return", "break", "continue", "in", "export", "local", "echo", "true",
+            "false",
+        ],
+        LangKind::Sql => &[
+            "select", "from", "where", "join", "left", "right", "inner", "outer", "on", "group",
+            "order", "by", "having", "insert", "into", "values", "update", "set", "delete",
+            "create", "table", "alter", "drop", "and", "or", "not", "null", "as", "limit",
+        ],
+        LangKind::Lua => &[
+            "function", "local", "return", "if", "then", "else", "elseif", "end", "for", "while",
+            "do", "break", "in", "true", "false", "nil",
+        ],
+        LangKind::Other => &[],
+    }
+}
+
+pub fn line_comment(lang: LangKind) -> Option<&'static str> {
+    match lang {
+        LangKind::Laml => Some("~"),
+        LangKind::Html => Some("<!--"),
+        LangKind::Python | LangKind::Ruby | LangKind::Shell | LangKind::Toml | LangKind::Yaml => {
+            Some("#")
+        }
+        LangKind::Lua | LangKind::Sql => Some("--"),
+        LangKind::Markdown | LangKind::Json | LangKind::Css => None,
+        _ => Some("//"),
+    }
+}
+
+fn push_other(spans: &mut Vec<Span>, other_start: &mut Option<usize>, end: usize) {
+    if let Some(s) = other_start.take() {
+        if end > s {
+            spans.push(Span {
+                start: s,
+                len: end - s,
+                kind: TokenKind::Other,
+            });
+        }
+    }
+}
+
+pub fn highlight(lang: LangKind, line: &str) -> Vec<Span> {
+    let bytes = line.as_bytes();
+    let mut spans: Vec<Span> = Vec::new();
+    let mut other_start: Option<usize> = None;
+    let mut i = 0;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if let Some(marker) = line_comment(lang) {
+            let mb = marker.as_bytes();
+            if i + mb.len() <= bytes.len() && &bytes[i..i + mb.len()] == mb {
+                push_other(&mut spans, &mut other_start, i);
+                spans.push(Span {
+                    start: i,
+                    len: bytes.len() - i,
+                    kind: TokenKind::Comment,
+                });
+                break;
+            }
+        }
+        if b == b'"' {
+            push_other(&mut spans, &mut other_start, i);
+            let mut j = i + 1;
+            while j < bytes.len() {
+                if bytes[j] == b'\\' {
+                    j += 2;
+                    continue;
+                }
+                if bytes[j] == b'"' {
+                    j += 1;
+                    break;
+                }
+                j += 1;
+            }
+            spans.push(Span {
+                start: i,
+                len: j - i,
+                kind: TokenKind::Str,
+            });
+            i = j;
+            continue;
+        }
+        if b.is_ascii_digit() {
+            push_other(&mut spans, &mut other_start, i);
+            let mut j = i;
+            while j < bytes.len() && (bytes[j].is_ascii_alphanumeric() || bytes[j] == b'.') {
+                j += 1;
+            }
+            spans.push(Span {
+                start: i,
+                len: j - i,
+                kind: TokenKind::Number,
+            });
+            i = j;
+            continue;
+        }
+        if b.is_ascii_alphabetic() || b == b'_' {
+            push_other(&mut spans, &mut other_start, i);
+            let mut j = i;
+            while j < bytes.len() && (bytes[j].is_ascii_alphanumeric() || bytes[j] == b'_') {
+                j += 1;
+            }
+            let word = &line[i..j];
+            let kind = if keywords(lang).contains(&word) {
+                TokenKind::Keyword
+            } else {
+                TokenKind::Other
+            };
+            spans.push(Span {
+                start: i,
+                len: j - i,
+                kind,
+            });
+            i = j;
+            continue;
+        }
+        if other_start.is_none() {
+            other_start = Some(i);
+        }
+        i += 1;
+    }
+    push_other(&mut spans, &mut other_start, bytes.len());
+    spans
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Diagnostic {
+    pub path: String,
+    pub line: u64,
+    pub col: u64,
+    pub message: String,
+    pub severity: String,
+}
+
+fn parse_diag_line(raw: &str, fallback_path: &str) -> Option<Diagnostic> {
+    let parts: Vec<&str> = raw.splitn(4, ':').collect();
+    if parts.len() < 3 {
+        return None;
+    }
+    let line: u64 = parts[1].trim().parse().ok()?;
+    if line == 0 {
+        return None;
+    }
+    let (col, message) = if parts.len() == 4 {
+        match parts[2].trim().parse::<u64>() {
+            Ok(c) if c > 0 => (c, parts[3].trim().to_string()),
+            _ => (1, format!("{}: {}", parts[2].trim(), parts[3].trim())),
+        }
+    } else {
+        (1, parts[2].trim().to_string())
+    };
+    if message.is_empty() {
+        return None;
+    }
+    let path = if parts[0].trim().is_empty() {
+        fallback_path.to_string()
+    } else {
+        parts[0].trim().to_string()
+    };
+    Some(Diagnostic {
+        path,
+        line,
+        col,
+        message,
+        severity: String::from("error"),
+    })
+}
+
 const LAML_KEYWORDS: &[&str] = &[
     "serve",
     "on",
