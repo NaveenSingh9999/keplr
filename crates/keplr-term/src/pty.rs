@@ -109,9 +109,17 @@ impl PtySession {
         Ok(())
     }
 
-    /// Resizes the grid. The pty itself is sized by the caller that owns the
-    /// pty handle, which is the one place that can reach it safely.
-    pub fn resize_grid(&self, cols: usize, rows: usize) {
+    /// Resizes the pty and the grid together, so the shell redraws for the new
+    /// size instead of wrapping against the old one.
+    pub fn resize(&self, cols: usize, rows: usize) {
+        let cols = cols.max(1);
+        let rows = rows.max(1);
+        let _ = self.master.resize(portable_pty::PtySize {
+            rows: rows as u16,
+            cols: cols as u16,
+            pixel_width: 0,
+            pixel_height: 0,
+        });
         if let Ok(mut grid) = self.grid.lock() {
             grid.resize(cols, rows);
         }

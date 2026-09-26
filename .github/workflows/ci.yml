@@ -17,7 +17,11 @@ jobs:
           components: clippy
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace --all-targets
-      - run: node --test crates/keplr-serve/tests/ui_layout.test.mjs
+      - name: Run browser-side tests when any exist
+        run: |
+          shopt -s nullglob
+          tests=(crates/keplr-serve/tests/*.test.mjs)
+          if [ ${#tests[@]} -gt 0 ]; then node --test "${tests[@]}"; fi
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo build --workspace
 
