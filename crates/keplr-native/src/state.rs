@@ -131,32 +131,20 @@ impl State {
     /// Drains the event rooms into the panes that watch them, returning true if
     /// anything changed so the caller can skip a repaint.
     pub fn drain_events(&mut self) -> bool {
-        drain(&mut self.events, |frame| self.apply_frame(frame))
+        // The receiver and the panes are separate fields, so the drain closure
+        // can hold one while it writes the other.
+        let Self {
+            events,
+            diagnostics,
+            tasks,
+            ..
+        } = self;
+        drain(events, |frame| apply_frame(frame, diagnostics, tasks))
     }
 
     /// Applies one event frame, ignoring anything this window does not watch.
     pub fn apply_frame(&mut self, frame: &str) -> bool {
-        let Ok(event) = serde_json::from_str::<Event>(frame) else {
-            return false;
-        };
-        match event {
-            Event::DiagnosticsUpdate { path, count } => {
-                self.diagnostics.retain(|line| !line.starts_with(&path));
-                if count > 0 {
-                    self.diagnostics.push(format!("{path}: {count}"));
-                }
-                self.diagnostics.sort();
-                true
-            }
-            Event::TaskUpdate { id, state, .. } => {
-                self.tasks.retain(|line| !line.starts_with(&id));
-                self.tasks
-                    .push(format!("{id} {}", format!("{state:?}").to_lowercase()));
-                self.tasks.sort();
-                true
-            }
-            _ => false,
-        }
+        apply_frame(frame, &mut self.diagnostics, &mut self.tasks)
     }
 
     /// Applies one input event, returning true if it was consumed. Anything not
@@ -331,6 +319,32 @@ impl State {
     }
 }
 
+/// Applies one event frame to the panes that watch rooms, and reports whether
+/// anything moved. A free function so a drain can borrow the receiver and the
+/// panes at the same time.
+fn apply_frame(frame: &str, diagnostics: &mut Vec<String>, tasks: &mut Vec<String>) -> bool {
+    let Ok(event) = serde_json::from_str::<Event>(frame) else {
+        return false;
+    };
+    match event {
+        Event::DiagnosticsUpdate { path, count } => {
+            diagnostics.retain(|line| !line.starts_with(&path));
+            if count > 0 {
+                diagnostics.push(format!("{path}: {count}"));
+            }
+            diagnostics.sort();
+            true
+        }
+        Event::TaskUpdate { id, state, .. } => {
+            tasks.retain(|line| !line.starts_with(&id));
+            tasks.push(format!("{id} {}", format!("{state:?}").to_lowercase()));
+            tasks.sort();
+            true
+        }
+        _ => false,
+    }
+}
+
 /// The character a key carries, if it is one.
 fn character(key: &RKey) -> Option<char> {
     match key {
@@ -495,7 +509,10 @@ mod tests {
         let mut state = state(std::path::Path::new("/tmp"));
         assert!(state.diagnostics().is_empty());
         state.apply_frame(r#"{"kind":"diagnosticsUpdate","path":"src/lib.rs","count":3}"#);
-        assert_eq!(state.diagnostics(), ["src/lib.rs: 3"]);
+        assert_eq!(
+            state.diagnostics().to_vec(),
+            vec!["src/lib.rs: 3".to_string()]
+        );
         // A later report for the same file replaces the old count instead of
         // stacking a second line.
         state.apply_frame(r#"{"kind":"diagnosticsUpdate","path":"src/lib.rs","count":0}"#);
@@ -506,11 +523,11 @@ mod tests {
     fn a_task_frame_fills_the_source_control_pane() {
         let mut state = state(std::path::Path::new("/tmp"));
         state.apply_frame(r#"{"kind":"taskUpdate","id":"build","state":"passed"}"#);
-        assert_eq!(state.tasks(), ["build passed"]);
+        assert_eq!(state.tasks().to_vec(), vec!["build passed".to_string()]);
         state.apply_frame(
             r#"{"kind":"taskUpdate","id":"build","state":"failed","detail":"2 errors"}"#,
         );
-        assert_eq!(state.tasks(), ["build failed"]);
+        assert_eq!(state.tasks().to_vec(), vec!["build failed".to_string()]);
     }
 
     #[test]
