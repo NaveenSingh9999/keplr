@@ -1081,165 +1081,12 @@ fn font_response(bytes: &'static [u8]) -> impl IntoResponse {
         .into_response()
 }
 
-const TERM_HISTORY_LINES: usize = 2000;
-
-#[derive(Clone, Copy, Debug)]
-struct TermSize {
-    cols: usize,
-    rows: usize,
-}
-
-impl alacritty_terminal::grid::Dimensions for TermSize {
-    fn total_lines(&self) -> usize {
-        self.rows + TERM_HISTORY_LINES
-    }
-
-    fn screen_lines(&self) -> usize {
-        self.rows
-    }
-
-    fn columns(&self) -> usize {
-        self.cols
-    }
-}
-
-#[derive(Clone, Debug)]
-struct TermListener;
-
-impl alacritty_terminal::event::EventListener for TermListener {
-    fn send_event(&self, _event: alacritty_terminal::event::Event) {}
-}
-
-fn term_css(c: &alacritty_terminal::vte::ansi::Color) -> Option<String> {
-    use alacritty_terminal::vte::ansi::{Color, NamedColor};
-    match c {
-        Color::Named(n) => Some(
-            match n {
-                NamedColor::Black => "#000000",
-                NamedColor::Red => "#FF453A",
-                NamedColor::Green => "#30D158",
-                NamedColor::Yellow => "#FF9F0A",
-                NamedColor::Blue => "#0A84FF",
-                NamedColor::Magenta => "#BF5AF2",
-                NamedColor::Cyan => "#64D2FF",
-                NamedColor::White => "#F5F5F7",
-                NamedColor::BrightBlack => "#6e7681",
-                NamedColor::BrightRed => "#ff7b72",
-                NamedColor::BrightGreen => "#7ee787",
-                NamedColor::BrightYellow => "#ffa657",
-                NamedColor::BrightBlue => "#79c0ff",
-                NamedColor::BrightMagenta => "#d2a8ff",
-                NamedColor::BrightCyan => "#56d4dd",
-                NamedColor::BrightWhite => "#ffffff",
-                NamedColor::Foreground | NamedColor::BrightForeground => "#F5F5F7",
-                NamedColor::Background => return None,
-                NamedColor::Cursor => "#0A84FF",
-                NamedColor::DimBlack => "#000000",
-                NamedColor::DimRed => "#FF453A",
-                NamedColor::DimGreen => "#30D158",
-                NamedColor::DimYellow => "#FF9F0A",
-                NamedColor::DimBlue => "#0A84FF",
-                NamedColor::DimMagenta => "#BF5AF2",
-                NamedColor::DimCyan => "#64D2FF",
-                NamedColor::DimWhite => "#F5F5F7",
-                NamedColor::DimForeground => "#8D8D93",
-            }
-            .to_string(),
-        ),
-        Color::Indexed(i) => Some(indexed_css(*i)),
-        Color::Spec(rgb) => Some(format!("#{:02x}{:02x}{:02x}", rgb.r, rgb.g, rgb.b)),
-    }
-}
-
-fn indexed_css(i: u8) -> String {
-    const BASE: [&str; 16] = [
-        "#000000", "#FF453A", "#30D158", "#FF9F0A", "#0A84FF", "#BF5AF2", "#64D2FF",
-        "#F5F5F7", "#6e7681", "#ff7b72", "#7ee787", "#ffa657", "#79c0ff", "#d2a8ff",
-        "#56d4dd", "#ffffff",
-    ];
-    if i < 16 {
-        return BASE[i as usize].to_string();
-    }
-    if i < 232 {
-        let v = i - 16;
-        let levels = [0, 95, 135, 175, 215, 255];
-        return format!(
-            "#{:02x}{:02x}{:02x}",
-            levels[(v / 36) as usize],
-            levels[((v % 36) / 6) as usize],
-            levels[(v % 6) as usize]
-        );
-    }
-    let g = 8 + (i - 232) * 10;
-    format!("#{:02x}{:02x}{:02x}", g, g, g)
-}
-
-fn term_snapshot(
-    term: &alacritty_terminal::term::Term<TermListener>,
-    cols: usize,
-    rows: usize,
-) -> serde_json::Value {
-    use alacritty_terminal::grid::Dimensions;
-    use alacritty_terminal::index::{Column, Line};
-    use alacritty_terminal::term::cell::Flags;
-    use alacritty_terminal::term::TermMode;
-    let content = term.renderable_content();
-    let show = content.mode.contains(TermMode::SHOW_CURSOR);
-    let cur = content.cursor.point;
-    let history_limit = term.grid().history_size().min(500);
-    let mut history = Vec::new();
-    for l in -(history_limit as i32)..0 {
-        let mut line = String::with_capacity(cols);
-        for c in 0..cols {
-            line.push(term.grid()[Line(l)][Column(c)].c);
-        }
-        history.push(line.trim_end().to_string());
-    }
-    while history.last().is_some_and(|line| line.is_empty()) {
-        history.pop();
-    }
-    let mut cells = Vec::with_capacity(rows);
-    for l in 0..rows {
-        let mut row = Vec::with_capacity(cols);
-        for c in 0..cols {
-            let cell = &term.grid()[Line(l as i32)][Column(c)];
-            let mut flags = 0u8;
-            if cell.flags.contains(Flags::BOLD) {
-                flags |= 1;
-            }
-            if cell.flags.contains(Flags::ITALIC) {
-                flags |= 2;
-            }
-            if cell.flags.contains(Flags::INVERSE) {
-                flags |= 4;
-            }
-            row.push(serde_json::json!([
-                cell.c.to_string(),
-                term_css(&cell.fg),
-                term_css(&cell.bg),
-                flags
-            ]));
-        }
-        cells.push(row);
-    }
-    serde_json::json!({
-        "cols": cols,
-        "rows": rows,
-        "cursor": [cur.line.0, cur.column.0],
-         "show": show,
-         "history": history,
-         "cells": cells,
-    })
-}
-
 async fn push_frame(
     socket: &mut axum::extract::ws::WebSocket,
-    term: &alacritty_terminal::term::Term<TermListener>,
-    cols: usize,
-    rows: usize,
+    grid: &keplr_term::TerminalGrid,
 ) -> anyhow::Result<()> {
     use axum::extract::ws::Message;
-    let frame = term_snapshot(term, cols, rows);
+    let frame = grid.snapshot();
     let text = serde_json::to_string(&frame).unwrap_or_default();
     socket
         .send(Message::Text(text))
@@ -1442,23 +1289,9 @@ async fn term_ws(
     ws.on_upgrade(move |socket| term_loop(root, cols.max(1), rows.max(1), cwd, socket))
 }
 
+/// Terminal working directories are resolved inside the workspace root.
 fn safe_terminal_cwd(root: &Path, requested: &str) -> PathBuf {
-    let raw = Path::new(requested);
-    if requested.is_empty() || raw.is_absolute() {
-        return root.to_path_buf();
-    }
-    if raw
-        .components()
-        .any(|part| matches!(part, std::path::Component::ParentDir))
-    {
-        return root.to_path_buf();
-    }
-    let candidate = root.join(raw);
-    if candidate.starts_with(root) {
-        candidate
-    } else {
-        root.to_path_buf()
-    }
+    keplr_term::contained_cwd(root, requested)
 }
 
 async fn term_loop(
@@ -1468,15 +1301,7 @@ async fn term_loop(
     cwd: String,
     mut socket: axum::extract::ws::WebSocket,
 ) {
-    use alacritty_terminal::term::{Config, Term};
-    use alacritty_terminal::vte::ansi::{Processor, StdSyncHandler};
-    let size = TermSize { cols, rows };
-    let config = Config {
-        scrolling_history: TERM_HISTORY_LINES,
-        ..Config::default()
-    };
-    let mut term = Term::new(config, &size, TermListener);
-    let mut processor: Processor<StdSyncHandler> = Processor::new();
+    let mut grid = keplr_term::TerminalGrid::new(cols, rows);
     use axum::extract::ws::Message;
     use std::io::{Read, Write};
     let pty_system = portable_pty::native_pty_system();
@@ -1494,7 +1319,7 @@ async fn term_loop(
         Err(_) => return,
     };
     let mut cmd = portable_pty::CommandBuilder::new("sh");
-    cmd.cwd(safe_terminal_cwd(&root, &cwd));
+    cmd.cwd(keplr_term::contained_cwd(&root, &cwd));
     let _child = match pair.slave.spawn_command(cmd) {
         Ok(c) => c,
         Err(_) => return,
@@ -1528,8 +1353,8 @@ async fn term_loop(
             out = fwd_rx.recv() => {
                 match out {
                     Some(bytes) => {
-                        processor.advance(&mut term, &bytes);
-                        if push_frame(&mut socket, &term, cols, rows).await.is_err() {
+                        grid.advance(&bytes);
+                        if push_frame(&mut socket, &grid).await.is_err() {
                             break;
                         }
                     }
@@ -1558,8 +1383,8 @@ async fn term_loop(
                                         pixel_width: 0,
                                         pixel_height: 0,
                                     });
-                                    term.resize(TermSize { cols, rows });
-                                    if push_frame(&mut socket, &term, cols, rows).await.is_err() {
+                                    grid.resize(cols, rows);
+                                    if push_frame(&mut socket, &grid).await.is_err() {
                                         break;
                                     }
                                 }

@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+keplr-term = { path = "../keplr-term" }
 anyhow.workspace = true
 axum.workspace = true
 tokio.workspace = true
@@ -16,7 +17,6 @@ keplr-lang = { path = "../keplr-lang" }
 keplr-sync = { path = "../keplr-sync" }
 keplr-theme = { path = "../keplr-theme" }
 portable-pty.workspace = true
-alacritty_terminal.workspace = true
 libc = "0.2"
 
 [dev-dependencies]

@@ -1,0 +1,17 @@
+[package]
+name = "keplr-term"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Terminal grid and PTY session shared by the Keplr browser and native clients"
+
+[lib]
+name = "keplr_term"
+path = "src/lib.rs"
+
+[dependencies]
+alacritty_terminal.workspace = true
+anyhow.workspace = true
+portable-pty.workspace = true
+serde.workspace = true
+serde_json.workspace = true
