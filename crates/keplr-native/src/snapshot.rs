@@ -190,7 +190,7 @@ pub fn parse(args: &[String]) -> Result<Options> {
     let mut panes = Vec::new();
     let mut size = DEFAULT_SIZE;
     let mut root = None;
-    let mut layout = false;
+    let layout;
     let mut index = 0;
     while index < args.len() {
         let arg = args[index].as_str();
@@ -203,6 +203,7 @@ pub fn parse(args: &[String]) -> Result<Options> {
         match arg {
             "--out" => out = Some(PathBuf::from(value()?)),
             "--pane" => panes.push(Pane::parse(&value()?)?),
+            "--layout" => layout = true,
             "--width" => {
                 size.0 = value()?
                     .parse()
