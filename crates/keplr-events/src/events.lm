@@ -1,0 +1,72 @@
+~ Keplr event service, LAML v4.1.
+~
+~ Rust supervises this process and speaks to it over a loopback WebSocket. The
+~ host pushes typed events, and this service answers with typed host commands and
+~ fans state out to every window that asked for it. Terminals, files, and
+~ processes stay in Rust; LAML owns realtime fan-out, rooms, and timers.
+~
+~ Run: laml run events.lm
+
+let PORT = 18787
+let ROOM = "keplr"
+
+~ Windows announce what they are showing, so a terminal frame reaches the window
+~ with a terminal and not the one looking at problems.
+on("connect", func(fd, path) {
+  joinRoom(fd, ROOM)
+  send(fd, jsonStringify({
+    kind: "hello",
+    fd: fd,
+    windows: len(members(ROOM))
+  }))
+})
+
+on("message", func(fd, msg) {
+  val event = jsonParse(msg)
+  if type(event) == "error" {
+    send(fd, jsonStringify({ cmd: "error", detail: "bad json" }))
+    return
+  }
+  let kind = event["kind"]
+  if type(kind) != "string" {
+    send(fd, jsonStringify({ cmd: "error", detail: "missing kind" }))
+    return
+  }
+
+  ~ A pane only cares about its own kind, and the state behind it is shared:
+  ~ one build, one terminal session, every window that is looking at it.
+  joinRoom(fd, ROOM + ":" + kind)
+
+  if kind == "terminal.frame" {
+    broadcast(ROOM + ":terminal.frame", msg, fd)
+    send(fd, jsonStringify({ cmd: "invalidate", reason: "terminal.frame" }))
+    return
+  }
+  if kind == "task.update" {
+    broadcast(ROOM + ":task.update", msg, fd)
+    send(fd, jsonStringify({ cmd: "invalidate", reason: "task.update" }))
+    return
+  }
+  if kind == "diagnostics.update" {
+    broadcast(ROOM + ":diagnostics.update", msg, fd)
+    send(fd, jsonStringify({ cmd: "invalidate", reason: "diagnostics.update" }))
+    return
+  }
+  if kind == "ping" {
+    send(fd, jsonStringify({ cmd: "pong", id: event["id"] }))
+    return
+  }
+  if kind == "watch" {
+    ~ A window switching panes leaves the rooms it no longer needs.
+    leaveRoom(fd, ROOM)
+    joinRoom(fd, ROOM + ":" + event["of"])
+    send(fd, jsonStringify({ cmd: "watching", of: event["of"] }))
+    return
+  }
+  send(fd, jsonStringify({ cmd: "ignored", kind: kind }))
+})
+
+on("close", func(fd) { leaveAll(fd) })
+
+serve(PORT, { ws: true, stats: true, workers: 4 })
+say("keplr events on " + PORT)

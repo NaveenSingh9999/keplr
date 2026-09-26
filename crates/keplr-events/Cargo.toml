@@ -1,0 +1,21 @@
+[package]
+name = "keplr-events"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Typed event bridge between the Keplr host and its supervised LAML realtime service"
+
+[lib]
+name = "keplr_events"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true, features = ["net", "time", "rt", "macros"] }
+tokio-tungstenite.workspace = true
+futures-util.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "net"] }
