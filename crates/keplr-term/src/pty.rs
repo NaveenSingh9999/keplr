@@ -121,13 +121,14 @@ impl PtySession {
         self.running.load(Ordering::SeqCst)
     }
 
-    /// The shell's exit status once it has exited.
-    pub fn exit_status(&mut self) -> Option<i32> {
+    /// The shell's exit code, once it has exited. A shell killed by a signal
+    /// has no code, which is `None`.
+    pub fn exit_code(&mut self) -> Option<i32> {
         self.child
             .try_wait()
             .ok()
             .flatten()
-            .and_then(|status| status.exit_code())
+            .map(|status| status.exit_code() as i32)
     }
 
     /// Asks the shell to exit, then waits briefly for the reader to finish.
