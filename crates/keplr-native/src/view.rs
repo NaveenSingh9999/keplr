@@ -448,7 +448,11 @@ fn editor(state: &mut State, path: &Path, rows: usize, chrome: &Chrome) -> ViewN
                         })
                         .font_size(11.5),
                 ),
-                ViewNode::text_node(format!("edit-text-{line}"), before.to_string(), body),
+                ViewNode::text_node(
+                    format!("edit-text-{line}"),
+                    before.to_string(),
+                    body.clone(),
+                ),
                 ViewNode::text_node(
                     format!("edit-caret-{line}"),
                     if on_cursor_line {
@@ -461,7 +465,7 @@ fn editor(state: &mut State, path: &Path, rows: usize, chrome: &Chrome) -> ViewN
                         .font_size(13.0)
                         .row_height(LINE),
                 ),
-                ViewNode::text_node(format!("edit-tail-{line}"), after.to_string(), body.clone()),
+                ViewNode::text_node(format!("edit-tail-{line}"), after.to_string(), body),
             ],
         ));
     }
