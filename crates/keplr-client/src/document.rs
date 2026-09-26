@@ -233,10 +233,12 @@ mod tests {
         let mut document = document("héllo");
         document.goto(0, 0);
         document.right();
-        // h is two bytes, so the cursor lands on the byte after it.
-        assert_eq!(document.cursor(), 2);
+        // h is one byte, so the cursor sits on the start of the two-byte é.
+        assert_eq!(document.cursor(), 1);
+        document.right();
+        assert_eq!(document.cursor(), 3, "the whole é is one step");
         document.left();
-        assert_eq!(document.cursor(), 0);
+        assert_eq!(document.cursor(), 1);
     }
 
     #[test]

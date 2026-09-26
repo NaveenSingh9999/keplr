@@ -318,10 +318,15 @@ mod tests {
         let mut app = app();
         app.open(editor("a.rs"));
         app.open(editor("b.rs"));
+        // Three tabs: problems, a.rs, b.rs, with b.rs focused.
+        assert_eq!(app.active_index(), 2);
         app.cycle(false);
-        assert_eq!(app.active_index(), 1, "backwards from the first tab wraps");
+        assert_eq!(app.active_index(), 1);
+        app.cycle(false);
+        app.cycle(false);
+        assert_eq!(app.active_index(), 2, "backwards from the first tab wraps");
         app.cycle(true);
-        assert_eq!(app.active_index(), 1, "forwards from the last tab stays");
+        assert_eq!(app.active_index(), 2, "forwards from the last tab stays");
     }
 
     #[test]
