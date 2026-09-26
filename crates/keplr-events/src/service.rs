@@ -63,7 +63,7 @@ impl Service {
     pub fn publish(&self, event: &Event) -> Vec<Command> {
         let kind = event_kind(event);
         let frame = encode_event(event);
-        self.broadcast(&room_for(kind), frame.as_str());
+        self.broadcast(&room_for(&kind), frame.as_str());
         match event {
             Event::Ping { id } => vec![Command::Pong { id: *id }],
             other => {
@@ -186,11 +186,14 @@ async fn stream_websocket(
 ) -> Result<(), tokio_tungstenite::tungstenite::Error> {
     let socket = tokio_tungstenite::accept_async(stream).await?;
     let (mut writer, mut reader) = socket.split();
+
+    // One channel per connection: the service holds a clone to fan events in,
+    // and the writer task drains whatever arrives.
     let (outbound, mut outbox) = mpsc::unbounded_channel::<String>();
 
-    // A subscriber starts on the terminal room, because that is the pane that
-    // needs a live stream the moment a window appears.
-    let id = service.subscribe("terminal", outbound);
+    // A window starts on the terminal room, because that is the pane needing a
+    // live stream the moment a window appears.
+    let id = service.subscribe("terminal", outbound.clone());
     let hello = Command::Hello {
         fd: id,
         windows: service.watchers("terminal"),
@@ -210,25 +213,24 @@ async fn stream_websocket(
     });
 
     while let Some(message) = reader.next().await {
-        match message {
-            Ok(Message::Text(text)) => {
-                let event: Event = match serde_json::from_str(&text) {
-                    Ok(event) => event,
-                    Err(_) => continue,
-                };
-                for command in service.publish(&event) {
-                    let frame = serde_json::to_string(&command).unwrap_or_default();
-                    if outbox.send(frame).is_err() {
-                        break;
-                    }
-                }
-            }
+        let text = match message {
+            Ok(Message::Text(text)) => text,
             Ok(Message::Close(_)) | Err(_) => break,
-            _ => {}
+            _ => continue,
+        };
+        let event: Event = match serde_json::from_str(&text) {
+            Ok(event) => event,
+            Err(_) => continue,
+        };
+        for command in service.publish(&event) {
+            let frame = serde_json::to_string(&command).unwrap_or_default();
+            if outbound.send(frame).is_err() {
+                break;
+            }
         }
     }
     service.unsubscribe(id);
-    drop(outbox);
+    drop(outbound);
     writer_task.abort();
     Ok(())
 }
