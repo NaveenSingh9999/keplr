@@ -68,9 +68,13 @@ pub fn color(token: &str, fallback: Color) -> Color {
         return fallback;
     };
     let pair = |index: usize| u8::from_str_radix(&hex[index * 2..index * 2 + 2], 16).ok();
-    let digit = |index: usize| u8::from_str_radix(&hex[index..index + 1], 16).ok();
     let channels: Option<Vec<u8>> = match hex.len() {
-        3 => (0..3).map(digit).collect(),
+        // Three digits are shorthand: each one stands for its own pair, so
+        // `#f0a` is `#ff00aa`.
+        3 => hex
+            .chars()
+            .map(|digit| u8::from_str_radix(&format!("{digit}{digit}"), 16).ok())
+            .collect(),
         6 => (0..3).map(pair).collect(),
         _ => None,
     };
@@ -378,7 +382,23 @@ fn cell_style(cell: &Cell, on_cursor: bool, chrome: &Chrome) -> Style {
         })
 }
 
+/// The byte offset of the caret inside a line, rounded down to a character
+/// boundary. The document tracks bytes and the view draws text, so a caret in
+/// the middle of a multi-byte character is drawn before that character rather
+/// than splitting it.
+fn caret_at(text: &str, caret: usize) -> usize {
+    let mut at = caret.min(text.len());
+    while at > 0 && !text.is_char_boundary(at) {
+        at -= 1;
+    }
+    at
+}
+
 /// An editor pane: a line number gutter, the text, and a caret block.
+///
+/// The line holding the cursor is drawn as three pieces, before the caret, the
+/// caret itself, and after it, so the block lands where the cursor is rather
+/// than only at the end of the line.
 fn editor(state: &mut State, path: &Path, rows: usize, chrome: &Chrome) -> ViewNode {
     let Some(document) = state.document(path) else {
         return empty_pane(
@@ -399,39 +419,49 @@ fn editor(state: &mut State, path: &Path, rows: usize, chrome: &Chrome) -> ViewN
         if line >= total {
             break;
         }
+        let on_cursor_line = line == cursor_line;
         let text = document.line_text(line).to_string();
-        let ends_caret = line == cursor_line && text.len() == caret;
+        let at = if on_cursor_line {
+            caret_at(&text, caret)
+        } else {
+            text.len()
+        };
+        let (before, after) = text.split_at(at);
+        let body = Style::default()
+            .color(chrome.text)
+            .font_size(13.0)
+            .row_height(LINE);
         children.push(ViewNode::row_element(
             format!("edit-row-{line}"),
             Style::default().height(LINE).row_height(LINE).gap(10.0),
             vec![
-                ViewNode::text(
+                ViewNode::text_node(
+                    format!("edit-num-{line}"),
                     (line + 1).to_string(),
                     Style::default()
                         .width(GUTTER - 10.0)
                         .align(Align::End)
-                        .color(if line == cursor_line {
+                        .color(if on_cursor_line {
                             chrome.secondary
                         } else {
                             chrome.tertiary
                         })
                         .font_size(11.5),
                 ),
-                ViewNode::text(
-                    text,
+                ViewNode::text_node(format!("edit-text-{line}"), before.to_string(), body),
+                ViewNode::text_node(
+                    format!("edit-caret-{line}"),
+                    if on_cursor_line {
+                        "\u{2588}".to_string()
+                    } else {
+                        String::new()
+                    },
                     Style::default()
-                        .color(chrome.text)
+                        .color(chrome.accent)
                         .font_size(13.0)
                         .row_height(LINE),
                 ),
-                if ends_caret {
-                    ViewNode::text(
-                        "\u{2588}",
-                        Style::default().color(chrome.accent).font_size(13.0),
-                    )
-                } else {
-                    ViewNode::empty(Style::default().width(0.0))
-                },
+                ViewNode::text_node(format!("edit-tail-{line}"), after.to_string(), body.clone()),
             ],
         ));
     }
@@ -533,11 +563,9 @@ mod tests {
             .unwrap_or_else(|| panic!("{id} is in the tree"))
     }
 
+    /// The text a node carries, which is empty for a node that draws nothing.
     fn text_of(app: &App, id: &str) -> String {
-        node(app, id)
-            .text
-            .clone()
-            .unwrap_or_else(|| panic!("{id} carries text"))
+        node(app, id).text.clone().unwrap_or_default()
     }
 
     #[test]
@@ -728,9 +756,15 @@ mod tests {
         let app = layout(&mut state);
         let first = node(&app, "edit-row-0");
         let second = node(&app, "edit-row-1");
-        assert_eq!(first.children[0].text.as_deref(), Some("1"));
-        assert_eq!(second.children[0].text.as_deref(), Some("2"));
-        assert_eq!(first.children[1].text.as_deref(), Some("first"));
+        assert_eq!(text_of(&app, "edit-num-0"), "1");
+        assert_eq!(text_of(&app, "edit-num-1"), "2");
+        assert_eq!(text_of(&app, "edit-text-0"), "first");
+        assert_eq!(text_of(&app, "edit-text-1"), "second");
+        assert_eq!(
+            text_of(&app, "edit-caret-1"),
+            "",
+            "only one line has a caret"
+        );
         assert!(
             second.rect.y >= first.rect.bottom() - 0.5,
             "lines stack downwards"
@@ -755,13 +789,11 @@ mod tests {
             modifiers: rcus::Modifiers::default(),
         });
         let app = layout(&mut state);
-        let row = node(&app, "edit-row-0");
-        assert_eq!(row.children[1].text.as_deref(), Some("xabc"));
-        assert_eq!(
-            row.children[2].text.as_deref(),
-            Some("\u{2588}"),
-            "the caret is drawn at the cursor"
-        );
+        // The insert left the cursor between the x and the rest of the line, so
+        // the line is drawn in three pieces around the block.
+        assert_eq!(text_of(&app, "edit-text-0"), "x");
+        assert_eq!(text_of(&app, "edit-caret-0"), "\u{2588}");
+        assert_eq!(text_of(&app, "edit-tail-0"), "abc");
         std::fs::remove_file(path).ok();
     }
 
@@ -787,11 +819,16 @@ mod tests {
         }
     }
 
+    /// A frame with the cursor below the last row, so a row is only split when
+    /// a test puts the cursor on it.
     fn frame_of(cols: usize, rows: usize) -> Snapshot {
         Snapshot {
             cols,
             rows,
-            cursor: Cursor { line: 0, column: 0 },
+            cursor: Cursor {
+                line: rows as i32,
+                column: 0,
+            },
             show_cursor: true,
             history: Vec::new(),
             cells: vec![vec![cell(' ', None); cols]; rows],

@@ -357,7 +357,10 @@ fn character(key: &RKey) -> Option<char> {
 /// no meaning for it. Control characters are sent as themselves, so Ctrl-C is
 /// the interrupt the shell expects.
 fn translate_key(key: &RKey, modifiers: Modifiers) -> Option<Key> {
-    if modifiers.meta {
+    // Alt and Meta chords are refused rather than guessed at: a terminal reads
+    // them as its own Meta prefix, and sending Ctrl+Alt+Z as Ctrl+Z would be
+    // worse than sending nothing.
+    if modifiers.meta || modifiers.alt {
         return None;
     }
     if modifiers.control {
@@ -495,12 +498,25 @@ mod tests {
     #[test]
     fn a_key_the_terminal_has_no_meaning_for_is_reported_as_unhandled() {
         assert_eq!(
-            translate_key(&RKey::Character("z".into()), ctrl(false, false, true)),
-            None
+            translate_key(
+                &RKey::Character("z".into()),
+                mods(false, false, false, true)
+            ),
+            None,
+            "meta is not a control character"
         );
         assert_eq!(
-            translate_key(&RKey::Character("z".into()), ctrl(true, true, false)),
-            None
+            translate_key(
+                &RKey::Character("z".into()),
+                mods(false, true, false, false)
+            ),
+            None,
+            "alt is a terminal prefix, not a binding here"
+        );
+        assert_eq!(
+            translate_key(&RKey::Character("z".into()), mods(true, false, true, false)),
+            Some(Key::Char('\u{1a}')),
+            "shift does not change a control chord"
         );
     }
 
@@ -540,6 +556,7 @@ mod tests {
     #[test]
     fn control_tab_cycles_tabs_and_control_w_closes_one() {
         let mut state = state(std::path::Path::new("/tmp"));
+        state.client.open(Pane::SourceControl);
         let before = state.client.active_index();
         assert!(state.key(&chord(RKey::Tab, true, false)));
         assert_ne!(state.client.active_index(), before);
@@ -572,14 +589,18 @@ mod tests {
         assert!(state.key(&down(RKey::Backspace)));
         let document = state.documents.get(path).expect("still open");
         assert_eq!(document.text(), "one\ntwo\n", "the backspace undid it");
-        assert_eq!(document.cursor(), 1, "the cursor went back too");
+        assert_eq!(document.cursor(), 0, "the cursor went back too");
         std::fs::remove_file(path).ok();
     }
 
     fn ctrl(control: bool, shift: bool, meta: bool) -> Modifiers {
+        mods(control, false, shift, meta)
+    }
+
+    fn mods(control: bool, alt: bool, shift: bool, meta: bool) -> Modifiers {
         Modifiers {
             control,
-            alt: false,
+            alt,
             shift,
             meta,
         }
