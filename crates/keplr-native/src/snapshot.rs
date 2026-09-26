@@ -157,6 +157,10 @@ pub struct Options {
     pub panes: Vec<Pane>,
     pub size: (u32, u32),
     pub root: PathBuf,
+    /// Print the solved layout instead of drawing it. Every box the window
+    /// would fill, with the numbers, which is the only way to tell a layout
+    /// mistake from a paint mistake without a display.
+    pub layout: bool,
 }
 
 /// Parses `--snapshot` arguments: `--out`, `--pane`, `--width`, `--height`, and
@@ -166,6 +170,7 @@ pub fn parse(args: &[String]) -> Result<Options> {
     let mut panes = Vec::new();
     let mut size = DEFAULT_SIZE;
     let mut root = None;
+    let mut layout = false;
     let mut index = 0;
     while index < args.len() {
         let arg = args[index].as_str();
@@ -203,12 +208,22 @@ pub fn parse(args: &[String]) -> Result<Options> {
         size,
         root: root
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))),
+        layout,
     })
 }
 
 /// Runs every requested pane, writing `<out stem>-<pane>.png` beside `--out`.
 pub fn run(args: &[String]) -> Result<()> {
     let options = parse(args)?;
+    if options.layout {
+        let mut state = state_for(options.panes[0], options.root.clone());
+        let tree = view(&mut state, PANE_ROWS);
+        let mut app = RcusApp::new(tree, rcus::fonts::MONO);
+        app.resize(options.size.0 as f32, options.size.1 as f32);
+        app.relayout();
+        println!("{}", layout_report(&app));
+        return Ok(());
+    }
     for pane in &options.panes {
         let out = match options.out.parent() {
             Some(parent) => parent.join(format!(
@@ -230,6 +245,42 @@ pub fn run(args: &[String]) -> Result<()> {
         );
     }
     Ok(())
+}
+
+/// The solved layout as text: one line per named box, in paint order.
+pub fn layout_report(app: &RcusApp) -> String {
+    let mut out = format!(
+        "viewport {:?}\n",
+        (app.viewport().width, app.viewport().height)
+    );
+    for node in app.layout().paint_nodes() {
+        if node.id.is_empty() {
+            continue;
+        }
+        let rect = node.rect;
+        out.push_str(&format!(
+            "{:<18} x={:>7.1} y={:>7.1} w={:>7.1} h={:>6.1}{}\n",
+            node.id,
+            rect.x,
+            rect.y,
+            rect.width,
+            rect.height,
+            match node.text.as_deref() {
+                Some(text) => format!("  {:?}", truncate(text)),
+                None => String::new(),
+            }
+        ));
+    }
+    out
+}
+
+fn truncate(text: &str) -> String {
+    let cut: String = text.chars().take(24).collect();
+    if text.chars().count() > 24 {
+        format!("{cut}…")
+    } else {
+        cut
+    }
 }
 
 #[cfg(test)]
@@ -258,6 +309,13 @@ mod tests {
         assert_eq!(options.panes, vec![Pane::Terminal]);
         assert_eq!(options.size, (640, 480));
         assert_eq!(options.root, PathBuf::from("/tmp"));
+        assert!(!options.layout, "laying out is not the default");
+    }
+
+    #[test]
+    fn asking_for_the_layout_is_a_flag() {
+        let options = parse(&args(&["--out", "/tmp/k.png", "--layout"])).expect("parses");
+        assert!(options.layout);
     }
 
     #[test]

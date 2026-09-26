@@ -111,6 +111,7 @@ pub fn view(state: &mut State, rows: usize) -> ViewNode {
     let mut tab_bar = vec![ViewNode::text(
         "keplr",
         Style::default()
+            .align(Align::Center)
             .color(chrome.accent)
             .font_size(14.0)
             .weight(700.0),
@@ -129,7 +130,6 @@ pub fn view(state: &mut State, rows: usize) -> ViewNode {
                     .height(TAB_BAR)
                     .gap(4.0)
                     .padding(Insets::symmetric(10.0, 0.0))
-                    .align(Align::Center)
                     .background(chrome.raised),
                 tab_bar,
             ),
@@ -144,17 +144,28 @@ pub fn view(state: &mut State, rows: usize) -> ViewNode {
                     .height(STATUS_BAR)
                     .gap(16.0)
                     .padding(Insets::symmetric(12.0, 0.0))
-                    .align(Align::Center)
                     .background(chrome.raised),
                 vec![
                     ViewNode::text(
                         root,
-                        Style::default().color(chrome.secondary).font_size(11.5),
+                        Style::default()
+                            .align(Align::Center)
+                            .color(chrome.secondary)
+                            .font_size(11.5),
                     ),
-                    ViewNode::text(status, Style::default().color(chrome.ok).font_size(11.5)),
+                    ViewNode::text(
+                        status,
+                        Style::default()
+                            .align(Align::Center)
+                            .color(chrome.ok)
+                            .font_size(11.5),
+                    ),
                     ViewNode::text(
                         rooms,
-                        Style::default().color(chrome.tertiary).font_size(11.0),
+                        Style::default()
+                            .align(Align::Center)
+                            .color(chrome.tertiary)
+                            .font_size(11.0),
                     ),
                 ],
             ),
@@ -190,7 +201,6 @@ fn rail(active: &Pane, chrome: &Chrome) -> ViewNode {
                 .padding(Insets::symmetric(4.0, 6.0))
                 .gap(1.0)
                 .justify(Justify::Center)
-                .align(Align::Center)
                 .background(if selected { chrome.pressed } else { chrome.bg })
                 .row_height(15.0),
             vec![
@@ -440,7 +450,6 @@ fn editor(state: &mut State, path: &Path, rows: usize, chrome: &Chrome) -> ViewN
                     (line + 1).to_string(),
                     Style::default()
                         .width(GUTTER - 10.0)
-                        .align(Align::End)
                         .color(if on_cursor_line {
                             chrome.secondary
                         } else {
@@ -578,6 +587,45 @@ mod tests {
         let app = layout(&mut state);
         for id in ["window", "tab-bar", "rail", "pane", "status-bar"] {
             assert!(app.bounds_of(id).is_some(), "{id} is in the tree");
+        }
+    }
+
+    #[test]
+    fn the_bars_span_the_whole_window_rather_than_sitting_in_the_middle() {
+        // `align` places a node inside its parent, so a bar that wants to be
+        // full width must not carry one: it ends up sized to its content and
+        // centred, which looks like a deliberate floating panel and is not.
+        let mut state = state();
+        let app = layout(&mut state);
+        for id in ["tab-bar", "status-bar", "window"] {
+            let rect = app.bounds_of(id).unwrap_or_else(|| panic!("{id}"));
+            assert!(
+                (rect.width - 1280.0).abs() < 0.5,
+                "{id} is {} wide, expected the full window",
+                rect.width
+            );
+            assert!(rect.x.abs() < 0.5, "{id} starts at {}", rect.x);
+        }
+    }
+
+    #[test]
+    fn a_rail_item_fills_the_rail() {
+        let mut state = state();
+        let app = layout(&mut state);
+        let rail = app.bounds_of("rail").expect("rail");
+        for id in [
+            "rail-editor",
+            "rail-terminal",
+            "rail-problems",
+            "rail-source",
+        ] {
+            let item = app.bounds_of(id).unwrap_or_else(|| panic!("{id}"));
+            assert!(
+                item.width >= rail.width - 9.0,
+                "{id} is {} wide inside a {} wide rail",
+                item.width,
+                rail.width
+            );
         }
     }
 
