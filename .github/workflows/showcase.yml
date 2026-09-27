@@ -20,6 +20,16 @@ jobs:
           node-version: 22
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - name: Install the libraries a window and a software GPU need
+        # The native client is a real winit + wgpu window. Building it needs the
+        # X11 and Wayland headers, and drawing it needs an adapter: the runner
+        # has no GPU, so Mesa's lavapipe provides a Vulkan device on the CPU.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libx11-dev libx11-xcb-dev libxcb1-dev libxcb-cursor-dev libxcb-shape0-dev \
+            libxcb-render0-dev libxcb-xfixes0-dev libxkbcommon-dev libwayland-dev \
+            mesa-vulkan-drivers libvulkan1
       - run: npm install --no-save playwright@1.52.0
       - run: npx playwright install --with-deps chromium
       - run: cargo build --release -p keplr-cli
@@ -33,6 +43,20 @@ jobs:
           done
           cat /tmp/keplr-showcase.log
           exit 1
+      - name: Build the native client
+        run: cargo build -p keplr-native
+      - name: Print the native window's solved layout
+        # The numbers behind the pictures. A layout mistake and a paint mistake
+        # look the same in a dark screenshot, and only one of them is visible
+        # in the text.
+        run: >
+          ./target/debug/keplr-native --snapshot
+          --out showcase-output/native/keplr.png
+          --layout --pane terminal . > showcase-output/native/layout.txt
+      - name: Draw every native pane
+        # The same state, the same view and the same rcus pipelines the window
+        # uses, drawn into PNGs on a machine with no display.
+        run: ./target/debug/keplr-native --snapshot --out showcase-output/native/keplr.png .
       - run: node .github/scripts/showcase.mjs
         env:
           KEPLR_URL: http://127.0.0.1:7137
@@ -44,4 +68,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: keplr-showcase
-          path: showcase-output/*.png
+          # The browser client at the top level, the native window under
+          # `native/`, and the layout it was drawn from beside the pictures.
+          path: showcase-output/**/*.png
+          if-no-files-found: error

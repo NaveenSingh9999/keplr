@@ -25,6 +25,9 @@ jobs:
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo build --workspace
 
+  # The native window is drawn into PNGs by the showcase workflow, which is
+  # where a software Vulkan driver is installed. Here it is only built, tested
+  # and linted.
   gpu-check:
     runs-on: ubuntu-latest
     steps:
@@ -50,42 +53,6 @@ jobs:
         with:
           name: render-snapshot
           path: /tmp/shot.png
-
-  native-snapshot:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Install the system libraries a window needs
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libx11-dev libx11-xcb-dev libxcb1-dev libxcb-cursor-dev libxcb-shape0-dev \
-            libxcb-render0-dev libxcb-xfixes0-dev libxkbcommon-dev libwayland-dev
-      - name: Install a software Vulkan driver
-        # There is no GPU on a runner, and wgpu will not draw a frame without an
-        # adapter. Mesa's lavapipe is a Vulkan device on the CPU, so the window
-        # is really rendered rather than skipped.
-        run: |
-          sudo apt-get install -y --no-install-recommends \
-            mesa-vulkan-drivers libvulkan1
-      - run: cargo build -p keplr-native
-      - name: Print the solved layout
-        # The numbers behind the pictures: which box is where, and how big. A
-        # layout mistake and a paint mistake look the same in a dark screenshot.
-        run: ./target/debug/keplr-native --snapshot --out /tmp/shots/keplr.png --layout --pane terminal .
-      - name: Draw every pane
-        run: ./target/debug/keplr-native --snapshot --out /tmp/shots/keplr.png .
-      - uses: actions/upload-artifact@v4
-        with:
-          name: native-snapshots
-          path: /tmp/shots
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: native-layout
-          path: /tmp/layout.txt
 
   wasm-check:
     runs-on: ubuntu-latest
