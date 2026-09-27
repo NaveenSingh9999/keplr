@@ -49,10 +49,11 @@ jobs:
         # The numbers behind the pictures. A layout mistake and a paint mistake
         # look the same in a dark screenshot, and only one of them is visible
         # in the text.
-        run: >
-          ./target/debug/keplr-native --snapshot
-          --out showcase-output/native/keplr.png
-          --layout --pane terminal . > showcase-output/native/layout.txt
+        run: |
+          mkdir -p showcase-output/native
+          ./target/debug/keplr-native --snapshot \
+            --out showcase-output/native/keplr.png \
+            --layout --pane terminal . > showcase-output/native/layout.txt
       - name: Draw every native pane
         # The same state, the same view and the same rcus pipelines the window
         # uses, drawn into PNGs on a machine with no display.
