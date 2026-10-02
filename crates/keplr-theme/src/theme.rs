@@ -375,7 +375,7 @@ impl UserTheme {
             &format!(
                 "{} {}",
                 if self.motion.reduced_motion {
-                    0
+                    0.0
                 } else {
                     self.motion.spring.stiffness
                 },
@@ -453,10 +453,22 @@ pub fn parse_hex(token: &str) -> Result<[u8; 4], String> {
     }
 }
 
+/// A token is "unset" when it holds its type's zero value, which for a colour
+/// is an empty string: the user simply did not mention it.
+trait Unset {
+    fn is_unset(&self) -> bool;
+}
+
+impl Unset for String {
+    fn is_unset(&self) -> bool {
+        self.is_empty()
+    }
+}
+
 macro_rules! merge_fields {
     ($base:expr, $over:expr, $($field:ident),+ $(,)?) => {{
         let mut out = $base.clone();
-        $( if $over.$field != Default::default() { out.$field = $over.$field.clone(); } )+
+        $( if !$over.$field.is_unset() { out.$field = $over.$field.clone(); } )+
         out
     }};
 }
