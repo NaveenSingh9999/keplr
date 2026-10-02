@@ -20,6 +20,7 @@ use rcus::{App as RcusApp, DesktopApp, InputEvent};
 
 mod snapshot;
 mod state;
+mod theme;
 mod view;
 
 use state::State;

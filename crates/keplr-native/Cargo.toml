@@ -7,6 +7,7 @@ license = "MIT"
 publish = false
 
 [dependencies]
+keplr-anim = { path = "../keplr-anim" }
 keplr-client = { path = "../keplr-client" }
 keplr-events = { path = "../keplr-events" }
 keplr-term = { path = "../keplr-term" }

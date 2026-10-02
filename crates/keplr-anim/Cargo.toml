@@ -1,0 +1,11 @@
+[package]
+name = "keplr-anim"
+version = "0.1.0"
+edition = "2021"
+description = "Keplr's motion catalogue: durations, curves, indicators and panels, all from the user's theme"
+license = "MIT"
+publish = false
+
+[dependencies]
+keplr-theme = { path = "../keplr-theme" }
+rcus = "0.2.0"
