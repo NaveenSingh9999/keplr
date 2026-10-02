@@ -124,11 +124,13 @@ pub fn problems(root: &Path) -> Vec<String> {
             out.push(format!("{label} is not valid JSON"));
             continue;
         };
-        let Ok(theme) = serde_json::from_value::<UserTheme>(value) else {
+        let Ok(over) = serde_json::from_value::<UserTheme>(value) else {
             out.push(format!("{label} does not match the theme format"));
             continue;
         };
-        for problem in theme.problems() {
+        // Check what will actually be drawn: a file that sets one colour is
+        // meant to inherit the rest, not to be reported as twenty empty ones.
+        for problem in UserTheme::merged(&over).problems() {
             out.push(format!("{label}: {problem}"));
         }
     }
@@ -144,7 +146,10 @@ pub fn resolve(root: &Path, wanted: Option<&str>) -> UserTheme {
             .iter()
             .find(|theme| theme.name.eq_ignore_ascii_case(name))
             .map(|theme| theme.theme.clone())
-            .unwrap_or_else(|| themes.first().map(|t| t.theme.clone()).unwrap_or_default()),
+            // A name that is not here falls back to the built-in rather than to
+            // whichever workspace theme happens to sort first, so the window is
+            // the same whatever was asked for.
+            .unwrap_or_default(),
         None => themes
             .first()
             .map(|theme| theme.theme.clone())
