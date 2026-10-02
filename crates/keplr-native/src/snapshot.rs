@@ -102,9 +102,9 @@ fn state_for(pane: Pane, root: PathBuf, wanted_theme: Option<&str>) -> State {
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "sh".to_string());
     let mut state = State::new(root, shell, redraw);
     if let Some(wanted) = wanted_theme {
-        std::env::set_var("KEPLR_THEME", &wanted);
+        std::env::set_var("KEPLR_THEME", wanted);
         state.reload_theme();
-        if !state.theme().name.eq_ignore_ascii_case(&wanted) {
+        if !state.theme().name.eq_ignore_ascii_case(wanted) {
             eprintln!(
                 "no theme named {wanted:?}; drawing {} instead",
                 state.theme().name
