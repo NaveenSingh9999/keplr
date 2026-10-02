@@ -9,10 +9,10 @@ use std::path::Path;
 
 use keplr_client::Pane;
 use keplr_term::{Cell, Snapshot};
-use keplr_theme::Theme;
 use rcus::{Align, Color, Insets, Justify, Style, ViewNode};
 
 use crate::state::State;
+use crate::theme::Chrome;
 
 /// Rows of content to draw when the host has not measured the pane yet.
 pub const FALLBACK_ROWS: usize = 28;
@@ -28,70 +28,9 @@ const RAIL: f32 = 56.0;
 /// Width of the editor's line number gutter, including its right gap.
 const GUTTER: f32 = 52.0;
 
-/// The colours the chrome uses, parsed from the shared theme so the native
-/// window and the browser client cannot drift apart.
-pub struct Chrome {
-    pub bg: Color,
-    pub raised: Color,
-    pub pressed: Color,
-    pub text: Color,
-    pub secondary: Color,
-    pub tertiary: Color,
-    pub accent: Color,
-    pub ok: Color,
-    pub error: Color,
-}
-
-impl Chrome {
-    /// Parses the AMOLED tokens. A token that does not parse falls back rather
-    /// than taking a window down.
-    pub fn new(theme: &Theme) -> Self {
-        let black = Color::rgba(0.0, 0.0, 0.0, 1.0);
-        let white = Color::rgba(1.0, 1.0, 1.0, 1.0);
-        Self {
-            bg: color(theme.bg, black),
-            raised: color(theme.raised, Color::rgba(0.05, 0.05, 0.06, 1.0)),
-            pressed: color(theme.pressed, Color::rgba(0.12, 0.12, 0.13, 1.0)),
-            text: color(theme.text, white),
-            secondary: color(theme.text_secondary, Color::rgba(0.6, 0.6, 0.64, 1.0)),
-            tertiary: color(theme.text_tertiary, Color::rgba(0.42, 0.42, 0.46, 1.0)),
-            accent: color(theme.accent, Color::rgba(0.04, 0.52, 1.0, 1.0)),
-            ok: color(theme.ok, Color::rgba(0.19, 0.82, 0.35, 1.0)),
-            error: color(theme.error, Color::rgba(1.0, 0.27, 0.23, 1.0)),
-        }
-    }
-}
-
-/// Parses a `#rrggbb` or `#rgb` token, falling back when it cannot.
-pub fn color(token: &str, fallback: Color) -> Color {
-    let Some(hex) = token.trim().strip_prefix('#') else {
-        return fallback;
-    };
-    let pair = |index: usize| u8::from_str_radix(&hex[index * 2..index * 2 + 2], 16).ok();
-    let channels: Option<Vec<u8>> = match hex.len() {
-        // Three digits are shorthand: each one stands for its own pair, so
-        // `#f0a` is `#ff00aa`.
-        3 => hex
-            .chars()
-            .map(|digit| u8::from_str_radix(&format!("{digit}{digit}"), 16).ok())
-            .collect(),
-        6 => (0..3).map(pair).collect(),
-        _ => None,
-    };
-    match channels {
-        Some(channels) if channels.len() == 3 => Color::rgba(
-            channels[0] as f32 / 255.0,
-            channels[1] as f32 / 255.0,
-            channels[2] as f32 / 255.0,
-            1.0,
-        ),
-        _ => fallback,
-    }
-}
-
 /// The whole window: tab bar, rail, showing pane, status bar.
 pub fn view(state: &mut State, rows: usize) -> ViewNode {
-    let chrome = Chrome::new(&Theme::amoled());
+    let chrome = state.chrome();
     let status = state.status.clone();
     let tabs: Vec<(String, bool)> = state
         .client
@@ -181,7 +120,7 @@ fn tab(index: usize, label: &str, focused: bool, chrome: &Chrome) -> ViewNode {
             .height(24.0)
             .padding(Insets::symmetric(10.0, 0.0))
             .align(Align::Center)
-            .background(if focused { chrome.pressed } else { chrome.bg })
+            .background(if focused { chrome.overlay } else { chrome.bg })
             .color(if focused {
                 chrome.text
             } else {
@@ -201,7 +140,7 @@ fn rail(active: &Pane, chrome: &Chrome) -> ViewNode {
                 .padding(Insets::symmetric(4.0, 6.0))
                 .gap(1.0)
                 .justify(Justify::Center)
-                .background(if selected { chrome.pressed } else { chrome.bg })
+                .background(if selected { chrome.overlay } else { chrome.bg })
                 .row_height(15.0),
             vec![
                 ViewNode::text(
@@ -547,6 +486,7 @@ fn empty_pane(id: &str, title: &str, hint: &str, chrome: &Chrome) -> ViewNode {
 mod tests {
     use super::*;
     use crate::state::State;
+    use crate::theme::Chrome;
     use keplr_term::{Cursor, Snapshot, TerminalGrid};
     use rcus::{App, LayoutNode};
     use std::path::Path;
@@ -567,6 +507,10 @@ mod tests {
 
     fn laid_out(nodes: Vec<ViewNode>) -> App {
         App::new(ViewNode::column(nodes), rcus::fonts::MONO)
+    }
+
+    fn state_chrome() -> Chrome {
+        Chrome::new(&keplr_theme::UserTheme::default())
     }
 
     fn node<'a>(app: &'a App, id: &str) -> &'a LayoutNode {
@@ -683,12 +627,12 @@ mod tests {
         let app = layout(&mut state);
         assert_eq!(
             node(&app, "tab-1").color,
-            Some(Chrome::new(&Theme::amoled()).text),
+            Some(state_chrome().text),
             "the focused tab is drawn in the reading color"
         );
         assert_eq!(
             node(&app, "rail-source").background,
-            Some(Chrome::new(&Theme::amoled()).pressed),
+            Some(state_chrome().overlay),
             "the rail marks the showing pane"
         );
     }
@@ -696,7 +640,7 @@ mod tests {
     #[test]
     fn a_terminal_pane_draws_one_named_row_per_grid_row() {
         let frame = TerminalGrid::new(20, 4).snapshot();
-        let chrome = Chrome::new(&Theme::amoled());
+        let chrome = state.chrome();
         let app = laid_out(grid_rows(&frame, &chrome));
         for y in 0..4 {
             let row = node(&app, &format!("term-row-{y}"));
@@ -716,7 +660,7 @@ mod tests {
             cell('c', Some("#FF453A")),
             cell('d', Some("#FF453A")),
         ];
-        let chrome = Chrome::new(&Theme::amoled());
+        let chrome = state.chrome();
         let app = laid_out(runs(&cells, &frame_of(4, 1), 0, &chrome));
         assert_eq!(text_of(&app, "term-0-0"), "ab");
         assert_eq!(text_of(&app, "term-0-2"), "cd");
@@ -732,7 +676,7 @@ mod tests {
         let cells = vec![cell('a', None), cell('b', None), cell('c', None)];
         let mut frame = frame_of(3, 1);
         frame.cursor = Cursor { line: 0, column: 1 };
-        let chrome = Chrome::new(&Theme::amoled());
+        let chrome = state.chrome();
         let app = laid_out(runs(&cells, &frame, 0, &chrome));
         assert_eq!(
             node(&app, "term-0-1").background,
@@ -748,7 +692,7 @@ mod tests {
         let mut frame = frame_of(2, 1);
         frame.show_cursor = false;
         frame.cursor = Cursor { line: 0, column: 0 };
-        let chrome = Chrome::new(&Theme::amoled());
+        let chrome = state.chrome();
         let app = laid_out(runs(&cells, &frame, 0, &chrome));
         assert_eq!(text_of(&app, "term-0-0"), "ab");
     }
@@ -757,7 +701,7 @@ mod tests {
     fn an_inverse_cell_swaps_its_colors() {
         let mut inverted = cell('x', Some("#FF453A"));
         inverted.flags |= Cell::INVERSE;
-        let chrome = Chrome::new(&Theme::amoled());
+        let chrome = state.chrome();
         let app = laid_out(runs(&[inverted], &frame_of(1, 1), 0, &chrome));
         let node = node(&app, "term-0-0");
         assert_eq!(node.background, Some(chrome.error), "red became the fill");

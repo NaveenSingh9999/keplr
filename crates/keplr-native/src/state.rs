@@ -11,6 +11,9 @@ use std::sync::{Arc, Mutex};
 
 use keplr_client::{App, Document, Key, Pane, Terminal, TerminalHost};
 use keplr_events::{channel, drain, Event, Service, UnboundedReceiver};
+use keplr_theme::UserTheme;
+
+use crate::theme::Chrome;
 use keplr_term::{Snapshot, TerminalGrid};
 use rcus::desktop::Redraw;
 use rcus::{InputEvent, Key as RKey, Modifiers};
@@ -44,6 +47,10 @@ impl TerminalHost for Painter {
 pub struct State {
     /// Which panes are open and which one is showing.
     pub client: App,
+    /// The user's theme, resolved once at startup.
+    theme: UserTheme,
+    /// Colours parsed from the theme, so the view never re-parses them.
+    chrome: Chrome,
     /// Live shells, keyed by session so a pane switch keeps the process.
     terminals: HashMap<String, Terminal>,
     /// Open editors, keyed by path, so a tab switch keeps the cursor.
@@ -79,13 +86,23 @@ impl State {
             client.events().subscribe(DIAGNOSTICS_ROOM, sender.clone()),
             client.events().subscribe(TASKS_ROOM, sender),
         ];
+        let theme = keplr_theme::resolve(root, std::env::var("KEPLR_THEME").ok().as_deref());
+        let chrome = Chrome::new(&theme);
+        let problems = keplr_theme::problems(&keplr_client_root(&client));
+        let status = if problems.is_empty() {
+            "ready".to_string()
+        } else {
+            format!("{} theme problem(s): {}", problems.len(), problems[0])
+        };
         Self {
             client,
+            theme,
+            chrome,
             terminals: HashMap::new(),
             documents: HashMap::new(),
             diagnostics: Vec::new(),
             tasks: Vec::new(),
-            status: "ready".to_string(),
+            status,
             shell,
             redraw,
             events,
@@ -100,6 +117,25 @@ impl State {
         if let Ok(mut slot) = self.redraw.lock() {
             *slot = Some(redraw);
         }
+    }
+
+    /// The theme this window is drawing with.
+    pub fn theme(&self) -> &UserTheme {
+        &self.theme
+    }
+
+    /// The colours parsed from that theme.
+    pub fn chrome(&self) -> Chrome {
+        self.chrome.clone()
+    }
+
+    /// Re-reads the theme, which is what changing it in a picker does.
+    pub fn reload_theme(&mut self) {
+        self.theme = keplr_theme::resolve(
+            self.client.root(),
+            std::env::var("KEPLR_THEME").ok().as_deref(),
+        );
+        self.chrome = Chrome::new(&self.theme);
     }
 
     /// The current frame of a terminal pane, or `None` if it has no shell yet.
@@ -393,6 +429,11 @@ fn apply_frame(frame: &str, diagnostics: &mut Vec<String>, tasks: &mut Vec<Strin
 }
 
 /// The character a key carries, if it is one.
+/// The workspace a client is rooted at, for theme discovery.
+fn keplr_client_root(client: &App) -> &std::path::Path {
+    client.root()
+}
+
 fn character(key: &RKey) -> Option<char> {
     match key {
         RKey::Character(text) => text.chars().next(),
