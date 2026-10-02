@@ -60,7 +60,7 @@ impl Default for Radius {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Radius {
     pub sm: f32,
@@ -69,7 +69,7 @@ pub struct Radius {
 }
 
 /// Every surface, border and text colour the shell draws.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ColorTokens {
     pub chrome: Hex,
@@ -95,7 +95,7 @@ pub struct ColorTokens {
 }
 
 /// Colours for code, by the token names the highlighter already emits.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct SyntaxTokens {
     pub keyword: Hex,
@@ -112,7 +112,7 @@ pub struct SyntaxTokens {
 }
 
 /// How long things take and how they move.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct MotionTokens {
     pub fast_ms: u16,

@@ -7,7 +7,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::theme::{problems, UserTheme};
+use crate::theme::UserTheme;
 
 /// Where a theme came from, so a picker can show which one is the workspace's.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -120,7 +120,7 @@ pub fn problems(root: &Path) -> Vec<String> {
             out.push(format!("{label} does not match the theme format"));
             continue;
         };
-        for problem in problems(&theme) {
+        for problem in theme.problems() {
             out.push(format!("{label}: {problem}"));
         }
     }
