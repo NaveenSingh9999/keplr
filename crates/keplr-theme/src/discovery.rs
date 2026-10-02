@@ -9,13 +9,17 @@ use std::path::{Path, PathBuf};
 
 use crate::theme::UserTheme;
 
-/// Where a theme came from, so a picker can show which one is the workspace's.
+/// Where a theme came from.
+///
+/// Ordered so that a workspace's own themes come first: someone who dropped a
+/// file in wants that file, and the built-in is the fallback rather than the
+/// default.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ThemeSource {
-    /// Shipped with Keplr.
-    BuiltIn,
     /// Written in this workspace.
     File,
+    /// Shipped with Keplr.
+    BuiltIn,
 }
 
 /// One theme the window can switch to.
