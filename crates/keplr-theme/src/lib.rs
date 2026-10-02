@@ -155,8 +155,8 @@ pub mod theme;
 
 pub use discovery::{discover, load, problems, resolve, themes_dir, DiscoveredTheme, ThemeSource};
 pub use theme::{
-    Appearance, ColorTokens, Density, MotionTokens, Radius, SpringTokens, SyntaxTokens, UiTokens,
-    UserTheme,
+    parse_hex, Appearance, ColorTokens, Density, MotionTokens, Radius, SpringTokens, SyntaxTokens,
+    UiTokens, UserTheme,
 };
 
 #[cfg(test)]
