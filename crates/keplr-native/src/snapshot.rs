@@ -77,8 +77,14 @@ const SHELL_WAIT: std::time::Duration = std::time::Duration::from_millis(120);
 const SHELL_ATTEMPTS: usize = 40;
 
 /// Renders one pane and writes it to `out`.
-pub fn write_png(out: &std::path::Path, pane: Pane, size: (u32, u32), root: PathBuf) -> Result<()> {
-    let mut state = state_for(pane, root);
+pub fn write_png(
+    out: &std::path::Path,
+    pane: Pane,
+    size: (u32, u32),
+    root: PathBuf,
+    wanted_theme: Option<&str>,
+) -> Result<()> {
+    let mut state = state_for(pane, root, wanted_theme);
     let bytes = render_png(&mut state, pane, size)?;
     if let Some(parent) = out.parent() {
         std::fs::create_dir_all(parent).ok();
@@ -88,13 +94,23 @@ pub fn write_png(out: &std::path::Path, pane: Pane, size: (u32, u32), root: Path
 }
 
 /// A state with the given pane showing and, where it can be, filled in.
-fn state_for(pane: Pane, root: PathBuf) -> State {
+fn state_for(pane: Pane, root: PathBuf, wanted_theme: Option<&str>) -> State {
     // A snapshot has no event loop, so the redraw handle is the empty one: the
     // pty reader can ask for a frame that nobody will draw, which is harmless
     // because the snapshot draws the grid once it has settled.
     let redraw = Arc::new(Mutex::new(Some(Redraw::default())));
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "sh".to_string());
     let mut state = State::new(root, shell, redraw);
+    if let Some(wanted) = wanted_theme {
+        std::env::set_var("KEPLR_THEME", &wanted);
+        state.reload_theme();
+        if !state.theme().name.eq_ignore_ascii_case(&wanted) {
+            eprintln!(
+                "no theme named {wanted:?}; drawing {} instead",
+                state.theme().name
+            );
+        }
+    }
     // The state opens on the problems pane, so showing another one means asking
     // for it: publishing to a room fills a pane but does not switch to it.
     match pane {
@@ -177,6 +193,8 @@ pub struct Options {
     pub panes: Vec<Pane>,
     pub size: (u32, u32),
     pub root: PathBuf,
+    /// A theme by name, so CI can draw the same pane in two of them.
+    pub theme: Option<String>,
     /// Print the solved layout instead of drawing it. Every box the window
     /// would fill, with the numbers, which is the only way to tell a layout
     /// mistake from a paint mistake without a display.
@@ -204,6 +222,7 @@ pub fn parse(args: &[String]) -> Result<Options> {
             "--out" => out = Some(PathBuf::from(value()?)),
             "--pane" => panes.push(Pane::parse(&value()?)?),
             "--layout" => layout = true,
+            "--theme" => theme = Some(value()?),
             "--width" => {
                 size.0 = value()?
                     .parse()
@@ -230,6 +249,7 @@ pub fn parse(args: &[String]) -> Result<Options> {
         root: root
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))),
         layout,
+        theme,
     })
 }
 
@@ -237,7 +257,11 @@ pub fn parse(args: &[String]) -> Result<Options> {
 pub fn run(args: &[String]) -> Result<()> {
     let options = parse(args)?;
     if options.layout {
-        let mut state = state_for(options.panes[0], options.root.clone());
+        let mut state = state_for(
+            options.panes[0],
+            options.root.clone(),
+            options.theme.as_deref(),
+        );
         let tree = view(&mut state, PANE_ROWS);
         let mut app = RcusApp::new(tree, rcus::fonts::MONO);
         app.resize(options.size.0 as f32, options.size.1 as f32);
@@ -262,7 +286,13 @@ pub fn run(args: &[String]) -> Result<()> {
             )),
             None => PathBuf::from(format!("{}-{}.png", options.out.display(), pane.name())),
         };
-        write_png(&out, *pane, options.size, options.root.clone())?;
+        write_png(
+            &out,
+            *pane,
+            options.size,
+            options.root.clone(),
+            options.theme.as_deref(),
+        )?;
         println!(
             "{} ({} bytes)",
             out.display(),
@@ -335,12 +365,19 @@ mod tests {
         assert_eq!(options.size, (640, 480));
         assert_eq!(options.root, PathBuf::from("/tmp"));
         assert!(!options.layout, "laying out is not the default");
+        assert!(options.theme.is_none(), "no theme was named");
     }
 
     #[test]
     fn asking_for_the_layout_is_a_flag() {
         let options = parse(&args(&["--out", "/tmp/k.png", "--layout"])).expect("parses");
         assert!(options.layout);
+    }
+
+    #[test]
+    fn a_theme_can_be_named() {
+        let options = parse(&args(&["--out", "/tmp/k.png", "--theme", "Solar"])).expect("parses");
+        assert_eq!(options.theme.as_deref(), Some("Solar"));
     }
 
     #[test]
@@ -364,7 +401,7 @@ mod tests {
     /// not an empty file.
     #[test]
     fn a_snapshot_is_a_png_with_pixels_in_it() {
-        let mut state = state_for(Pane::Problems, PathBuf::from("/tmp"));
+        let mut state = state_for(Pane::Problems, PathBuf::from("/tmp"), None);
         let png = match render_png(&mut state, Pane::Problems, (320, 200)) {
             Ok(png) => png,
             Err(error) => {
