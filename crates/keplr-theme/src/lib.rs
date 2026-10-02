@@ -371,7 +371,8 @@ mod user_theme_tests {
 
     #[test]
     fn every_colour_token_is_listed_for_a_picker() {
-        let table = theme::colour_table(&UserTheme::default());
+        let theme = UserTheme::default();
+        let table = theme::colour_table(&theme);
         assert_eq!(table.len(), 20);
         assert_eq!(table.get("accent"), Some(&"#0A84FF"));
     }
