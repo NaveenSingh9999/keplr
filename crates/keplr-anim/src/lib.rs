@@ -241,14 +241,15 @@ mod tests {
 
     #[test]
     fn an_indicator_is_where_it_was_put_until_it_is_moved() {
-        let mut indicator = Indicator::new((10.0, 48.0), Instant::now());
+        let now = Instant::now();
+        let mut indicator = Indicator::new((10.0, 48.0), now);
         let motion = Motion::from(&tokens(false));
-        indicator.move_to((10.0, 48.0), Instant::now(), &motion);
-        assert_eq!(indicator.sample(Instant::now()), (10.0, 48.0));
+        indicator.move_to((10.0, 48.0), now, &motion);
+        assert_eq!(indicator.sample(now), (10.0, 48.0));
         assert_eq!(
             indicator.ends_at(),
-            Instant::now() + Duration::ZERO,
-            "no travel, no waiting"
+            now,
+            "no travel, so nothing to wait for"
         );
     }
 
