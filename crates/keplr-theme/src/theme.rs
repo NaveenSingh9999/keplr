@@ -438,16 +438,16 @@ pub fn parse_hex(token: &str) -> Result<[u8; 4], String> {
             Ok([d[0], d[1], d[2], 255])
         }
         6 => Ok([
-            expand(&hex[0..2]).map_err(|e| e)?,
-            expand(&hex[2..4]).map_err(|e| e)?,
-            expand(&hex[4..6]).map_err(|e| e)?,
+            expand(&hex[0..2])?,
+            expand(&hex[2..4])?,
+            expand(&hex[4..6])?,
             255,
         ]),
         8 => Ok([
-            expand(&hex[0..2]).map_err(|e| e)?,
-            expand(&hex[2..4]).map_err(|e| e)?,
-            expand(&hex[4..6]).map_err(|e| e)?,
-            expand(&hex[6..8]).map_err(|e| e)?,
+            expand(&hex[0..2])?,
+            expand(&hex[2..4])?,
+            expand(&hex[4..6])?,
+            expand(&hex[6..8])?,
         ]),
         other => Err(format!("{token:?} has {other} digits, expected 3, 6 or 8")),
     }
