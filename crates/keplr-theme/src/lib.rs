@@ -150,6 +150,15 @@ pub fn static_tokens() -> &'static str {
 "#
 }
 
+pub mod discovery;
+pub mod theme;
+
+pub use discovery::{discover, load, problems, resolve, themes_dir, DiscoveredTheme, ThemeSource};
+pub use theme::{
+    Appearance, ColorTokens, Density, MotionTokens, Radius, SpringTokens, SyntaxTokens, UiTokens,
+    UserTheme,
+};
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -177,5 +186,193 @@ mod tests {
         let (l1, l2) = (lum("#8D8D93"), lum("#000000"));
         let ratio = (l1.max(l2) + 0.05) / (l1.min(l2) + 0.05);
         assert!(ratio >= 4.5, "contrast {ratio}");
+    }
+}
+
+#[cfg(test)]
+mod user_theme_tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn the_default_theme_is_the_one_the_spec_describes() {
+        let theme = UserTheme::default();
+        assert_eq!(theme.colors.accent, "#0A84FF");
+        assert_eq!(theme.syntax.keyword, "#BF5AF2");
+        assert_eq!(theme.ui.font_size, 13.0);
+        assert_eq!(theme.ui.radius.md, 6.0);
+        assert_eq!(theme.motion.normal_ms, 180);
+        assert!(!theme.motion.reduced_motion);
+    }
+
+    #[test]
+    fn an_empty_object_decodes_to_the_default_theme() {
+        let over: UserTheme = serde_json::from_str("{}").expect("decodes");
+        assert_eq!(UserTheme::merged(&over), UserTheme::default());
+    }
+
+    #[test]
+    fn one_colour_overrides_only_that_colour() {
+        let over: UserTheme =
+            serde_json::from_str(r##"{"colors":{"accent":"#FF0000"}}"##).expect("decodes");
+        let merged = UserTheme::merged(&over);
+        assert_eq!(merged.colors.accent, "#FF0000");
+        assert_eq!(merged.colors.text, "#E6E6EA", "the rest is untouched");
+    }
+
+    #[test]
+    fn a_theme_may_name_itself_and_be_dark_or_light() {
+        let over: UserTheme =
+            serde_json::from_str(r#"{"name":"Solar","appearance":"light"}"#).expect("decodes");
+        let merged = UserTheme::merged(&over);
+        assert_eq!(merged.name, "Solar");
+        assert_eq!(merged.appearance, Appearance::Light);
+    }
+
+    #[test]
+    fn a_duration_longer_than_the_ceiling_is_clamped() {
+        let over: UserTheme =
+            serde_json::from_str(r#"{"motion":{"fastMs":9999}}"#).expect("decodes");
+        assert_eq!(UserTheme::merged(&over).motion.fast_ms, 400);
+    }
+
+    #[test]
+    fn a_bad_colour_is_named_rather_than_ignored() {
+        let over: UserTheme =
+            serde_json::from_str(r##"{"colors":{"accent":"chartreuse"}}"##).expect("decodes");
+        let problems = UserTheme::merged(&over).problems();
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(problems[0].starts_with("colors.accent"), "{}", problems[0]);
+    }
+
+    #[test]
+    fn a_bad_font_size_is_reported_too() {
+        let over: UserTheme = serde_json::from_str(r#"{"ui":{"fontSize":400}}"#).expect("decodes");
+        let problems = UserTheme::merged(&over).problems();
+        assert!(
+            problems.iter().any(|p| p.starts_with("ui.fontSize")),
+            "{problems:?}"
+        );
+    }
+
+    #[test]
+    fn a_good_theme_has_nothing_to_report() {
+        assert!(UserTheme::default().problems().is_empty());
+    }
+
+    #[test]
+    fn hex_accepts_three_six_and_eight_digits() {
+        assert_eq!(theme::parse_hex("#fff").unwrap(), [255, 255, 255, 255]);
+        assert_eq!(theme::parse_hex("#102030").unwrap(), [16, 32, 48, 255]);
+        assert_eq!(theme::parse_hex("#10203080").unwrap(), [16, 32, 48, 128]);
+        assert!(
+            theme::parse_hex("102030").is_err(),
+            "a missing # is not a colour"
+        );
+        assert!(
+            theme::parse_hex("#12345").is_err(),
+            "five digits is not a colour"
+        );
+    }
+
+    #[test]
+    fn the_css_block_carries_every_token() {
+        let css = UserTheme::default().to_css();
+        for name in [
+            "--k-chrome:#000000",
+            "--k-accent:#0A84FF",
+            "--k-syntax-keyword:#BF5AF2",
+            "--k-syntax-macro:#BF5AF2",
+            "--k-radius-md:6px",
+            "--k-dur-normal:180ms",
+            "--k-ease:cubic-bezier(0.2,0,0,1)",
+            "--k-reduced-motion:0",
+        ] {
+            assert!(css.contains(name), "missing {name} in\n{css}");
+        }
+        assert!(css.starts_with(":root{") && css.trim_end().ends_with('}'));
+    }
+
+    #[test]
+    fn the_css_block_is_stable() {
+        assert_eq!(UserTheme::default().to_css(), UserTheme::default().to_css());
+    }
+
+    #[test]
+    fn a_workspace_without_a_theme_directory_still_has_the_built_in_one() {
+        let found = discovery::discover(Path::new("/tmp/keplr-no-such-workspace"));
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].source, ThemeSource::BuiltIn);
+        assert_eq!(found[0].theme, UserTheme::default());
+    }
+
+    #[test]
+    fn a_theme_file_is_found_and_layered_over_the_default() {
+        let root = std::env::temp_dir().join("keplr-theme-test-workspace");
+        let dir = root.join(".keplr").join("themes");
+        std::fs::create_dir_all(&dir).expect("fixture");
+        std::fs::write(
+            dir.join("mine.json"),
+            r##"{"name":"Mine","colors":{"accent":"#00FF00"}}"##,
+        )
+        .expect("fixture");
+        let found = discovery::discover(&root);
+        assert_eq!(found.len(), 2, "the built-in plus the user's");
+        let mine = found
+            .iter()
+            .find(|t| t.name == "Mine")
+            .expect("found by name");
+        assert_eq!(mine.source, ThemeSource::File);
+        assert_eq!(mine.theme.colors.accent, "#00FF00");
+        assert!(
+            discovery::problems(&root).is_empty(),
+            "{:?}",
+            discovery::problems(&root)
+        );
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn a_broken_theme_file_is_reported_and_skipped() {
+        let root = std::env::temp_dir().join("keplr-theme-broken-workspace");
+        let dir = root.join(".keplr").join("themes");
+        std::fs::create_dir_all(&dir).expect("fixture");
+        std::fs::write(dir.join("broken.json"), "{not json").expect("fixture");
+        std::fs::write(dir.join("huge.json"), vec![b'x'; 300_000]).expect("fixture");
+        let found = discovery::discover(&root);
+        assert_eq!(found.len(), 1, "only the built-in survives");
+        let problems = discovery::problems(&root);
+        assert!(
+            problems.iter().any(|p| p.contains("broken.json")),
+            "{problems:?}"
+        );
+        assert!(
+            problems.iter().any(|p| p.contains("huge.json")),
+            "{problems:?}"
+        );
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn a_named_theme_is_chosen_and_an_unknown_name_falls_back() {
+        let root = std::env::temp_dir().join("keplr-theme-resolve-workspace");
+        let dir = root.join(".keplr").join("themes");
+        std::fs::create_dir_all(&dir).expect("fixture");
+        std::fs::write(dir.join("a.json"), r#"{"name":"Alpha"}"#).expect("fixture");
+        assert_eq!(discovery::resolve(&root, Some("Alpha")).name, "Alpha");
+        assert_eq!(discovery::resolve(&root, Some("nope")).name, "Keplr Dark");
+        assert_eq!(
+            discovery::resolve(&root, None).name,
+            "Alpha",
+            "the first by name"
+        );
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn every_colour_token_is_listed_for_a_picker() {
+        let table = theme::colour_table(&UserTheme::default());
+        assert_eq!(table.len(), 20);
+        assert_eq!(table.get("accent"), Some(&"#0A84FF"));
     }
 }
