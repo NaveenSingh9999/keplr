@@ -80,16 +80,16 @@ impl State {
         shell: String,
         redraw: Arc<Mutex<Option<Redraw>>>,
     ) -> Self {
-        let client = App::new(root, Service::new());
+        let root: PathBuf = root.into();
+        let client = App::new(root.clone(), Service::new());
         let (sender, events) = channel();
         let _watch = vec![
             client.events().subscribe(DIAGNOSTICS_ROOM, sender.clone()),
             client.events().subscribe(TASKS_ROOM, sender),
         ];
-        let root: PathBuf = root.into();
         let theme = keplr_theme::resolve(&root, std::env::var("KEPLR_THEME").ok().as_deref());
         let chrome = Chrome::new(&theme);
-        let problems = keplr_theme::problems(&keplr_client_root(&client));
+        let problems = keplr_theme::problems(&root);
         let status = if problems.is_empty() {
             "ready".to_string()
         } else {
@@ -430,11 +430,6 @@ fn apply_frame(frame: &str, diagnostics: &mut Vec<String>, tasks: &mut Vec<Strin
 }
 
 /// The character a key carries, if it is one.
-/// The workspace a client is rooted at, for theme discovery.
-fn keplr_client_root(client: &App) -> &std::path::Path {
-    client.root()
-}
-
 fn character(key: &RKey) -> Option<char> {
     match key {
         RKey::Character(text) => text.chars().next(),
