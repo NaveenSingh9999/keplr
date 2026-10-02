@@ -9,7 +9,7 @@ use std::path::Path;
 
 use keplr_client::Pane;
 use keplr_term::{Cell, Snapshot};
-use rcus::{Align, Color, Insets, Justify, Style, ViewNode};
+use rcus::{Color, Insets, Justify, Style, ViewNode};
 
 use crate::state::State;
 use crate::theme::Chrome;
@@ -28,176 +28,14 @@ const RAIL: f32 = 56.0;
 /// Width of the editor's line number gutter, including its right gap.
 const GUTTER: f32 = 52.0;
 
-/// The whole window: tab bar, rail, showing pane, status bar.
+/// The window. The shell builds the frame and this supplies the pane inside it.
 pub fn view(state: &mut State, rows: usize) -> ViewNode {
-    let chrome = state.chrome();
-    let status = state.status.clone();
-    let tabs: Vec<(String, bool)> = state
-        .client
-        .tabs()
-        .iter()
-        .map(|tab| (tab.pane.label(), tab.focused))
-        .collect();
-    let active = state
-        .client
-        .active()
-        .map(|tab| tab.pane.clone())
-        .unwrap_or(Pane::Problems);
-    let root = state.client.root().display().to_string();
-    let rooms = state.client.rooms().join(" ");
-    let content = content(state, rows, &chrome);
-
-    let mut tab_bar = vec![ViewNode::text(
-        "keplr",
-        Style::default()
-            .align(Align::Center)
-            .color(chrome.accent)
-            .font_size(14.0)
-            .weight(700.0),
-    )];
-    for (index, (label, focused)) in tabs.iter().enumerate() {
-        tab_bar.push(tab(index, label, *focused, &chrome));
-    }
-
-    ViewNode::element(
-        "window",
-        Style::default().background(chrome.chrome).fill(true),
-        vec![
-            ViewNode::row_element(
-                "tab-bar",
-                Style::default()
-                    .height(TAB_BAR)
-                    .gap(4.0)
-                    .padding(Insets::symmetric(10.0, 0.0))
-                    .background(chrome.surface),
-                tab_bar,
-            ),
-            ViewNode::row_element(
-                "body",
-                Style::default().flex_grow(1.0),
-                vec![rail(&active, &chrome), content],
-            ),
-            ViewNode::row_element(
-                "status-bar",
-                Style::default()
-                    .height(STATUS_BAR)
-                    .gap(16.0)
-                    .padding(Insets::symmetric(12.0, 0.0))
-                    .background(chrome.surface),
-                vec![
-                    ViewNode::text(
-                        root,
-                        Style::default()
-                            .align(Align::Center)
-                            .color(chrome.text_muted)
-                            .font_size(11.5),
-                    ),
-                    ViewNode::text(
-                        status,
-                        Style::default()
-                            .align(Align::Center)
-                            .color(chrome.success)
-                            .font_size(11.5),
-                    ),
-                    ViewNode::text(
-                        rooms,
-                        Style::default()
-                            .align(Align::Center)
-                            .color(chrome.text_faint)
-                            .font_size(11.0),
-                    ),
-                ],
-            ),
-        ],
-    )
+    crate::shell::view(state, rows)
 }
 
-fn tab(index: usize, label: &str, focused: bool, chrome: &Chrome) -> ViewNode {
-    ViewNode::text_node(
-        format!("tab-{index}"),
-        label.to_string(),
-        Style::default()
-            .height(24.0)
-            .padding(Insets::symmetric(10.0, 0.0))
-            .align(Align::Center)
-            .background(if focused {
-                chrome.overlay
-            } else {
-                chrome.chrome
-            })
-            .color(if focused {
-                chrome.text
-            } else {
-                chrome.text_muted
-            })
-            .font_size(12.0),
-    )
-}
-
-/// The left rail: a fixed column of pane kinds, never a stack of cards.
-fn rail(active: &Pane, chrome: &Chrome) -> ViewNode {
-    let item = |id: &str, label: &str, glyph: &str, selected: bool| {
-        ViewNode::element(
-            id.to_string(),
-            Style::default()
-                .height(48.0)
-                .padding(Insets::symmetric(4.0, 6.0))
-                .gap(1.0)
-                .justify(Justify::Center)
-                .background(if selected {
-                    chrome.overlay
-                } else {
-                    chrome.chrome
-                })
-                .row_height(15.0),
-            vec![
-                ViewNode::text(
-                    glyph.to_string(),
-                    Style::default()
-                        .color(if selected {
-                            chrome.accent
-                        } else {
-                            chrome.text_muted
-                        })
-                        .font_size(14.0),
-                ),
-                ViewNode::text(
-                    label.to_string(),
-                    Style::default()
-                        .color(if selected {
-                            chrome.text
-                        } else {
-                            chrome.text_faint
-                        })
-                        .font_size(9.5),
-                ),
-            ],
-        )
-    };
-    let (editor, terminal, problems, source) = match active {
-        Pane::Editor { .. } => (true, false, false, false),
-        Pane::Terminal { .. } => (false, true, false, false),
-        Pane::Problems => (false, false, true, false),
-        Pane::SourceControl => (false, false, false, true),
-    };
-    ViewNode::element(
-        "rail",
-        Style::default()
-            .width(RAIL)
-            .padding(Insets::symmetric(4.0, 6.0))
-            .gap(2.0)
-            .background(chrome.surface),
-        vec![
-            item("rail-editor", "editor", "E", editor),
-            item("rail-terminal", "term", "T", terminal),
-            item("rail-problems", "issue", "P", problems),
-            item("rail-source", "src", "S", source),
-        ],
-    )
-}
-
-/// The showing pane, wrapped so every pane clips its own overflow.
-fn content(state: &mut State, rows: usize, chrome: &Chrome) -> ViewNode {
+/// The pane the editor area is showing: whatever the focused tab holds, or
+/// nothing when there is no tab.
+pub fn pane(state: &mut State, rows: usize, chrome: &Chrome) -> ViewNode {
     let pane = state.client.active().map(|tab| tab.pane.clone());
     let body = match pane {
         Some(Pane::Terminal { session }) => terminal(state, &session, chrome),

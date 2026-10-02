@@ -18,6 +18,7 @@ use anyhow::Result;
 use rcus::desktop::Redraw;
 use rcus::{App as RcusApp, DesktopApp, InputEvent};
 
+mod shell;
 mod snapshot;
 mod state;
 mod theme;

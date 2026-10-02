@@ -43,6 +43,48 @@ impl TerminalHost for Painter {
     }
 }
 
+/// One row in the sidebar: a glyph and a label.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Row {
+    pub glyph: char,
+    pub label: String,
+}
+
+/// What the activity bar is showing.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SidebarView {
+    #[default]
+    Files,
+    Search,
+    Source,
+    Outline,
+}
+
+impl SidebarView {
+    pub fn glyph(self) -> char {
+        match self {
+            SidebarView::Files => '\u{f07b}',
+            SidebarView::Search => '\u{f002}',
+            SidebarView::Source => '\u{f418}',
+            SidebarView::Outline => '\u{f0ae}',
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            SidebarView::Files => "files",
+            SidebarView::Search => "search",
+            SidebarView::Source => "source",
+            SidebarView::Outline => "outline",
+        }
+    }
+
+    /// A name safe to put in a node id.
+    pub fn slug(self) -> &'static str {
+        self.label()
+    }
+}
+
 /// The state behind one window.
 pub struct State {
     /// Which panes are open and which one is showing.
@@ -51,6 +93,12 @@ pub struct State {
     theme: UserTheme,
     /// Colours parsed from the theme, so the view never re-parses them.
     chrome: Chrome,
+    /// Which view the activity bar is showing.
+    sidebar_view: SidebarView,
+    /// How wide the sidebar is, and how tall the panel is open.
+    sidebar_width: f32,
+    panel_height: f32,
+    panel_open: bool,
     /// Live shells, keyed by session so a pane switch keeps the process.
     terminals: HashMap<String, Terminal>,
     /// Open editors, keyed by path, so a tab switch keeps the cursor.
@@ -99,6 +147,10 @@ impl State {
             client,
             theme,
             chrome,
+            sidebar_view: SidebarView::Files,
+            sidebar_width: crate::shell::SIDEBAR_DEFAULT,
+            panel_height: crate::shell::PANEL_DEFAULT,
+            panel_open: false,
             terminals: HashMap::new(),
             documents: HashMap::new(),
             diagnostics: Vec::new(),
@@ -123,6 +175,98 @@ impl State {
     /// The theme this window is drawing with.
     pub fn theme(&self) -> &UserTheme {
         &self.theme
+    }
+
+    /// Which view the activity bar is showing.
+    pub fn sidebar_view(&self) -> SidebarView {
+        self.sidebar_view
+    }
+
+    /// Switches the sidebar, which is what a click on the activity bar does.
+    pub fn set_sidebar_view(&mut self, view: SidebarView) {
+        self.sidebar_view = view;
+    }
+
+    /// The sidebar's width, clamped to what it can be dragged to.
+    pub fn sidebar_width(&self) -> f32 {
+        self.sidebar_width
+            .clamp(crate::shell::SIDEBAR_MIN, crate::shell::SIDEBAR_MAX)
+    }
+
+    /// Drags the sidebar's edge, clamped to its bounds.
+    pub fn set_sidebar_width(&mut self, width: f32) {
+        self.sidebar_width = width.clamp(crate::shell::SIDEBAR_MIN, crate::shell::SIDEBAR_MAX);
+    }
+
+    /// How tall the panel is open.
+    pub fn panel_height(&self) -> f32 {
+        self.panel_height.max(crate::shell::PANEL_MIN)
+    }
+
+    /// Drags the panel's edge.
+    pub fn set_panel_height(&mut self, height: f32) {
+        self.panel_height = height.max(crate::shell::PANEL_MIN);
+    }
+
+    pub fn panel_open(&self) -> bool {
+        self.panel_open
+    }
+
+    /// Opens or closes the bottom panel, which is what ctrl+j does.
+    pub fn set_panel_open(&mut self, open: bool) {
+        self.panel_open = open;
+    }
+
+    /// The rows the sidebar shows: the workspace, shallow and stable, so the
+    /// list is the same every time the window opens.
+    pub fn sidebar_rows(&self) -> Vec<Row> {
+        let mut rows = vec![Row {
+            glyph: '\u{f07c}',
+            label: self
+                .client
+                .root()
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| self.client.root().display().to_string()),
+        }];
+        let mut found: Vec<(String, Vec<String>)> = Vec::new();
+        for entry in walkdir::WalkDir::new(self.client.root())
+            .max_depth(2)
+            .into_iter()
+            .filter_map(Result::ok)
+        {
+            if !entry.file_type().is_dir() {
+                continue;
+            }
+            let Some(name) = entry.file_name().to_str() else {
+                continue;
+            };
+            if name.starts_with('.') || name == "target" || name == "node_modules" {
+                continue;
+            }
+            let children: Vec<String> = walkdir::WalkDir::new(entry.path())
+                .max_depth(1)
+                .into_iter()
+                .filter_map(Result::ok)
+                .filter(|child| child.file_type().is_file())
+                .filter_map(|child| child.file_name().to_str().map(str::to_string))
+                .collect();
+            found.push((name.to_string(), children));
+        }
+        found.sort_by(|a, b| a.0.cmp(&b.0));
+        for (name, children) in found.into_iter().take(12) {
+            rows.push(Row {
+                glyph: '\u{f07b}',
+                label: name,
+            });
+            for child in children.into_iter().take(6) {
+                rows.push(Row {
+                    glyph: '\u{f15b}',
+                    label: child,
+                });
+            }
+        }
+        rows
     }
 
     /// The colours parsed from that theme.
