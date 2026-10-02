@@ -11,7 +11,7 @@
 
 use std::time::{Duration, Instant};
 
-use keplr_theme::MotionTokens;
+use keplr_theme::{MotionTokens, SpringTokens};
 use rcus::{Animated, Curve};
 
 /// The durations and curves, resolved from a theme.
