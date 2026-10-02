@@ -192,3 +192,35 @@ MIT — see [LICENSE](LICENSE).
 UI icon credits: IDE chrome from [Feather Icons](https://feathericons.com) (MIT),
 file glyphs from the [Seti UI](https://github.com/jesseweed/seti-ui) file-icon set
 (MIT) — both inlined into the app, no network needed.
+
+## The native client
+
+`keplr-native` is a native window drawn by [rcus](https://crates.io/crates/rcus),
+a retained GPU UI toolkit with no browser engine: wgpu for drawing, winit for the
+window, and a Rust core for the view tree. Both clients read one theme file.
+
+```sh
+cargo build -p keplr-native -j 3
+./target/debug/keplr-native ~/projects/keplr
+```
+
+On a machine with no display it draws the same window into PNGs, which is how CI
+checks what it looks like:
+
+```sh
+./target/debug/keplr-native --snapshot --out shot.png --layout ~/projects/keplr
+```
+
+### Themes
+
+A theme is a JSON file in `<root>/.keplr/themes/`. Nothing to install: the file
+is the theme. The browser client turns it into CSS custom properties and the
+native client reads it directly, so one file looks the same in both.
+`.keplr/themes/keplr-dark.json` is the full documented set.
+
+### What is in the toolkit
+
+rcus 0.2 draws every box through a signed-distance rounded-box shader, so
+corners, hairline borders and shadows come from one pipeline. It has a spring
+and cubic-bezier easing, and a window that wakes at refresh rate only while
+something is animating.
