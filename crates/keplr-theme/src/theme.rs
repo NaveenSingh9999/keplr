@@ -125,7 +125,7 @@ pub struct MotionTokens {
     pub reduced_motion: bool,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct SpringTokens {
     pub stiffness: f32,

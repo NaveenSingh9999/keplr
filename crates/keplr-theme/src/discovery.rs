@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use crate::theme::UserTheme;
 
 /// Where a theme came from, so a picker can show which one is the workspace's.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ThemeSource {
     /// Shipped with Keplr.
     BuiltIn,
@@ -62,7 +62,11 @@ pub fn discover(root: &Path) -> Vec<DiscoveredTheme> {
             found.push(theme);
         }
     }
-    found.sort_by(|a, b| (a.source, &a.name).cmp(&(b.source, &b.name)));
+    found.sort_by(|a, b| {
+        a.source
+            .cmp(&b.source)
+            .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+    });
     found
 }
 
