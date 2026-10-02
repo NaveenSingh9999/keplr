@@ -315,10 +315,8 @@ mod tests {
             let phase = shimmer_phase(Instant::now(), period);
             assert!((0.0..1.0).contains(&phase), "got {phase}");
         }
-        assert_eq!(
-            shimmer_phase(Instant::now(), Duration::ZERO) >= 0.0,
-            true,
-            "a zero period still returns a position"
-        );
+        // A zero period must not divide by zero into a nonsense position.
+        let phase = shimmer_phase(Instant::now(), Duration::ZERO);
+        assert!((0.0..1.0).contains(&phase), "got {phase}");
     }
 }
