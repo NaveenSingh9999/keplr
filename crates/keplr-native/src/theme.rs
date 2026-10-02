@@ -106,11 +106,6 @@ impl Chrome {
         }
     }
 
-    /// The window's own backdrop, which is the one colour nothing is drawn on.
-    pub fn page(&self) -> Color {
-        self.chrome
-    }
-
     /// An all-zero palette, used only as the base a theme is merged onto when
     /// there is nothing to merge onto.
     #[cfg(test)]
