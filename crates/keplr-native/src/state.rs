@@ -86,7 +86,8 @@ impl State {
             client.events().subscribe(DIAGNOSTICS_ROOM, sender.clone()),
             client.events().subscribe(TASKS_ROOM, sender),
         ];
-        let theme = keplr_theme::resolve(root, std::env::var("KEPLR_THEME").ok().as_deref());
+        let root: PathBuf = root.into();
+        let theme = keplr_theme::resolve(&root, std::env::var("KEPLR_THEME").ok().as_deref());
         let chrome = Chrome::new(&theme);
         let problems = keplr_theme::problems(&keplr_client_root(&client));
         let status = if problems.is_empty() {

@@ -809,11 +809,16 @@ mod tests {
     fn a_colour_token_that_is_not_hex_falls_back_instead_of_panicking() {
         let black = Color::rgba(0.0, 0.0, 0.0, 1.0);
         let white = Color::rgba(1.0, 1.0, 1.0, 1.0);
-        assert_eq!(color("not a colour", black), black);
-        assert_eq!(color("#12345", black), black, "five digits is not hex");
-        assert_eq!(color("#fff", white), white);
+        let chrome = state_chrome();
+        assert_eq!(chrome.colour("not a colour", black), black);
         assert_eq!(
-            color("#102030", black),
+            chrome.colour("#12345", black),
+            black,
+            "five digits is not hex"
+        );
+        assert_eq!(chrome.colour("#fff", white), white);
+        assert_eq!(
+            chrome.colour("#102030", black),
             Color::rgba(16.0 / 255.0, 32.0 / 255.0, 48.0 / 255.0, 1.0)
         );
     }
