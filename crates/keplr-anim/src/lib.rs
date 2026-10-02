@@ -143,7 +143,8 @@ pub struct Panel {
 
 impl Panel {
     pub fn new(open: bool, now: Instant, motion: &Motion) -> Self {
-        let from = if open { 0.0 } else { 0.0 };
+        // A panel that has never been open starts shut, whatever `open` says.
+        let from = 0.0;
         let to = if open { 1.0 } else { 0.0 };
         Panel {
             progress: Animated::new(from, to, now, motion.normal, motion.ease),
