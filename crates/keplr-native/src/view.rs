@@ -96,7 +96,7 @@ pub fn view(state: &mut State, rows: usize) -> ViewNode {
                         status,
                         Style::default()
                             .align(Align::Center)
-                            .color(chrome.ok)
+                            .color(chrome.success)
                             .font_size(11.5),
                     ),
                     ViewNode::text(
@@ -213,7 +213,7 @@ fn content(state: &mut State, rows: usize, chrome: &Chrome) -> ViewNode {
             "source",
             "No tasks reported",
             state.tasks().to_vec(),
-            chrome.ok,
+            chrome.success,
             chrome,
         ),
         None => ViewNode::empty(Style::default()),
@@ -313,12 +313,12 @@ fn cell_style(cell: &Cell, on_cursor: bool, chrome: &Chrome) -> Style {
     let mut foreground = cell
         .fg
         .as_deref()
-        .map(|token| color(token, chrome.text))
+        .map(|token| chrome.colour(token, chrome.text))
         .unwrap_or(chrome.text);
     let mut background = cell
         .bg
         .as_deref()
-        .map(|token| color(token, chrome.chrome))
+        .map(|token| chrome.colour(token, chrome.chrome))
         .unwrap_or(chrome.chrome);
     if cell.flags & Cell::INVERSE != 0 {
         std::mem::swap(&mut foreground, &mut background);
@@ -648,7 +648,7 @@ mod tests {
     #[test]
     fn a_terminal_pane_draws_one_named_row_per_grid_row() {
         let frame = TerminalGrid::new(20, 4).snapshot();
-        let chrome = state.chrome();
+        let chrome = state_chrome();
         let app = laid_out(grid_rows(&frame, &chrome));
         for y in 0..4 {
             let row = node(&app, &format!("term-row-{y}"));
@@ -668,7 +668,7 @@ mod tests {
             cell('c', Some("#FF453A")),
             cell('d', Some("#FF453A")),
         ];
-        let chrome = state.chrome();
+        let chrome = state_chrome();
         let app = laid_out(runs(&cells, &frame_of(4, 1), 0, &chrome));
         assert_eq!(text_of(&app, "term-0-0"), "ab");
         assert_eq!(text_of(&app, "term-0-2"), "cd");
@@ -684,7 +684,7 @@ mod tests {
         let cells = vec![cell('a', None), cell('b', None), cell('c', None)];
         let mut frame = frame_of(3, 1);
         frame.cursor = Cursor { line: 0, column: 1 };
-        let chrome = state.chrome();
+        let chrome = state_chrome();
         let app = laid_out(runs(&cells, &frame, 0, &chrome));
         assert_eq!(
             node(&app, "term-0-1").background,
@@ -700,7 +700,7 @@ mod tests {
         let mut frame = frame_of(2, 1);
         frame.show_cursor = false;
         frame.cursor = Cursor { line: 0, column: 0 };
-        let chrome = state.chrome();
+        let chrome = state_chrome();
         let app = laid_out(runs(&cells, &frame, 0, &chrome));
         assert_eq!(text_of(&app, "term-0-0"), "ab");
     }
@@ -709,7 +709,7 @@ mod tests {
     fn an_inverse_cell_swaps_its_colors() {
         let mut inverted = cell('x', Some("#FF453A"));
         inverted.flags |= Cell::INVERSE;
-        let chrome = state.chrome();
+        let chrome = state_chrome();
         let app = laid_out(runs(&[inverted], &frame_of(1, 1), 0, &chrome));
         let node = node(&app, "term-0-0");
         assert_eq!(node.background, Some(chrome.error), "red became the fill");

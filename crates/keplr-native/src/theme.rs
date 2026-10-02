@@ -61,6 +61,15 @@ pub struct Chrome {
 }
 
 impl Chrome {
+    /// A colour written in a cell or a terminal frame, parsed the same way a
+    /// theme token is and falling back the same way.
+    pub fn colour(&self, token: &str, fallback: Color) -> Color {
+        match parse_hex(token) {
+            Ok(rgba) => to_colour(rgba),
+            Err(_) => fallback,
+        }
+    }
+
     /// Parses every token, falling back to the default theme's value for
     /// anything this theme got wrong, so one bad colour cannot blank the window.
     pub fn new(theme: &UserTheme) -> Self {
