@@ -8,11 +8,10 @@
 
 use std::path::Path;
 
-use rcus_core::{Align, Insets, Justify, Style, ViewNode};
+use rcus::{Align, Insets, Justify, Style, ViewNode};
 
 use crate::state::{Row, SidebarView, State};
 use crate::theme::Chrome;
-use crate::view;
 
 /// How tall each band is. macOS and VS Code agree closely enough that one set of
 /// numbers makes both feel right.
@@ -53,7 +52,9 @@ pub fn view(state: &mut State, rows: usize) -> ViewNode {
             .flex_shrink(1.0)
             .clip(true)
             .background(chrome.chrome),
-        vec![ViewNode::column(vec![view::pane(state, rows, &chrome)])],
+        vec![ViewNode::column(vec![crate::view::pane(
+            state, rows, &chrome,
+        )])],
     );
     let editor_side = ViewNode::column(vec![
         tab_strip(state, &chrome),
@@ -280,7 +281,7 @@ fn tab_strip(state: &mut State, chrome: &Chrome) -> ViewNode {
             style,
             vec![ViewNode::text_node(
                 format!("tab-label-{}", index),
-                tab.label.clone(),
+                tab.pane.label(),
                 Style::default()
                     .font_size(12.5)
                     .weight(if focused { 600.0 } else { 400.0 })
