@@ -83,11 +83,10 @@ fn title_bar(root: &Path, chrome: &Chrome) -> ViewNode {
         .file_name()
         .map(|name| name.to_string_lossy().to_string())
         .unwrap_or_else(|| "keplr".to_string());
-    ViewNode::element(
+    ViewNode::row_element(
         "title-bar",
         Style::default()
             .height(TITLE_BAR_H)
-            .fill(true)
             .padding(Insets::symmetric(14.0, 0.0))
             .align(Align::Center)
             .background(chrome.surface)
@@ -132,7 +131,7 @@ fn activity_bar(active: SidebarView, chrome: &Chrome) -> ViewNode {
     for candidate in ACTIVITY_VIEWS {
         let on = candidate == active;
         let colour = if on { chrome.accent } else { chrome.text_faint };
-        children.push(ViewNode::element(
+        children.push(ViewNode::row_element(
             format!("activity-{}", candidate.slug()),
             Style::default()
                 .height(46.0)
@@ -166,7 +165,7 @@ fn sidebar(state: &mut State, active: SidebarView, chrome: &Chrome) -> ViewNode 
         SidebarView::Outline => "outline",
     };
 
-    let mut children = vec![ViewNode::element(
+    let mut children = vec![ViewNode::row_element(
         "sidebar-header",
         Style::default()
             .height(30.0)
@@ -193,11 +192,11 @@ fn sidebar(state: &mut State, active: SidebarView, chrome: &Chrome) -> ViewNode 
             SidebarView::Outline => "No symbols",
             SidebarView::Files => "",
         };
-        children.push(ViewNode::element(
+        children.push(ViewNode::row_element(
             "sidebar-empty",
             Style::default()
                 .padding(Insets::symmetric(14.0, 10.0))
-                .font_size(12.0)
+                .align(Align::Center)
                 .color(chrome.text_faint),
             vec![ViewNode::text(
                 empty,
@@ -228,7 +227,7 @@ fn sidebar_row(index: usize, row: &Row, chrome: &Chrome) -> ViewNode {
         chrome.text
     };
     let weight = if nested { 400.0 } else { 600.0 };
-    ViewNode::element(
+    ViewNode::row_element(
         format!("sidebar-row-{}", index),
         Style::default()
             .height(24.0)
@@ -276,7 +275,7 @@ fn tab_strip(state: &mut State, chrome: &Chrome) -> ViewNode {
         } else {
             style.background(chrome.surface)
         };
-        children.push(ViewNode::element(
+        children.push(ViewNode::row_element(
             format!("tab-{}", index),
             style,
             vec![ViewNode::text_node(
@@ -290,7 +289,7 @@ fn tab_strip(state: &mut State, chrome: &Chrome) -> ViewNode {
         ));
     }
     if children.is_empty() {
-        children.push(ViewNode::element(
+        children.push(ViewNode::row_element(
             "tab-empty",
             Style::default()
                 .height(TAB_STRIP_H)
@@ -307,7 +306,6 @@ fn tab_strip(state: &mut State, chrome: &Chrome) -> ViewNode {
         "tab-strip",
         Style::default()
             .height(TAB_STRIP_H)
-            .fill(true)
             .background(chrome.surface),
         children,
     )
@@ -351,11 +349,10 @@ fn status_bar(state: &mut State, chrome: &Chrome) -> ViewNode {
     } else {
         "ctrl+j panel"
     };
-    ViewNode::element(
+    ViewNode::row_element(
         "status-bar",
         Style::default()
             .height(STATUS_BAR_H)
-            .fill(true)
             .padding(Insets::symmetric(12.0, 0.0))
             .align(Align::Center)
             .background(chrome.surface),
