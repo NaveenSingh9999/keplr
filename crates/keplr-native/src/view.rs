@@ -20,11 +20,11 @@ pub const FALLBACK_ROWS: usize = 28;
 /// Height of one line of content, in logical pixels.
 const LINE: f32 = 18.0;
 /// Height of the tab bar.
-const TAB_BAR: f32 = 36.0;
+const TAB_BAR: f32 = crate::shell::TAB_STRIP_H;
 /// Height of the status bar.
-const STATUS_BAR: f32 = 26.0;
+const STATUS_BAR: f32 = crate::shell::STATUS_BAR_H;
 /// Width of the left rail.
-const RAIL: f32 = 56.0;
+const RAIL: f32 = crate::shell::ACTIVITY_BAR_W;
 /// Width of the editor's line number gutter, including its right gap.
 const GUTTER: f32 = 52.0;
 
@@ -375,7 +375,15 @@ mod tests {
     fn the_window_has_a_bar_a_rail_a_pane_and_a_status() {
         let mut state = state();
         let app = layout(&mut state);
-        for id in ["window", "tab-bar", "rail", "pane", "status-bar"] {
+        for id in [
+            "window",
+            "title-bar",
+            "tab-strip",
+            "activity-bar",
+            "sidebar",
+            "pane",
+            "status-bar",
+        ] {
             assert!(app.bounds_of(id).is_some(), "{id} is in the tree");
         }
     }
@@ -387,7 +395,7 @@ mod tests {
         // centred, which looks like a deliberate floating panel and is not.
         let mut state = state();
         let app = layout(&mut state);
-        for id in ["tab-bar", "status-bar", "window"] {
+        for id in ["title-bar", "status-bar", "window"] {
             let rect = app.bounds_of(id).unwrap_or_else(|| panic!("{id}"));
             assert!(
                 (rect.width - 1280.0).abs() < 0.5,
@@ -402,12 +410,12 @@ mod tests {
     fn a_rail_item_fills_the_rail() {
         let mut state = state();
         let app = layout(&mut state);
-        let rail = app.bounds_of("rail").expect("rail");
+        let rail = app.bounds_of("activity-bar").expect("activity bar");
         for id in [
-            "rail-editor",
-            "rail-terminal",
-            "rail-problems",
-            "rail-source",
+            "activity-files",
+            "activity-search",
+            "activity-source",
+            "activity-outline",
         ] {
             let item = app.bounds_of(id).unwrap_or_else(|| panic!("{id}"));
             assert!(
@@ -429,7 +437,8 @@ mod tests {
             "the status bar is flush with the window, got {}",
             status.bottom()
         );
-        let rail = app.bounds_of("rail").expect("rail");
+        let rail = app.bounds_of("activity-bar").expect("activity bar");
+        let sidebar = app.bounds_of("sidebar").expect("sidebar");
         let pane = app.bounds_of("pane").expect("pane");
         assert!(
             (rail.width - RAIL).abs() < 0.5,
@@ -437,10 +446,14 @@ mod tests {
             rail.width
         );
         assert!(
-            (rail.right() - pane.x).abs() < 0.5,
-            "the pane starts where the rail ends"
+            (rail.right() - sidebar.x).abs() < 0.5,
+            "the sidebar starts where the rail ends"
         );
-        assert!(pane.width > 1000.0, "the pane takes the rest of the row");
+        assert!(
+            (sidebar.right() - pane.x).abs() < 0.5,
+            "the pane starts where the sidebar ends"
+        );
+        assert!(pane.width > 800.0, "the pane takes the rest of the row");
     }
 
     #[test]
@@ -448,7 +461,7 @@ mod tests {
         let mut state = state();
         let app = layout(&mut state);
         let pane = app.bounds_of("pane").expect("pane");
-        let tabs = app.bounds_of("tab-bar").expect("tab bar");
+        let tabs = app.bounds_of("tab-strip").expect("tab strip");
         let status = app.bounds_of("status-bar").expect("status bar");
         assert!(pane.y >= tabs.bottom() - 0.5, "the pane is below the tabs");
         assert!(
@@ -462,8 +475,8 @@ mod tests {
         let mut state = state();
         state.client.open(Pane::SourceControl);
         let app = layout(&mut state);
-        assert_eq!(text_of(&app, "tab-0"), "problems");
-        assert_eq!(text_of(&app, "tab-1"), "source");
+        assert_eq!(text_of(&app, "tab-label-0"), "problems");
+        assert_eq!(text_of(&app, "tab-label-1"), "source");
     }
 
     #[test]
@@ -472,14 +485,14 @@ mod tests {
         state.client.open(Pane::SourceControl);
         let app = layout(&mut state);
         assert_eq!(
-            node(&app, "tab-1").color,
+            node(&app, "tab-label-1").color,
             Some(state_chrome().text),
             "the focused tab is drawn in the reading color"
         );
         assert_eq!(
-            node(&app, "rail-source").background,
-            Some(state_chrome().overlay),
-            "the rail marks the showing pane"
+            node(&app, "activity-glyph-files").color,
+            Some(state_chrome().accent),
+            "the rail marks the view the sidebar is showing"
         );
     }
 
@@ -559,7 +572,10 @@ mod tests {
         let mut state = state();
         let app = layout(&mut state);
         let problems = node(&app, "problems");
-        assert_eq!(problems.rect.height, 800.0 - TAB_BAR - STATUS_BAR);
+        assert_eq!(
+            problems.rect.height,
+            800.0 - crate::shell::TITLE_BAR_H - TAB_BAR - STATUS_BAR
+        );
         let mut said_something = false;
         problems.children.iter().for_each(|child| {
             said_something |= child.text.is_some();
