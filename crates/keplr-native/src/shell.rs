@@ -67,6 +67,7 @@ pub fn view(state: &mut State, rows: usize) -> ViewNode {
             "window",
             Style::default()
                 .flex_grow(1.0)
+                .fill(true)
                 .clip(true)
                 .background(chrome.chrome),
             vec![activity_bar(active, &chrome), sidebar, editor_side],
@@ -86,6 +87,7 @@ fn title_bar(root: &Path, chrome: &Chrome) -> ViewNode {
         "title-bar",
         Style::default()
             .height(TITLE_BAR_H)
+            .fill(true)
             .padding(Insets::symmetric(14.0, 0.0))
             .align(Align::Center)
             .background(chrome.surface)
@@ -305,6 +307,7 @@ fn tab_strip(state: &mut State, chrome: &Chrome) -> ViewNode {
         "tab-strip",
         Style::default()
             .height(TAB_STRIP_H)
+            .fill(true)
             .background(chrome.surface),
         children,
     )
@@ -352,6 +355,7 @@ fn status_bar(state: &mut State, chrome: &Chrome) -> ViewNode {
         "status-bar",
         Style::default()
             .height(STATUS_BAR_H)
+            .fill(true)
             .padding(Insets::symmetric(12.0, 0.0))
             .align(Align::Center)
             .background(chrome.surface),
