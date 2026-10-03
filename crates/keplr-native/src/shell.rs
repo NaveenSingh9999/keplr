@@ -45,7 +45,7 @@ pub fn view(state: &mut State, rows: usize) -> ViewNode {
     let root = state.client.root().to_path_buf();
     let active = state.sidebar_view();
 
-    let sidebar = sidebar(state, active, chrome);
+    let sidebar = sidebar(state, active, &chrome);
     let editor_area = ViewNode::element(
         "editor-area",
         Style::default()
@@ -56,13 +56,13 @@ pub fn view(state: &mut State, rows: usize) -> ViewNode {
         vec![ViewNode::column(vec![view::pane(state, rows, &chrome)])],
     );
     let editor_side = ViewNode::column(vec![
-        tab_strip(state, chrome),
+        tab_strip(state, &chrome),
         editor_area,
-        panel(state, chrome),
+        panel(state, &chrome),
     ]);
 
     ViewNode::column(vec![
-        title_bar(&root, chrome),
+        title_bar(&root, &chrome),
         ViewNode::row_element(
             "window",
             Style::default()
@@ -70,9 +70,9 @@ pub fn view(state: &mut State, rows: usize) -> ViewNode {
                 .flex_shrink(1.0)
                 .clip(true)
                 .background(chrome.chrome),
-            vec![activity_bar(active, chrome), sidebar, editor_side],
+            vec![activity_bar(active, &chrome), sidebar, editor_side],
         ),
-        status_bar(state, chrome),
+        status_bar(state, &chrome),
     ])
 }
 
