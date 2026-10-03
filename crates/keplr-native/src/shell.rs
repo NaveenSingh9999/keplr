@@ -314,21 +314,30 @@ fn tab_strip(state: &mut State, chrome: &Chrome) -> ViewNode {
 /// reserved space.
 fn panel(state: &mut State, chrome: &Chrome) -> ViewNode {
     if !state.panel_open() {
-        return ViewNode::empty(Style::default().height(0.0).flex_shrink(0.0));
+        return ViewNode::empty(fixed(Style::default().height(0.0)));
     }
     ViewNode::element(
         "panel",
-        Style::default()
-            .height(state.panel_height())
-            .flex_shrink(0.0)
-            .padding(Insets::symmetric(12.0, 8.0))
-            .clip(true)
-            .background(chrome.surface),
+        fixed(
+            Style::default()
+                .height(state.panel_height())
+                .padding(Insets::symmetric(12.0, 8.0))
+                .clip(true)
+                .background(chrome.surface),
+        ),
         vec![ViewNode::text(
             "panel",
             Style::default().font_size(12.0).color(chrome.text_faint),
         )],
     )
+}
+
+/// A band that keeps its height when the window shrinks. rcus has no builder for
+/// shrink, and the panel is the one band that must not be squeezed.
+fn fixed(style: Style) -> Style {
+    let mut style = style;
+    style.flex_shrink = 0.0;
+    style
 }
 
 /// The bottom band, always present, always 24 tall.
