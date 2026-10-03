@@ -49,7 +49,6 @@ pub fn view(state: &mut State, rows: usize) -> ViewNode {
         "editor-area",
         Style::default()
             .flex_grow(1.0)
-            .flex_shrink(1.0)
             .clip(true)
             .background(chrome.chrome),
         vec![ViewNode::column(vec![crate::view::pane(
@@ -68,7 +67,6 @@ pub fn view(state: &mut State, rows: usize) -> ViewNode {
             "window",
             Style::default()
                 .flex_grow(1.0)
-                .flex_shrink(1.0)
                 .clip(true)
                 .background(chrome.chrome),
             vec![activity_bar(active, &chrome), sidebar, editor_side],
