@@ -6,12 +6,14 @@
 <title>keplr</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect x='16' y='16' width='480' height='480' rx='110' fill='%230e1116'/><ellipse cx='256' cy='256' rx='150' ry='96' fill='none' stroke='%2358a6ff' stroke-width='30' transform='rotate(-18 256 256)'/><circle cx='256' cy='256' r='22' fill='%23e6edf3'/><circle cx='336' cy='158' r='34' fill='%2358a6ff'/></svg>">
 <style>
-/* Keplr browser client — liquid-glass macOS-native shell.
+/* Keplr browser client — second-generation shell.
  *
- * Full-bleed bands with real vibrancy (translucent material over an ambient
- * glow, blurred and saturated like NSVisualEffectView), spring-eased motion
- * everywhere, and type set in SF Pro / SF Mono. Built for long sessions:
- * calm contrast, roomy 13px UI, quiet hairlines, nothing flashing.
+ * A fresh design synthesized from the best native IDE chrome:
+ * Xcode's navigator (inset rounded selections, quiet section headers),
+ * VS Code's workbench model (rail, panel tabs, status segments), and Zed's
+ * restraint (minimal chrome, centered palette, calm density, nothing
+ * flashing). Translucent vibrancy bands over an ambient glow, SF Pro / SF
+ * Mono throughout, spring-eased motion, comfortable for long sessions.
  *
  * Contract: every colour, radius, duration and border width is read from the
  * theme file served at /theme.css. This file defines no theme token — only
@@ -30,11 +32,11 @@
     Consolas, monospace;
 
   /* Band metrics shared with the native window. Layout, not taste. */
-  --title-h: 38px;
-  --tabs-h: 35px;
-  --rail-w: 48px;
-  --sidebar-w: 260px;
-  --status-h: 24px;
+  --title-h: 40px;
+  --tabs-h: 38px;
+  --rail-w: 50px;
+  --sidebar-w: 264px;
+  --status-h: 26px;
 
   /* Aliases for the legacy names scripts still use inline. Each one forwards
    * to the served token, so the theme file stays the single source of truth.
@@ -87,8 +89,8 @@ body {
   flex-direction: column;
   position: relative;
   background:
-    radial-gradient(1100px 500px at 15% -10%, color-mix(in srgb, var(--k-accent) 9%, transparent), transparent 60%),
-    radial-gradient(900px 480px at 90% 110%, color-mix(in srgb, var(--k-accent) 7%, transparent), transparent 60%),
+    radial-gradient(1200px 520px at 12% -12%, color-mix(in srgb, var(--k-accent) 10%, transparent), transparent 60%),
+    radial-gradient(1000px 520px at 88% 112%, color-mix(in srgb, var(--k-accent) 8%, transparent), transparent 60%),
     var(--k-chrome);
   color: var(--k-text);
   font-family: var(--ui);
@@ -314,13 +316,13 @@ select {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 10px;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--k-raised) 42%, transparent), color-mix(in srgb, var(--k-surface) 72%, transparent));
-  -webkit-backdrop-filter: blur(22px) saturate(1.5);
-  backdrop-filter: blur(22px) saturate(1.5);
+  gap: 4px;
+  padding: 0 12px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--k-raised) 45%, transparent), color-mix(in srgb, var(--k-surface) 74%, transparent));
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  backdrop-filter: blur(24px) saturate(1.5);
   border-bottom: var(--k-border-width) solid var(--k-border);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   animation: band-drop var(--k-dur-normal) var(--k-ease) both;
   -webkit-app-region: drag;
 }
@@ -330,39 +332,46 @@ select {
   -webkit-app-region: no-drag;
 }
 
+/* Project chip: breadcrumb-like, Xcode Cortez. */
 #root {
-  height: 26px;
-  max-width: 280px;
-  padding: 0 10px;
+  height: 28px;
+  max-width: 300px;
+  padding: 0 12px;
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   font-size: 12.5px;
   font-weight: 600;
+  letter-spacing: -0.01em;
   color: var(--k-text-muted);
-  border-radius: var(--k-radius-sm);
+  background: color-mix(in srgb, var(--k-text) 5%, transparent);
+  border: var(--k-border-width) solid var(--k-border);
+  border-radius: 8px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   transition: background var(--k-dur-fast) var(--k-ease), color var(--k-dur-fast) var(--k-ease),
-    transform var(--k-dur-fast) var(--k-ease);
+    border-color var(--k-dur-fast) var(--k-ease), transform var(--k-dur-fast) var(--k-ease);
 }
 
 #root:hover {
   background: color-mix(in srgb, var(--k-text) 9%, transparent);
   color: var(--k-text);
+  border-color: var(--k-border-strong);
 }
 
 #root:active {
   transform: scale(0.96);
 }
 
-/* The finder reads like Spotlight: a centered pill that invites typing. */
+/* Centered Spotlight pill. */
 .finder-trigger {
-  height: 26px;
-  min-width: 220px;
-  max-width: 340px;
+  height: 28px;
+  min-width: 230px;
+  max-width: 360px;
   margin: 0 auto;
-  padding: 0 10px;
+  padding: 0 12px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -371,8 +380,8 @@ select {
   color: var(--k-text-faint);
   background: color-mix(in srgb, var(--k-text) 6%, transparent);
   border: var(--k-border-width) solid var(--k-border);
-  border-radius: 8px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 1px 2px rgba(0, 0, 0, 0.25);
+  border-radius: 9px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 1px 3px rgba(0, 0, 0, 0.3);
   transition: background var(--k-dur-fast) var(--k-ease), color var(--k-dur-fast) var(--k-ease),
     border-color var(--k-dur-fast) var(--k-ease), box-shadow var(--k-dur-fast) var(--k-ease),
     transform var(--k-dur-fast) var(--k-ease);
@@ -393,12 +402,13 @@ select {
 }
 
 #syncpill {
-  height: 22px;
-  padding: 0 8px;
+  height: 24px;
+  padding: 0 9px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   font-size: 11px;
+  font-variant-numeric: tabular-nums;
   color: var(--k-text-muted);
   border-radius: 99px;
   transition: background var(--k-dur-fast) var(--k-ease);
@@ -478,7 +488,6 @@ select {
 .pane-leaf {
   flex-direction: column;
   overflow: hidden;
-  border-radius: 0;
 }
 
 .pane-splitter {
@@ -532,13 +541,13 @@ select {
   flex: none;
   display: flex;
   align-items: flex-end;
-  gap: 2px;
-  padding: 5px 6px 0;
+  gap: 3px;
+  padding: 6px 8px 0;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
-  background: color-mix(in srgb, var(--k-surface) 60%, transparent);
-  border-bottom: var(--k-border-width) solid var(--k-border);
+  background: color-mix(in srgb, var(--k-surface) 62%, transparent);
+  border-bottom: var(--k-border-width) solid var(--k-border-strong);
 }
 
 .pane-cardbar::-webkit-scrollbar {
@@ -550,26 +559,20 @@ select {
   display: none;
 }
 
-/* The bottom leaf already owns a full tab strip (bottomtabs, with counts and
- * panel controls) driven by the same setBottomTab its cards call, so its
- * pane cardbar would only be a second, redundant strip. */
-.pane-leaf[data-leaf-id="bottom"] > .pane-cardbar {
-  display: none;
-}
-
 .pane-card {
   flex: none;
-  height: 27px;
-  max-width: 190px;
+  height: 28px;
+  max-width: 200px;
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 0 7px 0 10px;
+  padding: 0 7px 0 11px;
   font-size: 12px;
+  font-weight: 500;
   color: var(--k-text-faint);
   border: var(--k-border-width) solid transparent;
   border-bottom: 0;
-  border-radius: 8px 8px 0 0;
+  border-radius: 9px 9px 0 0;
   transition: background var(--k-dur-fast) var(--k-ease), color var(--k-dur-fast) var(--k-ease);
 }
 
@@ -580,13 +583,13 @@ select {
 
 .pane-card.sel {
   color: var(--k-text);
-  background: color-mix(in srgb, var(--k-raised) 82%, transparent);
+  background: color-mix(in srgb, var(--k-raised) 85%, transparent);
   border-color: var(--k-border);
   box-shadow: inset 0 2px 0 var(--k-accent);
 }
 
 .pane-leaf.focused .pane-card.sel {
-  box-shadow: inset 0 2px 0 var(--k-accent), 0 -6px 14px -10px color-mix(in srgb, var(--k-accent) 55%, transparent);
+  box-shadow: inset 0 2px 0 var(--k-accent), 0 -8px 16px -12px color-mix(in srgb, var(--k-accent) 60%, transparent);
 }
 
 .pane-card-label {
@@ -596,12 +599,12 @@ select {
 }
 
 .pane-card-close {
-  width: 16px;
-  height: 16px;
+  width: 17px;
+  height: 17px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1;
   color: var(--k-text-faint);
   border-radius: 50%;
@@ -659,6 +662,13 @@ select {
   border-top: 0;
 }
 
+/* The bottom leaf already owns a full tab strip (bottomtabs, with counts and
+ * panel controls) driven by the same setBottomTab its cards call, so its
+ * pane cardbar would only be a second, redundant strip. */
+.pane-leaf[data-leaf-id="bottom"] > .pane-cardbar {
+  display: none;
+}
+
 .pane-card-placeholder {
   flex: 1;
   display: flex;
@@ -671,8 +681,8 @@ select {
 }
 
 .pane-card-placeholder > div {
-  max-width: 260px;
-  padding: 18px 20px;
+  max-width: 270px;
+  padding: 18px 22px;
   border: 1px dashed var(--k-border-strong);
   border-radius: var(--k-radius-md);
   background: color-mix(in srgb, var(--k-surface) 55%, transparent);
@@ -718,21 +728,21 @@ select {
   align-items: center;
   padding: 8px 0;
   gap: 4px;
-  background: color-mix(in srgb, var(--k-chrome) 68%, transparent);
-  -webkit-backdrop-filter: blur(22px) saturate(1.5);
-  backdrop-filter: blur(22px) saturate(1.5);
+  background: color-mix(in srgb, var(--k-chrome) 70%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  backdrop-filter: blur(24px) saturate(1.5);
   border-right: var(--k-border-width) solid var(--k-border);
 }
 
 .railitem {
-  width: 100%;
+  width: 40px;
   height: 46px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--k-text-faint);
   position: relative;
-  border-radius: var(--k-radius-sm);
+  border-radius: 11px;
   transition: color var(--k-dur-fast) var(--k-ease), background var(--k-dur-fast) var(--k-ease),
     transform var(--k-dur-fast) var(--k-ease);
 }
@@ -743,20 +753,21 @@ select {
 }
 
 .railitem:active {
-  transform: scale(0.9);
+  transform: scale(0.88);
 }
 
 .railitem.sel {
   color: var(--k-accent);
-  background: color-mix(in srgb, var(--k-accent) 10%, transparent);
+  background: color-mix(in srgb, var(--k-accent) 11%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--k-accent) 25%, transparent);
 }
 
 .railitem.sel::before {
   content: "";
   position: absolute;
-  left: 0;
-  top: 9px;
-  bottom: 9px;
+  left: -5px;
+  top: 10px;
+  bottom: 10px;
   width: 3px;
   border-radius: 0 3px 3px 0;
   background: var(--k-accent);
@@ -777,9 +788,9 @@ select {
   flex-direction: column;
   min-height: 0;
   min-width: 0;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--k-raised) 38%, transparent), color-mix(in srgb, var(--k-surface) 78%, transparent) 130px);
-  -webkit-backdrop-filter: blur(22px) saturate(1.5);
-  backdrop-filter: blur(22px) saturate(1.5);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--k-raised) 40%, transparent), color-mix(in srgb, var(--k-surface) 80%, transparent) 140px);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  backdrop-filter: blur(24px) saturate(1.5);
   border-right: var(--k-border-width) solid var(--k-border);
 }
 
@@ -794,15 +805,15 @@ select {
 }
 
 .docktabs {
-  min-height: 32px;
+  min-height: 34px;
   flex: none;
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 3px 8px;
+  padding: 4px 10px;
   font-size: 10.5px;
   font-weight: 700;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--k-text-faint);
   border-bottom: var(--k-border-width) solid var(--k-border);
@@ -815,20 +826,20 @@ select {
 }
 
 .docktabs button {
-  min-height: 24px;
-  padding: 2px 9px;
+  min-height: 25px;
+  padding: 2px 10px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   font-size: 11.5px;
   font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
   color: var(--k-text-muted);
-  border-radius: 7px;
+  border-radius: 8px;
   white-space: nowrap;
   transition: background var(--k-dur-fast) var(--k-ease), color var(--k-dur-fast) var(--k-ease),
-    transform var(--k-dur-fast) var(--k-ease);
+    transform var(--k-dur-fast) var(--k-ease), box-shadow var(--k-dur-fast) var(--k-ease);
 }
 
 .docktabs button:hover {
@@ -843,7 +854,8 @@ select {
 .docktabs button.sel {
   color: var(--k-text);
   background: color-mix(in srgb, var(--k-text) 10%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--k-text) 6%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--k-text) 7%, transparent),
+    0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .docktabs .cnt {
@@ -857,7 +869,7 @@ select {
   flex-direction: column;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 4px 0 8px;
+  padding: 6px 0 10px;
 }
 
 .dockbody > * {
@@ -869,7 +881,7 @@ select {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 7px 14px;
+  padding: 7px 16px;
 }
 
 #settingsbody .row label {
@@ -882,11 +894,11 @@ select {
 #modal .row {
   justify-content: flex-end;
   gap: 8px;
-  margin: 14px -14px -14px;
-  padding: 10px 14px;
+  margin: 16px -18px 0;
+  padding: 12px 18px;
   border-top: var(--k-border-width) solid var(--k-border);
   background: color-mix(in srgb, var(--k-surface) 60%, transparent);
-  border-radius: 0 0 var(--k-radius-md) var(--k-radius-md);
+  border-radius: 0 0 var(--k-radius-lg) var(--k-radius-lg);
 }
 
 .row .ic {
@@ -897,9 +909,48 @@ select {
 }
 
 .emptynote {
-  padding: 12px 14px;
+  padding: 12px 16px;
   font-size: 12px;
   color: var(--k-text-faint);
+}
+
+/* ---------------------------------------------------------- empty states -- */
+
+/* No blank voids: every empty surface says what it is. Pure CSS, so even a
+ * panel that never gets data still reads as intentional. */
+#leftbody:empty::after,
+#bbody:empty::after,
+#symbols:empty::after,
+#searchhits:empty::after,
+.tree-window:empty::after {
+  display: block;
+  padding: 18px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--k-text-faint);
+  animation: band-fade var(--k-dur-normal) var(--k-ease) both;
+}
+
+#leftbody:empty::after {
+  content: "Loading files…";
+  animation: empty-pulse 1.6s var(--k-ease) infinite;
+}
+
+#bbody:empty::after {
+  content: "Nothing here yet — pick a panel tab above.";
+}
+
+#symbols:empty::after {
+  content: "No symbols — open a file to see its outline.";
+}
+
+#searchhits:empty::after {
+  content: "Type above to search the workspace.";
+}
+
+.tree-window:empty::after {
+  padding: 10px 16px;
+  content: "No matches.";
 }
 
 /* ------------------------------------------------------------ file tree -- */
@@ -909,7 +960,7 @@ select {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
+  padding: 6px 12px 8px;
 }
 
 .tree-toolbar .tree-filter {
@@ -931,33 +982,35 @@ select {
   overflow-y: auto;
   overflow-x: hidden;
   position: relative;
-  padding-bottom: 8px;
+  padding: 0 6px 10px;
 }
 
 .tree-window {
   position: absolute;
   top: 0;
-  left: 0;
-  right: 0;
+  left: 6px;
+  right: 6px;
 }
 
-/* Virtual rows: exactly 24px — the renderer pages by this height. */
+/* Xcode-navigator rows: inset, rounded, calm. Exactly 24px — the renderer
+ * pages by this height, so the number never changes. */
 .trow {
   height: 24px;
   display: flex;
   align-items: center;
   gap: 6px;
+  margin: 1px 0;
   padding-right: 8px;
   color: var(--k-text-muted);
   cursor: pointer;
   white-space: nowrap;
-  border-radius: 0;
+  border-radius: 7px;
   position: relative;
   transition: background var(--k-dur-fast) var(--k-ease), color var(--k-dur-fast) var(--k-ease);
 }
 
 .trow:hover {
-  background: color-mix(in srgb, var(--k-text) 6%, transparent);
+  background: color-mix(in srgb, var(--k-text) 7%, transparent);
   color: var(--k-text);
 }
 
@@ -968,13 +1021,13 @@ select {
 }
 
 .trow.kb-focus {
-  box-shadow: inset 2px 0 0 var(--k-accent);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--k-accent) 65%, transparent);
 }
 
 .trow > .tri {
   flex: none;
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1008,34 +1061,46 @@ select {
   font-size: 12.5px;
 }
 
+/* Git status as tinted pills, not bare letters. */
 .gitbadge {
   flex: none;
   margin-left: auto;
-  min-width: 14px;
-  text-align: center;
+  min-width: 19px;
+  height: 16px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-family: var(--mono);
-  font-size: 10px;
-  font-weight: 700;
+  font-size: 9.5px;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--k-warning) 14%, transparent);
+  color: var(--k-warning);
 }
 
 .gitbadge.M {
+  background: color-mix(in srgb, var(--k-warning) 14%, transparent);
   color: var(--k-warning);
 }
 
 .gitbadge.U,
 .gitbadge.A {
+  background: color-mix(in srgb, var(--k-success) 14%, transparent);
   color: var(--k-success);
 }
 
 .gitbadge.D {
+  background: color-mix(in srgb, var(--k-error) 14%, transparent);
   color: var(--k-error);
 }
 
 .rowact {
   flex: none;
   opacity: 0;
-  transition: opacity var(--k-dur-fast) var(--k-ease), background var(--k-dur-fast) var(--k-ease);
+  transition: opacity var(--k-dur-fast) var(--k-ease), background var(--k-dur-fast) var(--k-ease),
+    transform var(--k-dur-fast) var(--k-ease);
 }
 
 .trow:hover .rowact,
@@ -1069,10 +1134,10 @@ select {
   display: flex;
   align-items: stretch;
   position: relative;
-  background: color-mix(in srgb, var(--k-surface) 72%, transparent);
-  -webkit-backdrop-filter: blur(22px) saturate(1.5);
-  backdrop-filter: blur(22px) saturate(1.5);
-  border-bottom: var(--k-border-width) solid var(--k-border);
+  background: color-mix(in srgb, var(--k-surface) 74%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  backdrop-filter: blur(24px) saturate(1.5);
+  border-bottom: var(--k-border-width) solid var(--k-border-strong);
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
@@ -1084,14 +1149,31 @@ select {
   display: none;
 }
 
+#tabsbar:not(.nofade),
+#tabsbar1:not(.nofade) {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 28px, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 28px, #000 calc(100% - 28px), transparent);
+}
+
+.pane-cardbar:not(:empty) {
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+}
+
+#termstrip:not(.nofade) {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 20px, #000 calc(100% - 20px), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 20px, #000 calc(100% - 20px), transparent);
+}
+
 .tab {
   flex: none;
   height: 100%;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 12px 0 14px;
+  gap: 9px;
+  padding: 0 10px 0 15px;
   font-size: 12.5px;
+  font-weight: 500;
   color: var(--k-text-faint);
   border-right: var(--k-border-width) solid var(--k-border);
   white-space: nowrap;
@@ -1113,8 +1195,8 @@ select {
 }
 
 .tab .dot {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: var(--k-text-faint);
   flex: none;
@@ -1123,12 +1205,12 @@ select {
 
 .tab.sel .dot {
   background: var(--k-accent);
-  box-shadow: 0 0 6px color-mix(in srgb, var(--k-accent) 80%, transparent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--k-accent) 80%, transparent);
 }
 
 .tab .x {
-  width: 18px;
-  height: 18px;
+  width: 19px;
+  height: 19px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1149,7 +1231,7 @@ select {
 .tab .x:hover {
   background: color-mix(in srgb, var(--k-text) 14%, transparent);
   color: var(--k-text);
-  transform: scale(1.1);
+  transform: scale(1.12);
 }
 
 /* Sliding accent underline that follows the active tab. Positioned by script. */
@@ -1159,7 +1241,7 @@ select {
   height: 2px;
   border-radius: 2px 2px 0 0;
   background: var(--k-accent);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--k-accent) 70%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--k-accent) 70%, transparent);
   pointer-events: none;
   transition: left var(--k-dur-normal) var(--k-ease), width var(--k-dur-normal) var(--k-ease),
     opacity var(--k-dur-fast) var(--k-ease);
@@ -1167,12 +1249,12 @@ select {
 
 #crumbs,
 #crumbs1 {
-  min-height: 27px;
+  min-height: 28px;
   flex: none;
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 14px;
+  gap: 5px;
+  padding: 3px 16px;
   font-size: 11.5px;
   color: var(--k-text-faint);
   background: var(--k-chrome);
@@ -1196,13 +1278,13 @@ select {
 
 .vtoggle {
   flex: none;
-  height: 19px;
-  padding: 0 9px;
+  height: 20px;
+  padding: 0 10px;
   display: inline-flex;
   align-items: center;
   font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-weight: 700;
+  letter-spacing: 0.05em;
   color: var(--k-text-faint);
   border: var(--k-border-width) solid var(--k-border-strong);
   border-radius: 99px;
@@ -1218,7 +1300,7 @@ select {
   color: var(--k-on-accent);
   background: var(--k-accent);
   border-color: transparent;
-  box-shadow: 0 1px 6px color-mix(in srgb, var(--k-accent) 45%, transparent);
+  box-shadow: 0 1px 8px color-mix(in srgb, var(--k-accent) 45%, transparent);
 }
 
 #editorwrap,
@@ -1240,7 +1322,7 @@ select {
   position: relative;
   overflow: auto;
   background: var(--k-chrome);
-  padding: 18px 26px 60px;
+  padding: 20px 28px 60px;
 }
 
 #previewwrap.on,
@@ -1315,7 +1397,7 @@ select {
   border: var(--k-border-width) solid var(--k-border-strong);
   border-radius: var(--k-radius-sm);
   color: var(--k-text);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
 }
 
 .cm-tooltip-autocomplete ul li[aria-selected] {
@@ -1331,13 +1413,13 @@ select {
 
 .cm-searchMatch {
   background: color-mix(in srgb, var(--k-warning) 60%, transparent);
-  border-radius: 2px;
+  border-radius: 3px;
 }
 
 .cm-searchMatch-selected {
   background: var(--k-accent);
   color: var(--k-on-accent);
-  border-radius: 2px;
+  border-radius: 3px;
 }
 
 /* The minimap lives off until Settings opts in; script flips display inline. */
@@ -1358,11 +1440,11 @@ select {
   flex-direction: column;
   min-height: 0;
   min-width: 0;
-  background: color-mix(in srgb, var(--k-surface) 78%, transparent);
-  -webkit-backdrop-filter: blur(22px) saturate(1.5);
-  backdrop-filter: blur(22px) saturate(1.5);
-  border-top: var(--k-border-width) solid var(--k-border);
-  box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.04);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--k-raised) 35%, transparent), color-mix(in srgb, var(--k-surface) 80%, transparent) 120px);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  backdrop-filter: blur(24px) saturate(1.5);
+  border-top: var(--k-border-width) solid var(--k-border-strong);
+  box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.045);
 }
 
 /* Maximized panel takes every pixel the leaf offers. */
@@ -1370,9 +1452,28 @@ select {
   flex: 1 1 auto !important;
 }
 
+/* Panel tabs as one macOS segmented control. */
 #bottomtabs {
   position: relative;
   cursor: default;
+  background: transparent;
+  border-bottom-color: var(--k-border);
+  text-transform: none;
+  letter-spacing: 0;
+  gap: 3px;
+}
+
+#bottomtabs > button[data-btab] {
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+#bottomtabs > button[data-btab].sel {
+  background: color-mix(in srgb, var(--k-text) 11%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--k-text) 7%, transparent),
+    0 1px 4px rgba(0, 0, 0, 0.35);
 }
 
 .grab,
@@ -1400,14 +1501,14 @@ select {
 }
 
 .cnt {
-  min-width: 17px;
-  height: 16px;
-  padding: 0 5px;
+  min-width: 18px;
+  height: 17px;
+  padding: 0 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
   border-radius: 99px;
   background: color-mix(in srgb, var(--k-text) 12%, transparent);
@@ -1422,13 +1523,15 @@ select {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  padding: 3px 14px;
+  margin: 1px 6px;
+  padding: 4px 10px;
   font-family: var(--mono);
   font-size: 12px;
   color: var(--k-text-muted);
   white-space: pre-wrap;
   word-break: break-word;
-  border-left: 2px solid transparent;
+  border-left: 0;
+  border-radius: 7px;
   cursor: pointer;
   transition: background var(--k-dur-fast) var(--k-ease), color var(--k-dur-fast) var(--k-ease);
 }
@@ -1438,7 +1541,7 @@ select {
 .hit:hover,
 .prob:hover,
 .task:hover {
-  background: color-mix(in srgb, var(--k-text) 5%, transparent);
+  background: color-mix(in srgb, var(--k-text) 6%, transparent);
   color: var(--k-text);
 }
 
@@ -1446,14 +1549,14 @@ select {
 .hit.sel {
   background: var(--k-selection);
   color: var(--k-text);
-  border-left-color: var(--k-accent);
+  box-shadow: inset 2px 0 0 var(--k-accent);
 }
 
 .problems .sev {
   flex: none;
-  width: 14px;
+  width: 15px;
   text-align: center;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .sev-e {
@@ -1475,11 +1578,11 @@ select {
 }
 
 .prob {
-  border-left-color: var(--k-warning);
+  box-shadow: inset 2px 0 0 var(--k-warning);
 }
 
 .prob.err {
-  border-left-color: var(--k-error);
+  box-shadow: inset 2px 0 0 var(--k-error);
   color: var(--k-text);
 }
 
@@ -1491,6 +1594,7 @@ select {
   flex: none;
   color: var(--k-accent);
   font-size: 11.5px;
+  font-weight: 600;
 }
 
 .hit .prev {
@@ -1509,12 +1613,12 @@ select {
   flex: 1 !important;
   min-height: 0;
   overflow-y: auto;
-  padding: 4px 0 8px;
+  padding: 4px 0 10px;
 }
 
 .task {
   align-items: center;
-  padding: 5px 14px;
+  padding: 6px 10px;
 }
 
 .task > span:last-child {
@@ -1527,7 +1631,7 @@ select {
 /* Skeleton shimmer shown while lists load. */
 .skel-row {
   height: 12px;
-  margin: 7px 14px;
+  margin: 8px 16px;
   border-radius: 6px;
   background: color-mix(in srgb, var(--k-text) 8%, transparent);
   overflow: hidden;
@@ -1539,15 +1643,15 @@ select {
   position: absolute;
   inset: 0;
   width: 45%;
-  background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--k-text) 12%, transparent), transparent);
+  background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--k-text) 13%, transparent), transparent);
   animation: shimmer-x 1.4s var(--k-ease) infinite;
 }
 
 /* -------------------------------------------------------------- controls -- */
 
 .kbtn {
-  min-height: 26px;
-  padding: 3px 12px;
+  min-height: 27px;
+  padding: 3px 13px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1559,7 +1663,7 @@ select {
   border-radius: 8px;
   transition: background var(--k-dur-fast) var(--k-ease), color var(--k-dur-fast) var(--k-ease),
     border-color var(--k-dur-fast) var(--k-ease), box-shadow var(--k-dur-fast) var(--k-ease),
-    transform var(--k-dur-fast) var(--k-ease), opacity var(--k-dur-fast) var(--k-ease);
+    transform var(--k-dur-fast) var(--k-ease), opacity var(--k-dur-fast) var(--k-ease), filter var(--k-dur-fast) var(--k-ease);
 }
 
 .kbtn:hover {
@@ -1586,16 +1690,17 @@ select {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 55%), var(--k-accent);
   color: var(--k-on-accent);
   font-weight: 600;
-  box-shadow: 0 1px 8px color-mix(in srgb, var(--k-accent) 35%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--k-accent) 35%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.12);
 }
 
 .kbtn.primary:hover,
 .kbtn-acc:hover {
   color: var(--k-on-accent);
   filter: brightness(1.1);
-  background: var(--k-accent);
-  box-shadow: 0 2px 14px color-mix(in srgb, var(--k-accent) 50%, transparent),
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 55%), var(--k-accent);
+  box-shadow: 0 3px 16px color-mix(in srgb, var(--k-accent) 50%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
@@ -1609,14 +1714,14 @@ select {
 }
 
 .kicon {
-  width: 28px;
-  height: 26px;
+  width: 29px;
+  height: 27px;
   flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: var(--k-text-muted);
-  border-radius: 7px;
+  border-radius: 8px;
   transition: background var(--k-dur-fast) var(--k-ease), color var(--k-dur-fast) var(--k-ease),
     transform var(--k-dur-fast) var(--k-ease), box-shadow var(--k-dur-fast) var(--k-ease);
 }
@@ -1632,8 +1737,12 @@ select {
 
 .kicon.on {
   color: var(--k-accent);
-  background: color-mix(in srgb, var(--k-accent) 13%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--k-accent) 30%, transparent);
+  background: color-mix(in srgb, var(--k-accent) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--k-accent) 32%, transparent);
+}
+
+.kicon.off {
+  opacity: 0.75;
 }
 
 .kicon .ic {
@@ -1642,15 +1751,15 @@ select {
 }
 
 .iconbtn {
-  width: 26px;
-  height: 26px;
+  width: 27px;
+  height: 27px;
   margin-left: auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 16px;
   color: var(--k-text-faint);
-  border-radius: 7px;
+  border-radius: 8px;
   transition: all var(--k-dur-fast) var(--k-ease);
 }
 
@@ -1661,18 +1770,18 @@ select {
 
 .ghostadd {
   border: 1px dashed var(--k-border-strong);
-  border-radius: 7px;
+  border-radius: 8px;
 }
 
 .kinput {
-  min-height: 27px;
-  padding: 4px 10px;
+  min-height: 28px;
+  padding: 4px 11px;
   font-size: 12.5px;
   background: color-mix(in srgb, var(--k-chrome) 72%, transparent);
   border: var(--k-border-width) solid var(--k-border-strong);
-  border-radius: 8px;
+  border-radius: 9px;
   color: var(--k-text);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35);
   transition: border-color var(--k-dur-fast) var(--k-ease), box-shadow var(--k-dur-fast) var(--k-ease),
     background var(--k-dur-fast) var(--k-ease);
 }
@@ -1684,7 +1793,7 @@ select {
 .kinput:focus {
   outline: none;
   border-color: var(--k-accent);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3),
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35),
     0 0 0 3px color-mix(in srgb, var(--k-accent) 25%, transparent);
 }
 
@@ -1717,7 +1826,7 @@ input[type="range"].kinput {
   box-shadow: none;
   -webkit-appearance: none;
   appearance: none;
-  height: 27px;
+  height: 28px;
   background: transparent;
   border-color: transparent;
   cursor: pointer;
@@ -1754,8 +1863,8 @@ input[type="number"].kinput {
   -webkit-appearance: none;
   appearance: none;
   flex: none;
-  width: 36px;
-  height: 21px;
+  width: 37px;
+  height: 22px;
   margin: 0;
   cursor: pointer;
   border-radius: 99px;
@@ -1763,10 +1872,10 @@ input[type="number"].kinput {
   background-image: radial-gradient(circle, #fff 0 7px, rgba(0, 0, 0, 0.06) 7.5px, transparent 8px);
   background-size: 16px 16px;
   background-repeat: no-repeat;
-  background-position: 2.5px center;
+  background-position: 3px center;
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35);
   transition: background-color var(--k-dur-fast) var(--k-ease), background-position var(--k-dur-fast) var(--k-ease),
-    box-shadow var(--k-dur-fast) var(--k-ease), transform var(--k-dur-fast) var(--k-ease);
+    box-shadow var(--k-dur-fast) var(--k-ease), transform var(--k-dur-fast) var(--k-ease), filter var(--k-dur-fast) var(--k-ease);
 }
 
 .kswitch:hover {
@@ -1779,20 +1888,20 @@ input[type="number"].kinput {
 
 .kswitch:checked {
   background-color: var(--k-accent);
-  background-position: 17.5px center;
+  background-position: 18px center;
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2),
-    0 0 8px color-mix(in srgb, var(--k-accent) 40%, transparent);
+    0 0 10px color-mix(in srgb, var(--k-accent) 40%, transparent);
 }
 
 .tgl {
-  min-height: 24px;
-  padding: 2px 9px;
+  min-height: 25px;
+  padding: 2px 10px;
   display: inline-flex;
   align-items: center;
   gap: 7px;
   font-size: 12px;
   color: var(--k-text-faint);
-  border-radius: 7px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all var(--k-dur-fast) var(--k-ease);
 }
@@ -1822,15 +1931,15 @@ input[type="number"].kinput {
   gap: 2px;
   padding: 2px;
   background: color-mix(in srgb, var(--k-text) 7%, transparent);
-  border-radius: 9px;
+  border-radius: 10px;
 }
 
 .kseg button {
-  min-height: 22px;
-  padding: 1px 12px;
+  min-height: 23px;
+  padding: 1px 13px;
   font-size: 12px;
   color: var(--k-text-muted);
-  border-radius: 7px;
+  border-radius: 8px;
   transition: all var(--k-dur-fast) var(--k-ease);
 }
 
@@ -1840,8 +1949,8 @@ input[type="number"].kinput {
 
 .kseg button.sel {
   color: var(--k-text);
-  background: color-mix(in srgb, var(--k-raised) 90%, transparent);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  background: color-mix(in srgb, var(--k-raised) 92%, transparent);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 
 /* Keyboard-shortcut chips. */
@@ -1850,12 +1959,12 @@ input[type="number"].kinput {
   font-family: var(--mono);
   font-size: 10.5px;
   line-height: 1.6;
-  padding: 0 6px;
+  padding: 0 7px;
   color: var(--k-text-muted);
   background: color-mix(in srgb, var(--k-text) 7%, transparent);
   border: var(--k-border-width) solid var(--k-border-strong);
   border-bottom-width: 2px;
-  border-radius: 5px;
+  border-radius: 6px;
   white-space: nowrap;
 }
 
@@ -1895,15 +2004,15 @@ input[type="number"].kinput {
 }
 
 .sbtn {
-  height: 20px;
-  padding: 0 7px;
+  height: 21px;
+  padding: 0 8px;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   color: var(--k-text-muted);
-  border-radius: 5px;
+  border-radius: 6px;
   white-space: nowrap;
   transition: background var(--k-dur-fast) var(--k-ease), color var(--k-dur-fast) var(--k-ease);
 }
@@ -1940,11 +2049,11 @@ input[type="number"].kinput {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 0 8px;
-  background: color-mix(in srgb, var(--k-surface) 72%, transparent);
-  -webkit-backdrop-filter: blur(22px) saturate(1.5);
-  backdrop-filter: blur(22px) saturate(1.5);
+  gap: 1px;
+  padding: 0 10px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--k-raised) 30%, transparent), color-mix(in srgb, var(--k-surface) 74%, transparent));
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  backdrop-filter: blur(24px) saturate(1.5);
   border-top: var(--k-border-width) solid var(--k-border);
   box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.04);
   font-size: 11px;
@@ -1954,17 +2063,36 @@ input[type="number"].kinput {
   animation-delay: 120ms;
 }
 
+/* Segmented status items with hairline separators. */
+#statusbar .sbtn {
+  position: relative;
+}
+
+#statusbar .sbtn + .sbtn {
+  margin-left: 5px;
+}
+
+#statusbar .sbtn + .sbtn::before {
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: 4px;
+  bottom: 4px;
+  width: 1px;
+  background: var(--k-border);
+}
+
 /* ------------------------------------------------------- source control -- */
 
 #scm {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px 12px;
+  gap: 9px;
+  padding: 12px 12px 14px;
 }
 
 #scm textarea.kinput {
-  min-height: 52px;
+  min-height: 54px;
   font-size: 12.5px;
 }
 
@@ -1990,7 +2118,7 @@ input[type="number"].kinput {
 .staged-sec,
 .changes-sec {
   border-top: var(--k-border-width) solid var(--k-border);
-  padding: 2px 0 4px;
+  padding: 3px 2px 5px;
 }
 
 .staged-sec:first-of-type,
@@ -2002,14 +2130,14 @@ input[type="number"].kinput {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 8px;
+  gap: 7px;
+  padding: 5px 10px;
   font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.09em;
+  font-weight: 800;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--k-text-faint);
-  border-radius: 6px;
+  border-radius: 7px;
   transition: background var(--k-dur-fast) var(--k-ease), color var(--k-dur-fast) var(--k-ease);
 }
 
@@ -2040,13 +2168,14 @@ input[type="number"].kinput {
 
 .sechead .n {
   margin-left: auto;
-  min-width: 17px;
-  height: 16px;
-  padding: 0 5px;
+  min-width: 18px;
+  height: 17px;
+  padding: 0 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 10px;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
   background: color-mix(in srgb, var(--k-text) 10%, transparent);
@@ -2057,7 +2186,8 @@ input[type="number"].kinput {
 .seckids {
   display: flex;
   flex-direction: column;
-  padding: 1px 0 3px;
+  gap: 1px;
+  padding: 2px 0 4px;
 }
 
 .seckids.closed {
@@ -2067,26 +2197,27 @@ input[type="number"].kinput {
 .filerow {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 25px;
-  padding: 2px 6px 2px 24px;
-  border-radius: 6px;
+  gap: 9px;
+  min-height: 26px;
+  margin: 0 6px;
+  padding: 2px 8px 2px 22px;
+  border-radius: 7px;
   cursor: pointer;
   transition: background var(--k-dur-fast) var(--k-ease);
 }
 
 .filerow:hover,
 .filerow:focus {
-  background: color-mix(in srgb, var(--k-text) 6%, transparent);
+  background: color-mix(in srgb, var(--k-text) 7%, transparent);
 }
 
 .filerow .badge {
   flex: none;
-  width: 13px;
+  width: 14px;
   text-align: center;
   font-family: var(--mono);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .filerow .nm {
@@ -2119,8 +2250,8 @@ input[type="number"].kinput {
 }
 
 .filerow .act .kicon {
-  width: 22px;
-  height: 22px;
+  width: 23px;
+  height: 23px;
 }
 
 .filerow .act .kicon .ic {
@@ -2144,8 +2275,8 @@ input[type="number"].kinput {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 4px 6px 0;
+  gap: 3px;
+  padding: 5px 8px 0;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -2155,15 +2286,15 @@ input[type="number"].kinput {
 }
 
 #termstrip .tab {
-  height: 27px;
+  height: 28px;
   border: var(--k-border-width) solid transparent;
   border-bottom: 0;
-  border-radius: 8px 8px 0 0;
+  border-radius: 9px 9px 0 0;
   font-size: 12px;
 }
 
 #termstrip .tab.sel {
-  background: color-mix(in srgb, var(--k-raised) 70%, transparent);
+  background: color-mix(in srgb, var(--k-raised) 72%, transparent);
   border-color: var(--k-border);
   box-shadow: inset 0 2px 0 var(--k-accent);
 }
@@ -2173,11 +2304,11 @@ input[type="number"].kinput {
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 5px 8px;
+  padding: 6px 10px;
 }
 
 .term-cwd {
-  margin-left: 4px;
+  margin-left: 5px;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2197,7 +2328,7 @@ input[type="number"].kinput {
 
 .term {
   height: 100%;
-  padding: 6px 10px;
+  padding: 6px 12px;
   font-family: var(--mono);
   font-size: var(--k-font-size);
   line-height: var(--k-line-height);
@@ -2215,7 +2346,7 @@ input[type="number"].kinput {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 8px;
+  padding: 7px 10px;
   background: color-mix(in srgb, var(--k-surface) 85%, transparent);
   border-bottom: var(--k-border-width) solid var(--k-border);
 }
@@ -2230,13 +2361,13 @@ input[type="number"].kinput {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  padding: 6px 8px;
+  padding: 7px 10px;
   border-top: var(--k-border-width) solid var(--k-border);
 }
 
 #termkeys .kbtn {
-  min-height: 24px;
-  padding: 1px 9px;
+  min-height: 25px;
+  padding: 1px 10px;
   font-family: var(--mono);
   font-size: 11px;
 }
@@ -2249,13 +2380,13 @@ input[type="number"].kinput {
 #suggest,
 #settingswrap,
 #findcard {
-  background: color-mix(in srgb, var(--k-overlay) 82%, transparent);
-  -webkit-backdrop-filter: blur(28px) saturate(1.6);
-  backdrop-filter: blur(28px) saturate(1.6);
+  background: color-mix(in srgb, var(--k-overlay) 84%, transparent);
+  -webkit-backdrop-filter: blur(30px) saturate(1.6);
+  backdrop-filter: blur(30px) saturate(1.6);
   border: var(--k-border-width) solid var(--k-border-strong);
   border-radius: var(--k-radius-md);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09);
 }
 
 #modalwrap:not(.open),
@@ -2278,13 +2409,13 @@ input[type="number"].kinput {
   display: flex;
 }
 
-/* Command palette: Spotlight floating over the work. */
+/* Command palette, Zed-style: centered, large type, calm rows. */
 #palwrap {
   position: fixed;
   left: 50%;
-  top: 11vh;
+  top: 10vh;
   transform: translateX(-50%);
-  width: min(640px, 92vw);
+  width: min(680px, 92vw);
   overflow: hidden;
   z-index: 60;
 }
@@ -2295,12 +2426,12 @@ input[type="number"].kinput {
 
 #palinput {
   width: 100%;
-  height: 46px;
-  padding: 0 16px 0 40px;
-  font-size: 14.5px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+  height: 50px;
+  padding: 0 18px 0 44px;
+  font-size: 15px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='17' height='17' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: 14px center;
+  background-position: 16px center;
   border-bottom: var(--k-border-width) solid var(--k-border);
 }
 
@@ -2313,27 +2444,28 @@ input[type="number"].kinput {
 }
 
 #palhint {
-  padding: 6px 16px;
+  padding: 7px 18px;
   font-size: 11px;
   color: var(--k-text-faint);
   border-top: var(--k-border-width) solid var(--k-border);
+  background: color-mix(in srgb, var(--k-surface) 50%, transparent);
 }
 
 #palist {
   max-height: 46vh;
   overflow-y: auto;
-  padding: 5px;
+  padding: 6px;
 }
 
 .prow {
-  min-height: 30px;
+  min-height: 32px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 4px 10px;
+  gap: 11px;
+  padding: 5px 12px;
   font-size: 13px;
   color: var(--k-text-muted);
-  border-radius: 8px;
+  border-radius: 9px;
   cursor: pointer;
   transition: background var(--k-dur-fast) var(--k-ease), color var(--k-dur-fast) var(--k-ease);
 }
@@ -2365,9 +2497,9 @@ input[type="number"].kinput {
   position: fixed;
   inset: 0;
   z-index: 70;
-  background: rgba(0, 0, 0, 0.45);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
+  background: rgba(0, 0, 0, 0.5);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
   border: 0;
   border-radius: 0;
   box-shadow: none;
@@ -2380,22 +2512,22 @@ input[type="number"].kinput {
 }
 
 #modal {
-  width: min(540px, 92vw);
+  width: min(560px, 92vw);
   max-height: 80vh;
   overflow-y: auto;
-  background: color-mix(in srgb, var(--k-overlay) 88%, transparent);
-  -webkit-backdrop-filter: blur(28px) saturate(1.6);
-  backdrop-filter: blur(28px) saturate(1.6);
+  background: color-mix(in srgb, var(--k-overlay) 90%, transparent);
+  -webkit-backdrop-filter: blur(30px) saturate(1.6);
+  backdrop-filter: blur(30px) saturate(1.6);
   border: var(--k-border-width) solid var(--k-border-strong);
   border-radius: var(--k-radius-lg);
-  box-shadow: 0 32px 90px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  padding: 18px 18px 0;
+  box-shadow: 0 36px 100px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  padding: 20px 20px 0;
   animation: overlay-in var(--k-dur-normal) var(--k-ease) both;
 }
 
 #modal h3 {
   margin: 0 0 12px;
-  font-size: 14px;
+  font-size: 14.5px;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
@@ -2403,7 +2535,7 @@ input[type="number"].kinput {
 #modal p {
   margin: 0 0 12px;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.65;
   color: var(--k-text-muted);
 }
 
@@ -2428,7 +2560,7 @@ input[type="number"].kinput {
 }
 
 #sctable td {
-  padding: 5px 6px;
+  padding: 6px;
   border-top: var(--k-border-width) solid var(--k-border);
   color: var(--k-text-muted);
 }
@@ -2438,7 +2570,7 @@ input[type="number"].kinput {
 }
 
 #sctable td:first-child {
-  width: 130px;
+  width: 140px;
 }
 
 #sctable .kkey {
@@ -2449,8 +2581,8 @@ input[type="number"].kinput {
 #settingswrap {
   position: fixed;
   right: 16px;
-  bottom: 34px;
-  width: min(430px, 92vw);
+  bottom: 36px;
+  width: min(440px, 92vw);
   max-height: 72vh;
   flex-direction: column;
   overflow: hidden;
@@ -2464,14 +2596,14 @@ input[type="number"].kinput {
 
 #modal header,
 #settingswrap header {
-  min-height: 38px;
+  min-height: 40px;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 8px 4px 16px;
+  padding: 4px 10px 4px 18px;
   font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.09em;
+  font-weight: 800;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--k-text-faint);
   border-bottom: var(--k-border-width) solid var(--k-border);
@@ -2481,15 +2613,15 @@ input[type="number"].kinput {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 6px 2px 14px;
+  padding: 6px 2px 16px;
 }
 
 #settingsbody h4 {
-  margin: 14px 0 2px;
-  padding: 0 16px;
+  margin: 16px 0 2px;
+  padding: 0 18px;
   font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.09em;
+  font-weight: 800;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--k-text-faint);
 }
@@ -2499,7 +2631,7 @@ input[type="number"].kinput {
 }
 
 #settingsbody .row .kinput[type="number"] {
-  width: 76px;
+  width: 78px;
   flex: none;
 }
 
@@ -2510,19 +2642,19 @@ input[type="number"].kinput {
 
 #settingsbody .row select.kinput {
   flex: none;
-  max-width: 190px;
+  max-width: 200px;
 }
 
 #settingsbody > .kbtn {
-  margin: 12px 0 0 16px;
+  margin: 12px 0 0 18px;
 }
 
 /* Context menu. */
 #ctxmenu {
   position: fixed;
-  min-width: 220px;
-  max-width: 320px;
-  padding: 5px;
+  min-width: 230px;
+  max-width: 330px;
+  padding: 6px;
   z-index: 80;
 }
 
@@ -2536,12 +2668,12 @@ input[type="number"].kinput {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 9px;
-  min-height: 29px;
-  padding: 4px 10px;
+  gap: 10px;
+  min-height: 30px;
+  padding: 4px 11px;
   font-size: 12.5px;
   color: var(--k-text-muted);
-  border-radius: 7px;
+  border-radius: 8px;
   text-align: left;
   transition: background var(--k-dur-fast) var(--k-ease), color var(--k-dur-fast) var(--k-ease);
 }
@@ -2580,16 +2712,16 @@ input[type="number"].kinput {
 .kmenu .sep,
 #ctxmenu > .sep {
   height: 1px;
-  margin: 5px 8px;
+  margin: 6px 10px;
   background: var(--k-border);
 }
 
 .kmenu .hd,
 #ctxmenu > .hd {
-  padding: 7px 10px 3px;
+  padding: 8px 11px 3px;
   font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.09em;
+  font-weight: 800;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--k-text-faint);
 }
@@ -2597,11 +2729,11 @@ input[type="number"].kinput {
 /* Inline completion popup anchored to the cursor. */
 #suggest {
   position: fixed;
-  min-width: 330px;
-  max-width: 480px;
+  min-width: 340px;
+  max-width: 490px;
   max-height: 40vh;
   overflow-y: auto;
-  padding: 5px;
+  padding: 6px;
   z-index: 65;
 }
 
@@ -2614,11 +2746,11 @@ input[type="number"].kinput {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  padding: 5px 10px;
+  padding: 5px 11px;
   font-family: var(--mono);
   font-size: 12.5px;
   color: var(--k-text-muted);
-  border-radius: 7px;
+  border-radius: 8px;
   cursor: pointer;
   transition: background var(--k-dur-fast) var(--k-ease), color var(--k-dur-fast) var(--k-ease);
 }
@@ -2645,9 +2777,9 @@ input[type="number"].kinput {
 #findcard {
   position: absolute;
   right: 18px;
-  top: 8px;
-  width: 350px;
-  padding: 9px;
+  top: 10px;
+  width: 360px;
+  padding: 10px;
   z-index: 40;
 }
 
@@ -2660,7 +2792,7 @@ input[type="number"].kinput {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 7px;
+  margin-bottom: 8px;
 }
 
 .frow:last-child {
@@ -2673,7 +2805,7 @@ input[type="number"].kinput {
 }
 
 .frow .count {
-  min-width: 46px;
+  min-width: 48px;
   text-align: right;
 }
 
@@ -2681,29 +2813,29 @@ input[type="number"].kinput {
 #ktoasts {
   position: fixed;
   right: 16px;
-  bottom: 36px;
+  bottom: 38px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   z-index: 75;
-  max-width: min(380px, 90vw);
+  max-width: min(390px, 90vw);
 }
 
 .ktoast {
   display: flex;
   align-items: flex-start;
-  gap: 9px;
-  padding: 10px 13px;
+  gap: 10px;
+  padding: 11px 14px;
   font-size: 12.5px;
-  line-height: 1.45;
+  line-height: 1.5;
   color: var(--k-text);
-  background: color-mix(in srgb, var(--k-overlay) 88%, transparent);
-  -webkit-backdrop-filter: blur(28px) saturate(1.6);
-  backdrop-filter: blur(28px) saturate(1.6);
+  background: color-mix(in srgb, var(--k-overlay) 90%, transparent);
+  -webkit-backdrop-filter: blur(30px) saturate(1.6);
+  backdrop-filter: blur(30px) saturate(1.6);
   border: var(--k-border-width) solid var(--k-border-strong);
   border-left: 3px solid var(--k-accent);
-  border-radius: 10px;
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  border-radius: 11px;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   cursor: pointer;
   animation: toast-in var(--k-dur-normal) var(--k-ease) both;
   transition: opacity 180ms var(--k-ease), transform 180ms var(--k-ease);
@@ -2729,9 +2861,9 @@ input[type="number"].kinput {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
+  padding: 7px 12px;
   border-bottom: var(--k-border-width) solid var(--k-border);
-  background: color-mix(in srgb, var(--k-surface) 60%, transparent);
+  background: color-mix(in srgb, var(--k-surface) 62%, transparent);
 }
 
 .difftitle {
@@ -2747,7 +2879,7 @@ input[type="number"].kinput {
 
 .diff {
   margin: 0;
-  padding: 12px 0 40px;
+  padding: 14px 0 40px;
   font-family: var(--mono);
   font-size: 12px;
   line-height: 1.65;
@@ -2756,7 +2888,7 @@ input[type="number"].kinput {
 }
 
 .diff > div {
-  padding: 0 16px;
+  padding: 0 18px;
   border-left: 3px solid transparent;
 }
 
@@ -2793,8 +2925,8 @@ input[type="number"].kinput {
 }
 
 .diffsplit .ln {
-  width: 44px;
-  min-width: 44px;
+  width: 46px;
+  min-width: 46px;
   text-align: right;
   color: var(--k-text-faint);
   font-variant-numeric: tabular-nums;
@@ -2812,9 +2944,9 @@ input[type="number"].kinput {
 /* ------------------------------------------------------------- markdown -- */
 
 .md {
-  max-width: 860px;
+  max-width: 880px;
   font-size: 13.5px;
-  line-height: 1.7;
+  line-height: 1.75;
   color: var(--k-text);
   animation: band-fade var(--k-dur-normal) var(--k-ease) both;
 }
@@ -2835,7 +2967,7 @@ input[type="number"].kinput {
 }
 
 .md h1 {
-  font-size: 24px;
+  font-size: 25px;
   padding-bottom: 8px;
   border-bottom: var(--k-border-width) solid var(--k-border);
 }
@@ -2900,8 +3032,8 @@ input[type="number"].kinput {
 
 .md pre {
   margin: 12px 0;
-  padding: 12px 14px;
-  background: color-mix(in srgb, var(--k-surface) 70%, transparent);
+  padding: 14px 16px;
+  background: color-mix(in srgb, var(--k-surface) 72%, transparent);
   border: var(--k-border-width) solid var(--k-border);
   border-radius: var(--k-radius-md);
   overflow-x: auto;
@@ -2935,7 +3067,7 @@ input[type="number"].kinput {
 
 .md th,
 .md td {
-  padding: 6px 12px;
+  padding: 7px 13px;
   border: var(--k-border-width) solid var(--k-border);
   text-align: left;
 }
@@ -2973,27 +3105,27 @@ input[type="number"].kinput {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 7px;
   padding: 24px;
   text-align: center;
   animation: band-fade var(--k-dur-slow) var(--k-ease) both;
 }
 
 .kempty .mark {
-  margin-bottom: 14px;
+  margin-bottom: 16px;
   animation: float-y 5s var(--k-ease) infinite;
-  filter: drop-shadow(0 12px 30px color-mix(in srgb, var(--k-accent) 35%, transparent));
+  filter: drop-shadow(0 14px 34px color-mix(in srgb, var(--k-accent) 38%, transparent));
 }
 
 .kempty h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
 
 .kempty p {
-  margin: 0 0 12px;
+  margin: 0 0 14px;
   font-size: 13px;
   color: var(--k-text-faint);
 }
@@ -3008,7 +3140,7 @@ input[type="number"].kinput {
 
 .kempty .acts .kbtn {
   border-color: var(--k-border-strong);
-  background: color-mix(in srgb, var(--k-surface) 70%, transparent);
+  background: color-mix(in srgb, var(--k-surface) 72%, transparent);
 }
 
 .kempty .acts .kbtn:hover {
@@ -3016,55 +3148,17 @@ input[type="number"].kinput {
 }
 
 .kempty .recent {
-  margin-top: 14px;
+  margin-top: 16px;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 240px;
+  min-width: 250px;
 }
 
 .kempty .recent .kbtn {
   justify-content: flex-start;
   font-family: var(--mono);
   font-size: 12px;
-}
-
-/* ---------------------------------------------------------- empty states -- */
-
-/* No blank voids: every empty surface says what it is. Pure CSS, so even a
- * panel that never gets data still reads as intentional. */
-#leftbody:empty::after,
-#bbody:empty::after,
-#symbols:empty::after,
-#searchhits:empty::after,
-.tree-window:empty::after {
-  display: block;
-  padding: 16px;
-  font-size: 12px;
-  color: var(--k-text-faint);
-  animation: band-fade var(--k-dur-normal) var(--k-ease) both;
-}
-
-#leftbody:empty::after {
-  content: "Loading files…";
-  animation: empty-pulse 1.6s var(--k-ease) infinite;
-}
-
-#bbody:empty::after {
-  content: "Nothing here yet — pick a panel tab above.";
-}
-
-#symbols:empty::after {
-  content: "No symbols — open a file.";
-}
-
-#searchhits:empty::after {
-  content: "Type above to search the workspace.";
-}
-
-.tree-window:empty::after {
-  padding: 10px 14px;
-  content: "No matches.";
 }
 
 /* ---------------------------------------------------------------- tooltip -- */
@@ -3080,18 +3174,18 @@ input[type="number"].kinput {
   left: 50%;
   transform: translateX(-50%) translateY(-4px) scale(0.97);
   z-index: 90;
-  padding: 5px 9px;
+  padding: 5px 10px;
   font-size: 11px;
   font-weight: 500;
   line-height: 1.35;
   white-space: nowrap;
   color: var(--k-text);
-  background: color-mix(in srgb, var(--k-overlay) 90%, transparent);
+  background: color-mix(in srgb, var(--k-overlay) 92%, transparent);
   -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
   border: var(--k-border-width) solid var(--k-border-strong);
-  border-radius: 7px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--k-dur-fast) var(--k-ease), transform var(--k-dur-fast) var(--k-ease);
@@ -3117,8 +3211,8 @@ input[type="number"].kinput {
 /* -------------------------------------------------------------- scrollbars -- */
 
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
 }
 
 ::-webkit-scrollbar-track {
@@ -3127,7 +3221,7 @@ input[type="number"].kinput {
 
 ::-webkit-scrollbar-thumb {
   background: var(--k-scrollbar);
-  border: 3px solid transparent;
+  border: 2.5px solid transparent;
   background-clip: content-box;
   border-radius: 8px;
   transition: background var(--k-dur-fast) var(--k-ease);
@@ -3136,7 +3230,7 @@ input[type="number"].kinput {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--k-text-faint);
   background-clip: content-box;
-  border: 3px solid transparent;
+  border: 2.5px solid transparent;
 }
 
 * {
@@ -3149,23 +3243,27 @@ input[type="number"].kinput {
 /* Compact density tightens chrome but never the tree rows: 24px is the
  * virtualization contract. */
 body.compact {
-  --tabs-h: 31px;
+  --tabs-h: 33px;
 }
 
 body.compact .docktabs {
-  min-height: 28px;
+  min-height: 29px;
 }
 
 body.compact .kbtn {
-  min-height: 23px;
-}
-
-body.compact .kinput {
   min-height: 24px;
 }
 
+body.compact .kinput {
+  min-height: 25px;
+}
+
 body.compact .railitem {
-  height: 40px;
+  height: 42px;
+}
+
+body.compact .trow {
+  height: 24px;
 }
 
 /* Reduced motion: state changes, no choreography. */
