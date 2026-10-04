@@ -372,6 +372,27 @@ mod tests {
     }
 
     #[test]
+    fn dump_the_window() {
+        fn walk(node: &LayoutNode, depth: usize) {
+            println!(
+                "{}{} x={:.1} y={:.1} w={:.1} h={:.1}",
+                "  ".repeat(depth),
+                node.id,
+                node.rect.x,
+                node.rect.y,
+                node.rect.width,
+                node.rect.height
+            );
+            for child in &node.children {
+                walk(child, depth + 1);
+            }
+        }
+        let mut state = state();
+        let app = layout(&mut state);
+        walk(&app.layout().root, 0);
+    }
+
+    #[test]
     fn the_window_has_a_bar_a_rail_a_pane_and_a_status() {
         let mut state = state();
         let app = layout(&mut state);
