@@ -646,8 +646,12 @@ select {
 }
 
 #pane-surface .pane-content > #left,
-#pane-surface .pane-content > #right {
+#pane-surface .pane-content > #center,
+#pane-surface .pane-content > #right,
+#pane-surface .pane-content > #bottom {
+  flex: 1 1 auto;
   width: auto;
+  max-width: none;
 }
 
 #pane-surface .pane-content > #bottom {
