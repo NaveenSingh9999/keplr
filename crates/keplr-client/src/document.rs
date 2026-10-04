@@ -17,6 +17,21 @@ pub struct Document {
     cursor: usize,
     top_line: usize,
     dirty: bool,
+    /// Where a shift-selection begins. The selection is always this point and
+    /// the cursor, whichever order they land in, and it is gone once a plain
+    /// cursor move collapses it.
+    anchor: Option<usize>,
+    undo_stack: Vec<Edit>,
+    redo_stack: Vec<Edit>,
+}
+
+/// One edit, stored so it can be reversed. The document had `removed` where
+/// it now has `added`, and `start` is where that happened.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct Edit {
+    start: usize,
+    removed: String,
+    added: String,
 }
 
 impl Document {
@@ -35,9 +50,79 @@ impl Document {
             cursor: 0,
             top_line: 0,
             dirty: false,
+            anchor: None,
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
         };
         document.reindex(0);
         Ok(document)
+    }
+
+    /// The selection as a `(start, end)` byte range, or `None` when the cursor
+    /// is just a caret.
+    pub fn selection(&self) -> Option<(usize, usize)> {
+        let anchor = self.anchor?;
+        if anchor == self.cursor {
+            return None;
+        }
+        Some((anchor.min(self.cursor), anchor.max(self.cursor)))
+    }
+
+    /// Replaces whatever text is selected and returns it, which is how typing
+    /// over a selection is one edit.
+    fn delete_selection(&mut self) -> String {
+        let Some((start, end)) = self.selection() else {
+            self.anchor = None;
+            return String::new();
+        };
+        let removed = self.text[start..end].to_string();
+        self.text.replace_range(start..end, "");
+        self.cursor = start;
+        self.anchor = None;
+        self.reindex(start);
+        removed
+    }
+
+    /// Records an edit, seeds a clean redo stack, and marks the document changed.
+    fn record(&mut self, edit: Edit) {
+        self.undo_stack.push(edit);
+        self.redo_stack.clear();
+        self.dirty = true;
+    }
+
+    /// Reverts the most recent edit, moving the caret to where the text used to
+    /// start.
+    pub fn undo(&mut self) -> bool {
+        let Some(edit) = self.undo_stack.pop() else {
+            return false;
+        };
+        let start = edit.start;
+        let added_len = edit.added.len();
+        self.text
+            .replace_range(start..start + added_len, &edit.removed);
+        self.cursor = start + edit.removed.len();
+        self.anchor = None;
+        self.reindex(start);
+        self.dirty = true;
+        self.redo_stack.push(edit);
+        true
+    }
+
+    /// Reapplies the edit that was most recently undone.
+    pub fn redo(&mut self) -> bool {
+        let Some(edit) = self.redo_stack.pop() else {
+            return false;
+        };
+        let start = edit.start;
+        let removed_len = edit.removed.len();
+        self.text
+            .replace_range(start..start + removed_len, &edit.added);
+        self.cursor = start + edit.added.len();
+        self.anchor = None;
+        self.reindex(start);
+        self.dirty = true;
+        self.undo_stack.push(edit);
+        true
     }
 
     pub fn path(&self) -> &Path {
@@ -107,6 +192,7 @@ impl Document {
             .unwrap_or(self.text.len())
             .max(start);
         self.cursor = (start + column.min(end - start)).min(self.text.len());
+        self.anchor = None;
         self.scroll_to_cursor();
     }
 
@@ -137,17 +223,33 @@ impl Document {
         self.top_line = (self.top_line as i64 + delta as i64).clamp(0, last as i64) as usize;
     }
 
-    /// Inserts text at the cursor.
+    /// Inserts text at the cursor, replacing any selected text.
     pub fn insert(&mut self, text: &str) {
+        let removed = self.delete_selection();
         let at = self.cursor.min(self.text.len());
         self.text.insert_str(at, text);
         self.cursor = at + text.len();
         self.reindex(at);
-        self.dirty = true;
+        self.record(Edit {
+            start: at,
+            removed,
+            added: text.to_string(),
+        });
     }
 
-    /// Deletes the character before the cursor.
+    /// Deletes the character before the cursor, or the selection when one is
+    /// present.
     pub fn backspace(&mut self) {
+        if self.selection().is_some() {
+            let (start, _) = self.selection().expect("checked above");
+            let removed = self.delete_selection();
+            self.record(Edit {
+                start,
+                removed,
+                added: String::new(),
+            });
+            return;
+        }
         if self.cursor == 0 {
             return;
         }
@@ -156,14 +258,52 @@ impl Document {
             .next_back()
             .map(|(index, _)| index)
             .unwrap_or(0);
+        let removed = self.text[previous..self.cursor].to_string();
         self.text.replace_range(previous..self.cursor, "");
         self.cursor = previous;
         self.reindex(previous);
-        self.dirty = true;
+        self.record(Edit {
+            start: previous,
+            removed,
+            added: String::new(),
+        });
     }
 
-    /// Moves the cursor left one character.
-    pub fn left(&mut self) {
+    /// Deletes the character after the cursor, or the selection when one is
+    /// present, which is what the Delete key does.
+    pub fn delete_forward(&mut self) {
+        if self.selection().is_some() {
+            let (start, _) = self.selection().expect("checked above");
+            let removed = self.delete_selection();
+            self.record(Edit {
+                start,
+                removed,
+                added: String::new(),
+            });
+            return;
+        }
+        if self.cursor >= self.text.len() {
+            return;
+        }
+        let next = self.cursor
+            + self.text[self.cursor..]
+                .chars()
+                .next()
+                .map(char::len_utf8)
+                .unwrap_or(1);
+        let removed = self.text[self.cursor..next].to_string();
+        self.text.replace_range(self.cursor..next, "");
+        self.reindex(self.cursor);
+        self.record(Edit {
+            start: self.cursor,
+            removed,
+            added: String::new(),
+        });
+    }
+
+    /// Moves the caret one character left, without touching the anchor. This
+    /// is the raw step the plain and shifting arrows both build on.
+    fn step_left(&mut self) {
         if self.cursor == 0 {
             return;
         }
@@ -174,8 +314,8 @@ impl Document {
             .unwrap_or(0);
     }
 
-    /// Moves the cursor right one character.
-    pub fn right(&mut self) {
+    /// Moves the caret one character right, without touching the anchor.
+    fn step_right(&mut self) {
         if self.cursor >= self.text.len() {
             return;
         }
@@ -184,6 +324,99 @@ impl Document {
             .next()
             .map(char::len_utf8)
             .unwrap_or(1);
+    }
+
+    /// Moves the cursor left one character. When a selection is present the
+    /// cursor collapses to its start, which is what plain left means.
+    pub fn left(&mut self) {
+        if let Some((start, _)) = self.selection() {
+            self.cursor = start;
+            self.anchor = None;
+            return;
+        }
+        self.step_left();
+    }
+
+    /// Moves the cursor right one character. When a selection is present the
+    /// cursor collapses to its end, which is what plain right means.
+    pub fn right(&mut self) {
+        if let Some((_, end)) = self.selection() {
+            self.cursor = end;
+            self.anchor = None;
+            return;
+        }
+        self.step_right();
+    }
+
+    /// Moves left while keeping the anchor, which is a shift+left. The first
+    /// shift-move fixes the anchor at the old cursor, and every move after it
+    /// grows or shrinks the range from there.
+    pub fn extend_left(&mut self) {
+        self.anchor.get_or_insert(self.cursor);
+        self.step_left();
+    }
+
+    /// Moves right while keeping the anchor, which is a shift+right.
+    pub fn extend_right(&mut self) {
+        self.anchor.get_or_insert(self.cursor);
+        self.step_right();
+    }
+
+    /// Moves the cursor up one line, keeping the column where it lands. Going
+    /// above the top is a no-op.
+    pub fn up(&mut self) {
+        let line = self.cursor_line();
+        if line == 0 {
+            return;
+        }
+        let column = self.cursor - self.line_start(line);
+        self.goto(line - 1, column);
+    }
+
+    /// Moves the cursor down one line, keeping the column where it lands.
+    pub fn down(&mut self) {
+        let line = self.cursor_line();
+        if line + 1 >= self.lines() {
+            return;
+        }
+        let column = self.cursor - self.line_start(line);
+        self.goto(line + 1, column);
+    }
+
+    /// Keeps the anchor and steps up, which is a shift+up.
+    pub fn extend_up(&mut self) {
+        let anchor = self.anchor.unwrap_or(self.cursor);
+        self.up();
+        self.anchor = Some(anchor);
+    }
+
+    /// Keeps the anchor and steps down, which is a shift+down.
+    pub fn extend_down(&mut self) {
+        let anchor = self.anchor.unwrap_or(self.cursor);
+        self.down();
+        self.anchor = Some(anchor);
+    }
+
+    /// Keeps the anchor and jumps to the start of the line, which is a
+    /// shift+home.
+    pub fn extend_home(&mut self) {
+        let anchor = self.anchor.unwrap_or(self.cursor);
+        self.goto(self.cursor_line(), 0);
+        self.anchor = Some(anchor);
+    }
+
+    /// Keeps the anchor and jumps to the end of the line, which is a shift+end.
+    pub fn extend_end(&mut self) {
+        let anchor = self.anchor.unwrap_or(self.cursor);
+        let line = self.cursor_line();
+        self.goto(line, self.text.len());
+        self.anchor = Some(anchor);
+    }
+
+    /// Selects the whole document, which is what ctrl+a means.
+    pub fn select_all(&mut self) {
+        self.anchor = Some(0);
+        self.cursor = self.text.len();
     }
 
     /// Writes the file, clearing the dirty flag.

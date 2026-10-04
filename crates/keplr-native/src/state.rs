@@ -570,17 +570,39 @@ impl State {
                 document.insert(text);
             }
             RKey::Backspace => document.backspace(),
+            RKey::Delete => document.delete_forward(),
+            RKey::Enter => document.insert("\n"),
+            RKey::ArrowLeft if modifiers.shift => document.extend_left(),
+            RKey::ArrowRight if modifiers.shift => document.extend_right(),
+            RKey::ArrowUp if modifiers.shift => document.extend_up(),
+            RKey::ArrowDown if modifiers.shift => document.extend_down(),
             RKey::ArrowLeft => document.left(),
             RKey::ArrowRight => document.right(),
+            RKey::ArrowUp => document.up(),
+            RKey::ArrowDown => document.down(),
             RKey::PageUp => document.scroll(-10),
             RKey::PageDown => document.scroll(10),
+            RKey::Home if modifiers.shift => document.extend_home(),
+            RKey::End if modifiers.shift => document.extend_end(),
             RKey::Home => document.goto(document.cursor_line(), 0),
             RKey::End => {
                 let line = document.cursor_line();
                 let end = document.text().len();
                 document.goto(line, end);
             }
-            RKey::Enter => document.insert("\n"),
+            _ if modifiers.control => match character(key) {
+                Some('z') if modifiers.shift => {
+                    document.redo();
+                }
+                Some('z') => {
+                    document.undo();
+                }
+                Some('y') => {
+                    document.redo();
+                }
+                Some('a') => document.select_all(),
+                _ => return false,
+            },
             _ => return false,
         }
         document.scroll_to_cursor();

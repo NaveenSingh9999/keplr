@@ -10,6 +10,7 @@ publish = false
 keplr-anim = { path = "../keplr-anim" }
 keplr-client = { path = "../keplr-client" }
 keplr-events = { path = "../keplr-events" }
+keplr-lang = { path = "../keplr-lang" }
 keplr-term = { path = "../keplr-term" }
 keplr-theme = { path = "../keplr-theme" }
 rcus = "0.2.0"

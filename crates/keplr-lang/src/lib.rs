@@ -31,29 +31,48 @@ pub enum LangKind {
 
 impl LangKind {
     pub fn from_path(path: &Path) -> Self {
-        match path.extension().and_then(|e| e.to_str()).unwrap_or("") {
-            "ts" => Self::TypeScript,
+        // Dotfiles like `.bashrc` and `.gitignore` have no extension, so the
+        // file name is tried first for those.
+        if let Some(name) = path.file_name().and_then(|name| name.to_str()) {
+            match name.to_ascii_lowercase().as_str() {
+                ".bashrc" | ".zshrc" | ".bash_profile" | ".bash_aliases"
+                | ".zshenv" | ".profile" => return Self::Shell,
+                "dockerfile" => return Self::Shell,
+                "makefile" | "gnumakefile" => return Self::Shell,
+                ".gitignore" | ".dockerignore" | ".gitattributes" => return Self::Other,
+                _ => {}
+            }
+        }
+        let extension = path
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        match extension.as_str() {
+            // Every flavour of JavaScript, including the ES module and the
+            // CommonJS wrappers of the same language.
+            "js" | "jsx" | "mjs" | "cjs" | "es6" => Self::JavaScript,
+            "ts" | "mts" | "cts" => Self::TypeScript,
             "tsx" => Self::Tsx,
-            "js" | "jsx" => Self::JavaScript,
-            "cpp" | "cc" | "cxx" | "h" | "hpp" => Self::Cpp,
+            "cpp" | "cc" | "cxx" | "h" | "hpp" | "hh" | "hxx" => Self::Cpp,
             "go" => Self::Go,
             "rs" => Self::Rust,
             "lm" => Self::Laml,
-            "py" => Self::Python,
+            "py" | "pyw" | "pyi" => Self::Python,
             "c" => Self::C,
             "cs" => Self::CSharp,
             "java" => Self::Java,
             "swift" => Self::Swift,
             "kt" | "kts" => Self::Kotlin,
             "rb" => Self::Ruby,
-            "php" => Self::Php,
-            "html" | "htm" => Self::Html,
-            "css" => Self::Css,
-            "json" => Self::Json,
+            "php" | "phtml" => Self::Php,
+            "html" | "htm" | "vue" | "svelte" | "xml" | "svg" => Self::Html,
+            "css" | "scss" | "sass" | "less" => Self::Css,
+            "json" | "jsonc" | "jsonl" => Self::Json,
             "toml" => Self::Toml,
             "yaml" | "yml" => Self::Yaml,
-            "md" | "markdown" => Self::Markdown,
-            "sh" | "bash" => Self::Shell,
+            "md" | "markdown" | "mdx" => Self::Markdown,
+            "sh" | "bash" | "zsh" | "fish" | "env" => Self::Shell,
             "sql" => Self::Sql,
             "lua" => Self::Lua,
             _ => Self::Other,

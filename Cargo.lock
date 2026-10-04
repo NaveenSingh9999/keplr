@@ -1832,6 +1832,7 @@ dependencies = [
  "keplr-anim",
  "keplr-client",
  "keplr-events",
+ "keplr-lang",
  "keplr-term",
  "keplr-theme",
  "pollster",
