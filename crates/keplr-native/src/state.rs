@@ -215,11 +215,6 @@ impl State {
         self.sidebar_width = width.clamp(crate::shell::SIDEBAR_MIN, crate::shell::SIDEBAR_MAX);
     }
 
-    /// The window's own size, kept so a drag can be turned back into a size.
-    pub fn window(&self) -> (f32, f32) {
-        self.window
-    }
-
     /// Records a new window size.
     pub fn set_window(&mut self, width: f32, height: f32) {
         self.window = (width, height);
@@ -453,6 +448,10 @@ impl State {
     /// What the first press of a drag grabbed.
     fn pointer_down(&mut self, x: f32, y: f32, node: Option<&str>) -> bool {
         if let Some(id) = node {
+            if id.starts_with("status-bar") {
+                self.set_panel_open(!self.panel_open);
+                return true;
+            }
             if let Some(view) = crate::shell::ACTIVITY_VIEWS
                 .iter()
                 .find(|view| id.ends_with(view.slug()))
