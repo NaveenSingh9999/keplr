@@ -64,15 +64,17 @@ pub fn view(state: &mut State, rows: usize) -> ViewNode {
             .flex_grow(1.0)
             .clip(true)
             .background(chrome.chrome),
-        vec![ViewNode::column(vec![crate::view::pane(
-            state, rows, &chrome,
-        )])],
+        vec![crate::view::pane(state, rows, &chrome)],
     );
-    let editor_side = ViewNode::column(vec![
-        tab_strip(state, &chrome),
-        editor_area,
-        panel(state, &chrome),
-    ]);
+    let editor_side = ViewNode::element(
+        "editor-side",
+        Style::default().flex_grow(1.0),
+        vec![
+            tab_strip(state, &chrome),
+            editor_area,
+            panel(state, &chrome),
+        ],
+    );
 
     ViewNode::column(vec![
         title_bar(&root, &chrome),
@@ -95,14 +97,14 @@ fn title_bar(root: &Path, chrome: &Chrome) -> ViewNode {
         .file_name()
         .map(|name| name.to_string_lossy().to_string())
         .unwrap_or_else(|| "keplr".to_string());
-    ViewNode::row_element(
+    band(
         "title-bar",
         Style::default()
             .height(TITLE_BAR_H)
+            .background(chrome.surface),
+        Style::default()
             .padding(Insets::symmetric(14.0, 0.0))
-            .align(Align::Center)
-            .background(chrome.surface)
-            .color(chrome.text),
+            .justify(Justify::SpaceBetween),
         vec![
             ViewNode::text_node(
                 "title-app",
@@ -112,20 +114,13 @@ fn title_bar(root: &Path, chrome: &Chrome) -> ViewNode {
                     .weight(600.0)
                     .color(chrome.text_faint),
             ),
-            ViewNode::element(
-                "title-name",
+            ViewNode::text_node(
+                "title-label",
+                title,
                 Style::default()
-                    .flex_grow(1.0)
-                    .align(Align::Center)
-                    .justify(Justify::Center),
-                vec![ViewNode::text_node(
-                    "title-label",
-                    title,
-                    Style::default()
-                        .font_size(12.0)
-                        .weight(600.0)
-                        .color(chrome.text),
-                )],
+                    .font_size(12.0)
+                    .weight(600.0)
+                    .color(chrome.text),
             ),
             ViewNode::text_node(
                 "title-hint",
@@ -159,7 +154,6 @@ fn activity_bar(active: SidebarView, chrome: &Chrome) -> ViewNode {
         Style::default()
             .width(ACTIVITY_BAR_W)
             .padding(Insets::symmetric(0.0, 6.0))
-            .align(Align::Center)
             .background(chrome.chrome),
         children,
     )
