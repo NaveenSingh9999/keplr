@@ -450,6 +450,13 @@ select {
   min-height: 0;
 }
 
+/* A hidden leaf's wrapper must not keep holding its split ratio: the ratio
+ * lives inline on the wrapper, but the hidden flag lands on the node, so
+ * without this the workbench keeps a dead black slab where the pane was. */
+.pane-child:has(> .pane-node[hidden]) {
+  display: none;
+}
+
 .pane-leaf {
   flex-direction: column;
   overflow: hidden;
@@ -518,6 +525,18 @@ select {
 
 .pane-cardbar::-webkit-scrollbar {
   height: 0;
+}
+
+/* A cardless leaf must not leave a dead strip behind. */
+.pane-cardbar:empty {
+  display: none;
+}
+
+/* The bottom leaf already owns a full tab strip (bottomtabs, with counts and
+ * panel controls) driven by the same setBottomTab its cards call, so its
+ * pane cardbar would only be a second, redundant strip. */
+.pane-leaf[data-leaf-id="bottom"] > .pane-cardbar {
+  display: none;
 }
 
 .pane-card {
