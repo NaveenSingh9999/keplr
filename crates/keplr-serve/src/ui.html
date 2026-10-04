@@ -22,48 +22,33 @@
 /* ---------------------------------------------------------------- tokens -- */
 
 :root {
-  /* Fallbacks for the case where the theme request has not landed yet. The
-   * theme overrides all of these a moment later. */
-  --k-chrome: #14161a;
-  --k-surface: #191c21;
-  --k-raised: #1f232a;
-  --k-overlay: #242932;
-  --k-border: #262b33;
-  --k-border-strong: #333a45;
-  --k-text: #d6dae1;
-  --k-text-muted: #9aa3b0;
-  --k-text-faint: #6b7482;
-  --k-accent: #5aa9e6;
-  --k-on-accent: #0d1117;
-  --k-focus-ring: #5aa9e6;
-  --k-selection: #26405c;
-  --k-current-line: #1b1f26;
-  --k-indent-guide: #23272f;
-  --k-scrollbar: #2f353f;
-  --k-success: #6cc08b;
-  --k-warning: #d9a441;
-  --k-error: #e06c75;
-  --k-info: #5aa9e6;
+  /* The theme's own tokens are not written here. They arrive from
+   * /theme.css, which reads the workspace theme file, and the only thing this
+   * file is allowed to define is what the theme does not cover: the fonts, the
+   * band's metrics, and a literal colour to paint before the theme lands so the
+   * window is never a white flash. */
 
-  --k-font-size: 13px;
-  --k-line-height: 1.5;
-  --k-radius-sm: 4px;
-  --k-radius-md: 6px;
-  --k-radius-lg: 10px;
-  --k-border-width: 1px;
-  --k-dur-fast: 110ms;
-  --k-dur-med: 180ms;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
   /* The band's own metrics, so the browser shell and the native window agree.
-   * These are layout, not taste, so they live here rather than in the theme. */
+   * These are layout, not taste, which is why they are here and not in the
+   * theme file. */
   --title-h: 38px;
   --tabs-h: 35px;
   --rail-w: 48px;
   --status-h: 24px;
   --sidebar-w: 260px;
+}
 
-  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+/* The paint before the theme arrives. Once /theme.css lands these two lines are
+ * overridden and nothing reads them again. */
+html {
+  background: #14161a;
+}
+
+body {
+  color: #d6dae1;
 }
 
 /* ------------------------------------------------------------ foundation -- */
@@ -216,7 +201,7 @@ textarea {
   bottom: 8px;
   width: 2px;
   background: var(--k-accent);
-  animation: railin var(--k-dur-med) ease;
+  animation: railin var(--k-dur-normal) ease;
 }
 
 @keyframes railin {
@@ -840,7 +825,7 @@ textarea {
   border-radius: 50%;
   background: var(--k-text-faint);
   flex: none;
-  transition: background var(--k-dur-med) ease;
+  transition: background var(--k-dur-normal) ease;
 }
 
 #dot.on {
@@ -1092,7 +1077,7 @@ textarea {
   border: var(--k-border-width) solid var(--k-border-strong);
   border-left: 2px solid var(--k-accent);
   border-radius: var(--k-radius-sm);
-  animation: overlayin var(--k-dur-med) ease;
+  animation: overlayin var(--k-dur-normal) ease;
 }
 
 .toast.err {
