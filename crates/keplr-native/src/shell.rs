@@ -38,6 +38,19 @@ pub const ACTIVITY_VIEWS: [SidebarView; 4] = [
     SidebarView::Outline,
 ];
 
+/// A band: a column that stretches to the full width of its parent, holding one
+/// row that lines the contents up.
+fn band(id: &str, outer: Style, inner: Style, children: Vec<ViewNode>) -> ViewNode {
+    let mut inner = inner;
+    inner.flex_grow = 1.0;
+    inner.align = Align::Center;
+    ViewNode::element(
+        id.to_string(),
+        outer,
+        vec![ViewNode::row_element(format!("{id}-row"), inner, children)],
+    )
+}
+
 /// The whole window.
 pub fn view(state: &mut State, rows: usize) -> ViewNode {
     let chrome = state.chrome();
@@ -67,7 +80,6 @@ pub fn view(state: &mut State, rows: usize) -> ViewNode {
             "window",
             Style::default()
                 .flex_grow(1.0)
-                .fill(true)
                 .clip(true)
                 .background(chrome.chrome),
             vec![activity_bar(active, &chrome), sidebar, editor_side],
@@ -131,12 +143,10 @@ fn activity_bar(active: SidebarView, chrome: &Chrome) -> ViewNode {
     for candidate in ACTIVITY_VIEWS {
         let on = candidate == active;
         let colour = if on { chrome.accent } else { chrome.text_faint };
-        children.push(ViewNode::row_element(
-            format!("activity-{}", candidate.slug()),
-            Style::default()
-                .height(46.0)
-                .align(Align::Center)
-                .justify(Justify::Center),
+        children.push(band(
+            &format!("activity-{}", candidate.slug()),
+            Style::default().height(46.0),
+            Style::default().justify(Justify::Center),
             vec![ViewNode::text_node(
                 format!("activity-glyph-{}", candidate.slug()),
                 candidate.glyph().to_string(),
@@ -165,12 +175,10 @@ fn sidebar(state: &mut State, active: SidebarView, chrome: &Chrome) -> ViewNode 
         SidebarView::Outline => "outline",
     };
 
-    let mut children = vec![ViewNode::row_element(
+    let mut children = vec![band(
         "sidebar-header",
-        Style::default()
-            .height(30.0)
-            .padding(Insets::symmetric(14.0, 0.0))
-            .align(Align::Center),
+        Style::default().height(30.0),
+        Style::default().padding(Insets::symmetric(14.0, 0.0)),
         vec![ViewNode::text_node(
             "sidebar-title",
             title.to_uppercase(),
@@ -192,12 +200,10 @@ fn sidebar(state: &mut State, active: SidebarView, chrome: &Chrome) -> ViewNode 
             SidebarView::Outline => "No symbols",
             SidebarView::Files => "",
         };
-        children.push(ViewNode::row_element(
+        children.push(band(
             "sidebar-empty",
-            Style::default()
-                .padding(Insets::symmetric(14.0, 10.0))
-                .align(Align::Center)
-                .color(chrome.text_faint),
+            Style::default(),
+            Style::default().padding(Insets::symmetric(14.0, 10.0)),
             vec![ViewNode::text(
                 empty,
                 Style::default().font_size(12.0).color(chrome.text_faint),
@@ -227,12 +233,11 @@ fn sidebar_row(index: usize, row: &Row, chrome: &Chrome) -> ViewNode {
         chrome.text
     };
     let weight = if nested { 400.0 } else { 600.0 };
-    ViewNode::row_element(
-        format!("sidebar-row-{}", index),
+    band(
+        &format!("sidebar-row-{}", index),
+        Style::default().height(24.0),
         Style::default()
-            .height(24.0)
             .padding(Insets::symmetric(indent, 0.0))
-            .align(Align::Center)
             .gap(8.0),
         vec![
             ViewNode::text_node(
@@ -265,9 +270,6 @@ fn tab_strip(state: &mut State, chrome: &Chrome) -> ViewNode {
         };
         let mut style = Style::default()
             .height(TAB_STRIP_H)
-            .padding(Insets::symmetric(14.0, 0.0))
-            .align(Align::Center)
-            .gap(8.0)
             .font_size(12.5)
             .color(colour);
         style = if focused {
@@ -275,9 +277,10 @@ fn tab_strip(state: &mut State, chrome: &Chrome) -> ViewNode {
         } else {
             style.background(chrome.surface)
         };
-        children.push(ViewNode::row_element(
-            format!("tab-{}", index),
+        children.push(band(
+            &format!("tab-{}", index),
             style,
+            Style::default().padding(Insets::symmetric(14.0, 0.0)),
             vec![ViewNode::text_node(
                 format!("tab-label-{}", index),
                 tab.pane.label(),
@@ -289,13 +292,12 @@ fn tab_strip(state: &mut State, chrome: &Chrome) -> ViewNode {
         ));
     }
     if children.is_empty() {
-        children.push(ViewNode::row_element(
+        children.push(band(
             "tab-empty",
             Style::default()
                 .height(TAB_STRIP_H)
-                .padding(Insets::symmetric(14.0, 0.0))
-                .align(Align::Center)
                 .background(chrome.surface),
+            Style::default().padding(Insets::symmetric(14.0, 0.0)),
             vec![ViewNode::text(
                 "no tabs",
                 Style::default().font_size(12.0).color(chrome.text_faint),
@@ -349,21 +351,19 @@ fn status_bar(state: &mut State, chrome: &Chrome) -> ViewNode {
     } else {
         "ctrl+j panel"
     };
-    ViewNode::row_element(
+    band(
         "status-bar",
         Style::default()
             .height(STATUS_BAR_H)
-            .padding(Insets::symmetric(12.0, 0.0))
-            .align(Align::Center)
             .background(chrome.surface),
+        Style::default()
+            .padding(Insets::symmetric(12.0, 0.0))
+            .justify(Justify::SpaceBetween),
         vec![
-            ViewNode::element(
+            ViewNode::text_node(
                 "status-left",
-                Style::default().flex_grow(1.0),
-                vec![ViewNode::text(
-                    left,
-                    Style::default().font_size(11.0).color(chrome.text_faint),
-                )],
+                left,
+                Style::default().font_size(11.0).color(chrome.text_faint),
             ),
             ViewNode::text_node(
                 "status-right",
