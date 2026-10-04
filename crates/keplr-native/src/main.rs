@@ -75,7 +75,7 @@ fn main() -> Result<()> {
                 | InputEvent::PointerMove { x, y, .. }
                 | InputEvent::PointerUp { x, y, .. } => {
                     state.set_window(layout.viewport.width, layout.viewport.height);
-                    let hit = layout.hit_test(*x, *y);
+                    let hit = layout.hit_test(x, y);
                     state.pointer(&event, hit.map(|node| node.id.as_str()))
                 }
                 _ => false,
