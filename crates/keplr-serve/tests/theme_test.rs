@@ -104,9 +104,10 @@ fn the_css_is_a_root_block_of_custom_properties() {
     assert!(css.starts_with(":root{"), "it is one root block");
     assert!(css.trim_end().ends_with('}'), "and it closes");
     assert!(
-        css.lines().all(|line| line.trim().is_empty()
-            || line.starts_with(":root")
-            || line.trim_start().starts_with("--k-")),
+        css.lines().all(|line| {
+            let line = line.trim();
+            line.is_empty() || line.starts_with(":root") || line == "}" || line.starts_with("--k-")
+        }),
         "and it holds nothing but tokens"
     );
 }
