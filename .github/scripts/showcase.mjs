@@ -102,6 +102,12 @@ await capture("shot-layout");
 await page.keyboard.press("Escape");
 
 await openPage(`?open=${open}&bottom=terminal`);
+// A fresh pty prints nothing on its own, which photographs as a dead panel.
+// Drive the shell like a user so the shot proves it is alive.
+await page.locator("#termholder canvas").click({ timeout: 20000 });
+await page.keyboard.type("echo keplr-terminal-ok");
+await page.keyboard.press("Enter");
+await page.waitForTimeout(2500);
 await capture("shot-terminal");
 
 await openPage(`?open=${open}&left=source`);
