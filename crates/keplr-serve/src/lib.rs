@@ -1825,6 +1825,12 @@ async fn sync_status(State(state): State<AppState>) -> Json<serde_json::Value> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use axum::response::IntoResponse;
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+    use std::sync::{Arc, Mutex};
+
     /// A throwaway workspace under the temp dir, which is the repo's
     /// convention and needs no dependency to do it.
     fn workspace(name: &str) -> PathBuf {
