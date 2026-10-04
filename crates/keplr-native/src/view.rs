@@ -243,6 +243,7 @@ fn editor(state: &mut State, path: &Path, rows: usize, chrome: &Chrome) -> ViewN
 
 /// One editable line, drawn as colour runs with the caret and the selection
 /// laid out as if the selection were text.
+#[allow(clippy::too_many_arguments)]
 fn editor_row(
     line: usize,
     text: &str,
@@ -426,7 +427,7 @@ fn guided_indent(whitespace: &str) -> String {
     let mut col = 0;
     while col < cols {
         out.push('\u{2502}');
-        out.extend(std::iter::repeat(' ').take(3));
+        out.extend(std::iter::repeat_n(' ', 3));
         col += 4;
     }
     out
@@ -453,9 +454,7 @@ fn highlight_line(
     let mut kinds = vec![TokenKind::Other; text.len()];
     for span in spans {
         let end = (span.start + span.len).min(text.len());
-        for byte in span.start..end {
-            kinds[byte] = span.kind;
-        }
+        kinds[span.start..end].fill(span.kind);
     }
 
     for byte in ws_len..text.len() {
