@@ -764,11 +764,11 @@ textarea {
 }
 
 .kkey {
+  margin-left: auto;
   font-family: var(--mono);
   font-size: 10px;
   color: var(--k-text-faint);
-  padding-left: 4px;
-  border-left: var(--k-border-width) solid var(--k-border);
+  white-space: nowrap;
 }
 
 #root {
@@ -1106,6 +1106,55 @@ textarea {
   font-weight: 400;
 }
 
+/* -------------------------------------------------------------- tooltip -- */
+
+/* A tooltip is the only text a glyph gets until it is clicked. It is drawn by
+ * the page rather than the browser so it can use the theme and the overlay
+ * radius, and it appears after a beat so a passing cursor does not flash it. */
+[data-tip] {
+  position: relative;
+}
+
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-3px);
+  z-index: 90;
+  padding: 4px 8px;
+  font-size: 11px;
+  line-height: 1.3;
+  white-space: nowrap;
+  color: var(--k-text);
+  background: var(--k-overlay);
+  border: var(--k-border-width) solid var(--k-border-strong);
+  border-radius: var(--k-radius-sm);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--k-dur-fast) ease, transform var(--k-dur-fast) ease;
+  transition-delay: 0s;
+}
+
+[data-tip]:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  transition-delay: 350ms;
+}
+
+/* The rail's tooltip belongs beside the glyph, not under it, because under it
+ * is the sidebar. */
+#rail [data-tip]::after {
+  top: 50%;
+  left: calc(100% + 8px);
+  transform: translateY(-50%) translateX(-3px);
+}
+
+#rail [data-tip]:hover::after {
+  transform: translateY(-50%) translateX(0);
+}
+
 /* --------------------------------------------------------------- a11y ---- */
 
 /* Motion is decoration. When the reader has asked for none, the window
@@ -1211,20 +1260,18 @@ textarea {
 </svg>
 
 <header id="titlebar">
-  <button class="kicon" id="t-left" data-tip="Toggle sidebar"><svg class="ic"><use href="#i-side"/></svg></button>
-  <button id="root" data-tip="Project root — open file finder">…</button>
+  <button class="kicon" id="t-left" data-tip="Toggle sidebar" aria-label="Toggle sidebar"><svg class="ic"><use href="#i-side"/></svg></button>
+  <button id="root" data-tip="Project root — open file finder" aria-label="Project root">…</button>
   <span class="spacer"></span>
   <button id="finder" class="finder-trigger" data-tip="Search files and commands · Ctrl+P" aria-label="Search files and commands">
-    <svg class="ic"><use href="#i-search"/></svg><span>Search</span><span class="kkey">⌘P</span>
+    <svg class="ic"><use href="#i-search"/></svg><span>Search</span>
   </button>
   <span class="spacer"></span>
-  <div class="kseg" id="layoutseg" role="group" aria-label="Layout">
-    <button id="layout-menu" data-tip="Layout controls"><svg class="ic"><use href="#i-panel"/></svg></button>
-    <button id="t-bottom" data-tip="Toggle panel"><svg class="ic"><use href="#i-panel"/></svg></button>
-    <button id="t-right" data-tip="Toggle outline"><svg class="ic"><use href="#i-list"/></svg></button>
-  </div>
-  <button id="syncpill" data-tip="Connection status"><span id="dot"></span><span id="syncword">live</span></button>
-  <button class="kicon" id="t-settings" data-tip="Settings"><svg class="ic"><use href="#i-gear"/></svg></button>
+  <button class="kicon" id="layout-menu" data-tip="Layout" aria-label="Layout"><svg class="ic"><use href="#i-side"/></svg></button>
+  <button class="kicon" id="t-bottom" data-tip="Toggle panel" aria-label="Toggle panel"><svg class="ic"><use href="#i-panel"/></svg></button>
+  <button class="kicon" id="t-right" data-tip="Toggle outline" aria-label="Toggle outline"><svg class="ic"><use href="#i-list"/></svg></button>
+  <button id="syncpill" data-tip="Connection status" aria-label="Connection status"><span id="dot"></span></button>
+  <button class="kicon" id="t-settings" data-tip="Settings" aria-label="Settings"><svg class="ic"><use href="#i-gear"/></svg></button>
 </header>
 <div id="workbench">
   <nav id="rail" role="tablist" aria-label="Views">
