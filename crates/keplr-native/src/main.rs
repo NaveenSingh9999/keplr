@@ -74,11 +74,8 @@ fn main() -> Result<()> {
                 InputEvent::PointerDown { x, y, .. }
                 | InputEvent::PointerMove { x, y, .. }
                 | InputEvent::PointerUp { x, y, .. } => {
-                    state.set_window(
-                        layout.map(|tree| tree.viewport.width).unwrap_or(0.0),
-                        layout.map(|tree| tree.viewport.height).unwrap_or(0.0),
-                    );
-                    let hit = layout.and_then(|tree| tree.hit_test(*x, *y));
+                    state.set_window(layout.viewport.width, layout.viewport.height);
+                    let hit = layout.hit_test(*x, *y);
                     state.pointer(&event, hit.map(|node| node.id.as_str()))
                 }
                 _ => false,
