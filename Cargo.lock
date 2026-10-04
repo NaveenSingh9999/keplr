@@ -1728,6 +1728,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "keplr-anim"
+version = "0.1.0"
+dependencies = [
+ "keplr-theme",
+ "rcus",
+]
+
+[[package]]
 name = "keplr-build"
 version = "0.1.0"
 dependencies = [
@@ -1821,13 +1829,16 @@ name = "keplr-native"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "keplr-anim",
  "keplr-client",
  "keplr-events",
  "keplr-term",
  "keplr-theme",
+ "pollster",
  "rcus",
  "serde_json",
  "walkdir",
+ "wgpu",
 ]
 
 [[package]]
@@ -2930,9 +2941,9 @@ checksum = "20675572f6f24e9e76ef639bc5552774ed45f1c30e2951e1e99c59888861c539"
 
 [[package]]
 name = "rcus"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb0e52c309a5b0d26580207f0e9ab260c647774c6928814d0333d2facb093c44"
+checksum = "d38396ffe5b6e4c5c8c138507e9f1301a7a1efa254443b024a7d0d61edcbeb4f"
 dependencies = [
  "rcus-app",
  "rcus-core",
@@ -2944,9 +2955,9 @@ dependencies = [
 
 [[package]]
 name = "rcus-app"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7c65f725ef3b9e3e084406d87087f892f6cec8d8a2332f42f58969cc2fd0ea4"
+checksum = "eef456d3f14e7178f7c6ae52b19f6d6ea509ccb43f2a0b4e2cd797abf4b6e393"
 dependencies = [
  "anyhow",
  "rcus-core",
@@ -2957,9 +2968,9 @@ dependencies = [
 
 [[package]]
 name = "rcus-core"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "35a01c8b4b5295bbd7d03179c672e936f4f4fa895a024a457dddcc82ba988c1c"
+checksum = "3db05f6a7083e60b47b3a1a12f79d885808f240f65ebf80359568107bf6f990c"
 dependencies = [
  "serde",
  "serde_json",
@@ -2967,9 +2978,9 @@ dependencies = [
 
 [[package]]
 name = "rcus-desktop"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7b84dce8ffccc32811a6f72f8bc5302a0f548218643c48885b18460237a8d9f"
+checksum = "4200adb00fe53fc6bacc90005cc6b358be9bfb28a87961b9087d26325cb06d6c"
 dependencies = [
  "anyhow",
  "pollster",
@@ -2983,9 +2994,9 @@ dependencies = [
 
 [[package]]
 name = "rcus-layout"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a69e0f7768ec79158997577d8a89790fc05ab8f4a6630868b52df557c41e74a1"
+checksum = "831267805f0d25be2ca5fe36f25adaca42a94f55c6eef736e2010988724894c5"
 dependencies = [
  "rcus-core",
  "serde",
@@ -2993,13 +3004,14 @@ dependencies = [
 
 [[package]]
 name = "rcus-render"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "594941c22a5cf6543618ebdff5d97bafa6b7745831a54d034b9d207e965643b4"
+checksum = "bd8c9f55ff0c3092bccc7cb9dd803a730a35d30b0b44d23e06cd371afa64062d"
 dependencies = [
  "ab_glyph",
  "anyhow",
  "bytemuck",
+ "image",
  "pollster",
  "rcus-layout",
  "wgpu",
@@ -3007,9 +3019,9 @@ dependencies = [
 
 [[package]]
 name = "rcus-ts"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "368989f39b127e1453ec44193fdefb880cee07bd745732032cf6e3564b83e311"
+checksum = "dd30798cc7b878d6e2500e44e4b31d4bbc38fe5eb49635540da7c2cf793bc947"
 dependencies = [
  "anyhow",
  "rcus-core",

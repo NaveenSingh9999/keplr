@@ -1066,6 +1066,38 @@ async fn ui_root() -> axum::response::Html<&'static str> {
     axum::response::Html(include_str!("ui.html"))
 }
 
+/// The workspace's theme as CSS custom properties.
+///
+/// This is the whole point of the theme file: one JSON document, read once,
+/// served as custom properties, and every surface in the browser client is
+/// painted from them. Change the file and the page changes with it, with no
+/// rebuild and no second source of truth.
+async fn theme_css(
+    axum::extract::State(state): axum::extract::State<AppState>,
+) -> impl IntoResponse {
+    let themes = keplr_theme::discover(&state.root);
+    // The first file theme wins over the built-in one, which is the same order
+    // the native client resolves them in.
+    let theme = themes
+        .iter()
+        .find(|found| found.source == keplr_theme::ThemeSource::File)
+        .map(|found| found.theme.clone())
+        .unwrap_or_default();
+    let name = themes
+        .iter()
+        .find(|found| found.source == keplr_theme::ThemeSource::File)
+        .map(|found| found.name.clone())
+        .unwrap_or_else(|| "built-in".to_string());
+    (
+        [
+            (axum::http::header::CONTENT_TYPE, "text/css; charset=utf-8"),
+            // A theme is a file the user edits, so it must not be cached.
+            (axum::http::header::CACHE_CONTROL, "no-cache"),
+        ],
+        format!("/* keplr theme: {name} */\n{}", theme.to_css()),
+    )
+}
+
 async fn ui_layout_js() -> impl IntoResponse {
     (
         [
@@ -1545,6 +1577,7 @@ pub async fn serve_full(
     }
     let app = Router::new()
         .route("/", get(ui_root))
+        .route("/theme.css", get(theme_css))
         .route("/ui-layout.js", get(ui_layout_js))
         .route(
             "/fonts/JetBrainsMono-Regular.ttf",
@@ -1792,6 +1825,69 @@ async fn sync_status(State(state): State<AppState>) -> Json<serde_json::Value> {
 
 #[cfg(test)]
 mod tests {
+    /// A throwaway workspace under the temp dir, which is the repo's
+    /// convention and needs no dependency to do it.
+    fn workspace(name: &str) -> PathBuf {
+        let root = std::env::temp_dir().join(name);
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join(".keplr").join("themes")).expect("workspace");
+        root
+    }
+
+    /// The state the theme route reads, which is a root and nothing else that
+    /// matters here.
+    fn themed_state(root: PathBuf) -> AppState {
+        AppState {
+            root,
+            token: String::new(),
+            attempts: Arc::new(Mutex::new(HashMap::new())),
+            daemons: Arc::new(Mutex::new(HashMap::new())),
+            sync_docs: Arc::new(Mutex::new(HashMap::new())),
+            sync_tx: Arc::new(Mutex::new(tokio::sync::broadcast::channel(16).0)),
+            sync_peers: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    async fn theme_body(state: AppState) -> String {
+        let response = theme_css(axum::extract::State(state)).await.into_response();
+        String::from_utf8(
+            axum::body::to_bytes(response.into_body(), 1 << 20)
+                .await
+                .expect("body reads")
+                .to_vec(),
+        )
+        .expect("css is text")
+    }
+
+    #[tokio::test]
+    async fn a_workspace_theme_reaches_the_browser_as_custom_properties() {
+        let root = workspace("keplr-serve-theme-route");
+        std::fs::write(
+            root.join(".keplr").join("themes").join("mine.json"),
+            r##"{"colors":{"accent":"#ff0000"},"ui":{"fontSize":15}}"##,
+        )
+        .expect("theme written");
+        let css = theme_body(themed_state(root.clone())).await;
+        assert!(
+            css.contains("--k-accent:#ff0000"),
+            "the user's colour wins: {css}"
+        );
+        assert!(
+            css.contains("--k-font-size:15px"),
+            "and so does their type size"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[tokio::test]
+    async fn a_workspace_without_a_theme_still_gets_usable_colours() {
+        let root = workspace("keplr-serve-no-theme");
+        let css = theme_body(themed_state(root.clone())).await;
+        assert!(css.contains(":root{"), "the built-in theme is a theme too");
+        assert!(css.contains("--k-chrome:"), "and it names every token");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     #[tokio::test]
     async fn terminal_frames_carry_a_cursor_and_cells() {
         let mut grid = keplr_term::TerminalGrid::new(8, 2);

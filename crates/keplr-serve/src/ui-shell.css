@@ -1,0 +1,1149 @@
+/* Keplr's browser client.
+ *
+ * One grid of full-bleed bands, the same shape the native window draws: title
+ * bar, activity rail, sidebar, editor, panel, status bar. A band reaches the
+ * window edge on every side, carries at most one hairline, and is never a
+ * rounded card. The only things with corners and shadows are the things that
+ * genuinely float: the palette, the menus, the modal.
+ *
+ * Every colour, radius, duration and border width comes from the theme file,
+ * served as custom properties at /theme.css. Nothing here hardcodes a colour,
+ * because the theme file is the theme.
+ */
+
+/* ---------------------------------------------------------------- tokens -- */
+
+:root {
+  /* Fallbacks for the case where the theme request has not landed yet. The
+   * theme overrides all of these a moment later. */
+  --k-chrome: #14161a;
+  --k-surface: #191c21;
+  --k-raised: #1f232a;
+  --k-overlay: #242932;
+  --k-border: #262b33;
+  --k-border-strong: #333a45;
+  --k-text: #d6dae1;
+  --k-text-muted: #9aa3b0;
+  --k-text-faint: #6b7482;
+  --k-accent: #5aa9e6;
+  --k-on-accent: #0d1117;
+  --k-focus-ring: #5aa9e6;
+  --k-selection: #26405c;
+  --k-current-line: #1b1f26;
+  --k-indent-guide: #23272f;
+  --k-scrollbar: #2f353f;
+  --k-success: #6cc08b;
+  --k-warning: #d9a441;
+  --k-error: #e06c75;
+  --k-info: #5aa9e6;
+
+  --k-font-size: 13px;
+  --k-line-height: 1.5;
+  --k-radius-sm: 4px;
+  --k-radius-md: 6px;
+  --k-radius-lg: 10px;
+  --k-border-width: 1px;
+  --k-dur-fast: 110ms;
+  --k-dur-med: 180ms;
+
+  /* The band's own metrics, so the browser shell and the native window agree.
+   * These are layout, not taste, so they live here rather than in the theme. */
+  --title-h: 38px;
+  --tabs-h: 35px;
+  --rail-w: 48px;
+  --status-h: 24px;
+  --sidebar-w: 260px;
+
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* ------------------------------------------------------------ foundation -- */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  background: var(--k-chrome);
+  color: var(--k-text);
+  font-family: var(--ui);
+  font-size: var(--k-font-size);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.ic {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  display: block;
+}
+
+/* A focus ring that reads on any theme, drawn with a ring rather than an
+ * outline so it is visible against both bands and overlays. */
+:focus-visible {
+  outline: 2px solid var(--k-focus-ring);
+  outline-offset: -2px;
+  border-radius: var(--k-radius-sm);
+}
+
+/* --------------------------------------------------------------- bands --- */
+
+#titlebar {
+  height: var(--title-h);
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  background: var(--k-surface);
+  /* The one hairline the frame is allowed. */
+  border-bottom: var(--k-border-width) solid var(--k-border);
+}
+
+#workbench {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+#bottom {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--k-surface);
+  border-top: var(--k-border-width) solid var(--k-border);
+}
+
+#statusbar {
+  height: var(--status-h);
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 8px;
+  background: var(--k-surface);
+  border-top: var(--k-border-width) solid var(--k-border);
+  font-size: 11px;
+  color: var(--k-text-muted);
+  overflow: hidden;
+}
+
+/* The rail is a band of glyphs. No text, no container, no indicator that
+ * floats: the showing view is drawn in the accent colour. */
+#rail {
+  width: var(--rail-w);
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 0;
+  gap: 2px;
+  background: var(--k-chrome);
+  border-right: var(--k-border-width) solid var(--k-border);
+}
+
+.railitem {
+  width: 100%;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--k-text-faint);
+  position: relative;
+  transition: color var(--k-dur-fast) ease, background var(--k-dur-fast) ease;
+}
+
+.railitem:hover {
+  color: var(--k-text);
+  background: var(--k-overlay);
+}
+
+.railitem.sel {
+  color: var(--k-accent);
+}
+
+/* The active marker is a bar on the rail's inner edge, flush with it. */
+.railitem.sel::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  background: var(--k-accent);
+  animation: railin var(--k-dur-med) ease;
+}
+
+@keyframes railin {
+  from {
+    transform: scaleY(0.2);
+    opacity: 0;
+  }
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+.railitem .ic {
+  width: 20px;
+  height: 20px;
+}
+
+/* ------------------------------------------------------------- sidebar --- */
+
+.dock {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--k-surface);
+  border-right: var(--k-border-width) solid var(--k-border);
+}
+
+#left {
+  width: var(--sidebar-w);
+  /* The rail owns the view choice now, so the dock's own tab strip is gone:
+   * two controls for one decision is worse than none. */
+}
+
+#right {
+  width: 300px;
+  border-right: 0;
+  border-left: var(--k-border-width) solid var(--k-border);
+}
+
+.docktabs {
+  height: 30px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--k-text-faint);
+  border-bottom: var(--k-border-width) solid var(--k-border);
+}
+
+.docktabs button {
+  height: 24px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--k-text-muted);
+  border-radius: var(--k-radius-sm);
+  transition: background var(--k-dur-fast) ease, color var(--k-dur-fast) ease;
+}
+
+.docktabs button:hover {
+  background: var(--k-overlay);
+  color: var(--k-text);
+}
+
+.docktabs button.sel {
+  color: var(--k-text);
+  background: var(--k-overlay);
+}
+
+.dockbody {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 0;
+}
+
+/* A sidebar row is one line of text and a glyph, flush to the left. Depth is
+ * indent and a fainter glyph, nothing more. */
+.row {
+  height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  color: var(--k-text);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--k-dur-fast) ease;
+}
+
+.row:hover {
+  background: var(--k-overlay);
+}
+
+.row.sel {
+  background: var(--k-overlay);
+  color: var(--k-text);
+}
+
+.row .ic {
+  width: 14px;
+  height: 14px;
+  color: var(--k-text-faint);
+}
+
+.row.child {
+  padding-left: 30px;
+  color: var(--k-text-muted);
+}
+
+.row.child .ic {
+  width: 12px;
+  height: 12px;
+}
+
+.row .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row .badge {
+  margin-left: auto;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--k-text-faint);
+}
+
+.emptynote {
+  padding: 12px 14px;
+  font-size: 12px;
+  color: var(--k-text-faint);
+}
+
+/* --------------------------------------------------------------- editor --- */
+
+#center {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+.col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--k-chrome);
+}
+
+#tabsbar,
+#tabsbar1 {
+  height: var(--tabs-h);
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  background: var(--k-surface);
+  border-bottom: var(--k-border-width) solid var(--k-border);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+#tabsbar::-webkit-scrollbar,
+#tabsbar1::-webkit-scrollbar,
+.dockbody::-webkit-scrollbar,
+#bbody::-webkit-scrollbar {
+  height: 0;
+}
+
+.tab {
+  flex: none;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  font-size: 12.5px;
+  color: var(--k-text-faint);
+  background: var(--k-surface);
+  border-right: var(--k-border-width) solid var(--k-border);
+  white-space: nowrap;
+  transition: background var(--k-dur-fast) ease, color var(--k-dur-fast) ease;
+}
+
+.tab:hover {
+  color: var(--k-text);
+  background: var(--k-raised);
+}
+
+/* The showing tab is the window colour, not a raised card: it reads as part of
+ * the content rather than a lid sitting on top of it. */
+.tab.sel {
+  color: var(--k-text);
+  background: var(--k-chrome);
+  box-shadow: inset 0 2px 0 var(--k-accent);
+}
+
+.tab .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--k-text-faint);
+  flex: none;
+}
+
+.tab.sel .dot {
+  background: var(--k-accent);
+}
+
+#crumbs,
+#crumbs1 {
+  height: 26px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  font-size: 11px;
+  color: var(--k-text-faint);
+  background: var(--k-chrome);
+  border-bottom: var(--k-border-width) solid var(--k-border);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+#crumbs b,
+#crumbs1 b {
+  font-weight: 500;
+  color: var(--k-text-muted);
+}
+
+#editorwrap,
+#editorwrap1,
+#previewwrap,
+#previewwrap1 {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+#fallback {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 10px 14px;
+  resize: none;
+  font-family: var(--mono);
+  font-size: var(--k-font-size);
+  line-height: var(--k-line-height);
+  tab-size: 4;
+}
+
+#fallback:focus {
+  outline: none;
+}
+
+/* CodeMirror is the browser's editor, so it is themed rather than restyled:
+ * only the things the theme owns are set here. */
+.cm-editor {
+  height: 100%;
+  background: var(--k-chrome);
+  color: var(--k-text);
+  font-family: var(--mono);
+  font-size: var(--k-font-size);
+}
+
+.cm-editor.cm-focused {
+  outline: none;
+}
+
+.cm-scroller {
+  font-family: var(--mono) !important;
+  line-height: var(--k-line-height) !important;
+}
+
+.cm-content {
+  padding: 10px 0 40vh 0;
+  caret-color: var(--k-accent);
+}
+
+.cm-gutters {
+  background: var(--k-chrome);
+  color: var(--k-text-faint);
+  border-right: var(--k-border-width) solid var(--k-border);
+}
+
+.cm-activeLine {
+  background: var(--k-current-line);
+}
+
+.cm-activeLineGutter {
+  background: var(--k-current-line);
+  color: var(--k-text-muted);
+}
+
+.cm-selectionBackground,
+.cm-editor ::selection {
+  background: var(--k-selection) !important;
+}
+
+.cm-cursor {
+  border-left-color: var(--k-accent);
+  border-left-width: 2px;
+}
+
+.cm-tooltip {
+  background: var(--k-overlay);
+  border: var(--k-border-width) solid var(--k-border-strong);
+  border-radius: var(--k-radius-sm);
+  color: var(--k-text);
+}
+
+.cm-tooltip-autocomplete ul li[aria-selected] {
+  background: var(--k-selection);
+  color: var(--k-text);
+}
+
+.cm-panels {
+  background: var(--k-surface);
+  color: var(--k-text);
+  border-top: var(--k-border-width) solid var(--k-border);
+}
+
+.cm-searchMatch {
+  background: var(--k-warning);
+  color: var(--k-on-accent);
+}
+
+.cm-searchMatch-selected {
+  background: var(--k-accent);
+  color: var(--k-on-accent);
+}
+
+/* --------------------------------------------------------------- panel --- */
+
+#bbody {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+#bottomtabs {
+  position: relative;
+  cursor: default;
+}
+
+/* The grab band: a hit area at the panel's edge with nothing drawn in it,
+ * because a window should not show a handle to explain that it can be dragged. */
+#bgrab {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -4px;
+  height: 8px;
+  cursor: row-resize;
+  z-index: 3;
+}
+
+.problems,
+.logline,
+.hit {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 3px 14px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--k-text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+  transition: background var(--k-dur-fast) ease;
+}
+
+.problems:hover,
+.logline:hover,
+.hit:hover {
+  background: var(--k-overlay);
+}
+
+.problems.sel,
+.hit.sel {
+  background: var(--k-overlay);
+  border-left-color: var(--k-accent);
+}
+
+.problems .sev {
+  flex: none;
+  width: 14px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.sev-e {
+  color: var(--k-error);
+}
+
+.sev-w {
+  color: var(--k-warning);
+}
+
+.sev-i {
+  color: var(--k-info);
+}
+
+.problems .where,
+.logline .where {
+  color: var(--k-text-faint);
+  flex: none;
+}
+
+.cnt {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  border-radius: var(--k-radius-sm);
+  background: var(--k-overlay);
+  color: var(--k-text-muted);
+}
+
+/* ------------------------------------------------------------- controls --- */
+
+/* A control is a row of text, not a pill. It picks up a background on hover so
+ * it is findable, and it keeps square corners so it never reads as a chip. */
+.kbtn {
+  height: 24px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--k-text-muted);
+  border-radius: var(--k-radius-sm);
+  transition: background var(--k-dur-fast) ease, color var(--k-dur-fast) ease;
+}
+
+.kbtn:hover {
+  background: var(--k-overlay);
+  color: var(--k-text);
+}
+
+.kbtn-ghost {
+  color: var(--k-text-faint);
+}
+
+.kbtn.primary {
+  background: var(--k-accent);
+  color: var(--k-on-accent);
+}
+
+.kbtn.primary:hover {
+  filter: brightness(1.08);
+}
+
+.kicon {
+  width: 28px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--k-text-muted);
+  border-radius: var(--k-radius-sm);
+  transition: background var(--k-dur-fast) ease, color var(--k-dur-fast) ease;
+}
+
+.kicon:hover {
+  background: var(--k-overlay);
+  color: var(--k-text);
+}
+
+.kinput {
+  height: 26px;
+  padding: 0 8px;
+  background: var(--k-chrome);
+  border: var(--k-border-width) solid var(--k-border);
+  border-radius: var(--k-radius-sm);
+  color: var(--k-text);
+  transition: border-color var(--k-dur-fast) ease;
+}
+
+.kinput:focus {
+  outline: none;
+  border-color: var(--k-accent);
+}
+
+.kinput::placeholder {
+  color: var(--k-text-faint);
+}
+
+.tgl {
+  height: 24px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--k-text-faint);
+  border-radius: var(--k-radius-sm);
+}
+
+.tgl:hover {
+  background: var(--k-overlay);
+}
+
+.tgl[aria-checked="true"] {
+  color: var(--k-text);
+  background: var(--k-overlay);
+}
+
+.tgl[aria-checked="true"]::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--k-accent);
+}
+
+.kseg {
+  display: flex;
+  align-items: center;
+}
+
+/* The finder is a plain band in the title bar, not a floating capsule. */
+.finder-trigger {
+  height: 24px;
+  padding: 0 8px 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--k-text-faint);
+  border-radius: var(--k-radius-sm);
+  border: var(--k-border-width) solid var(--k-border);
+  transition: background var(--k-dur-fast) ease, color var(--k-dur-fast) ease;
+}
+
+.finder-trigger:hover {
+  background: var(--k-overlay);
+  color: var(--k-text);
+}
+
+.kkey {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--k-text-faint);
+  padding-left: 4px;
+  border-left: var(--k-border-width) solid var(--k-border);
+}
+
+#root {
+  height: 24px;
+  max-width: 280px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--k-text-muted);
+  border-radius: var(--k-radius-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#root:hover {
+  background: var(--k-overlay);
+  color: var(--k-text);
+}
+
+.sbtn {
+  height: 20px;
+  padding: 0 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--k-text-muted);
+  border-radius: var(--k-radius-sm);
+  white-space: nowrap;
+  transition: background var(--k-dur-fast) ease, color var(--k-dur-fast) ease;
+}
+
+.sbtn:hover {
+  background: var(--k-overlay);
+  color: var(--k-text);
+}
+
+.sbtn .ic {
+  width: 13px;
+  height: 13px;
+}
+
+#smsg {
+  color: var(--k-text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The connection dot is a dot. It is not a pill with a word in it. */
+#dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--k-text-faint);
+  flex: none;
+  transition: background var(--k-dur-med) ease;
+}
+
+#dot.on {
+  background: var(--k-success);
+}
+
+#syncpill {
+  height: 20px;
+  padding: 0 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--k-text-muted);
+  border-radius: var(--k-radius-sm);
+}
+
+#syncpill:hover {
+  background: var(--k-overlay);
+}
+
+/* -------------------------------------------------------------- overlay -- */
+
+/* An overlay floats, so it is the one place corners and shadows belong. */
+#palwrap,
+#modalwrap,
+#ctxmenu,
+#suggest,
+#settingswrap,
+#findcard {
+  background: var(--k-overlay);
+  border: var(--k-border-width) solid var(--k-border-strong);
+  border-radius: var(--k-radius-md);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.3);
+  animation: overlayin var(--k-dur-fast) ease;
+}
+
+@keyframes overlayin {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+#palwrap {
+  position: fixed;
+  left: 50%;
+  top: 12vh;
+  transform: translateX(-50%);
+  width: min(620px, 92vw);
+  overflow: hidden;
+  z-index: 60;
+}
+
+#palinput {
+  width: 100%;
+  height: 40px;
+  padding: 0 14px;
+  font-size: 14px;
+  border-bottom: var(--k-border-width) solid var(--k-border);
+}
+
+#palinput:focus {
+  outline: none;
+}
+
+#palist {
+  max-height: 46vh;
+  overflow: auto;
+  padding: 4px 0;
+}
+
+.palrow {
+  height: 26px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  font-size: 12.5px;
+  color: var(--k-text-muted);
+  cursor: pointer;
+}
+
+.palrow:hover,
+.palrow.sel {
+  background: var(--k-selection);
+  color: var(--k-text);
+}
+
+.palrow .where {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--k-text-faint);
+}
+
+#modalwrap {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.4);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  z-index: 70;
+}
+
+#modal {
+  width: min(520px, 92vw);
+  max-height: 80vh;
+  overflow: auto;
+  background: var(--k-overlay);
+  border: var(--k-border-width) solid var(--k-border-strong);
+  border-radius: var(--k-radius-md);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  animation: overlayin var(--k-dur-fast) ease;
+}
+
+#modal header,
+#settingswrap header {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px 0 14px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--k-text-faint);
+  border-bottom: var(--k-border-width) solid var(--k-border);
+}
+
+#settingswrap {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: min(420px, 92vw);
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 55;
+}
+
+#settingsbody {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px 14px 14px;
+}
+
+#modalbody {
+  padding: 14px;
+}
+
+/* The context menu is a list of commands, not a card of chips. */
+#ctxmenu {
+  position: fixed;
+  min-width: 200px;
+  padding: 4px 0;
+  z-index: 80;
+}
+
+.ctxrow {
+  height: 26px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  font-size: 12.5px;
+  color: var(--k-text-muted);
+  cursor: pointer;
+}
+
+.ctxrow:hover {
+  background: var(--k-selection);
+  color: var(--k-text);
+}
+
+.ctxrow .key {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--k-text-faint);
+}
+
+/* The find bar is a strip along the top of the editor, not a floating card. */
+#findcard {
+  position: absolute;
+  right: 18px;
+  top: 8px;
+  width: 340px;
+  padding: 8px;
+  z-index: 40;
+}
+
+.frow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.frow:last-child {
+  margin-bottom: 0;
+}
+
+.frow .kinput {
+  flex: 1;
+  min-width: 0;
+}
+
+.frow .count {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--k-text-faint);
+  min-width: 44px;
+  text-align: right;
+}
+
+#suggest {
+  position: fixed;
+  min-width: 320px;
+  max-height: 40vh;
+  overflow: auto;
+  padding: 4px 0;
+  z-index: 65;
+}
+
+.ktoasts {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 75;
+}
+
+.toast {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--k-text);
+  background: var(--k-overlay);
+  border: var(--k-border-width) solid var(--k-border-strong);
+  border-left: 2px solid var(--k-accent);
+  border-radius: var(--k-radius-sm);
+  animation: overlayin var(--k-dur-med) ease;
+}
+
+.toast.err {
+  border-left-color: var(--k-error);
+}
+
+.toast.ok {
+  border-left-color: var(--k-success);
+}
+
+/* ------------------------------------------------------------ terminals -- */
+
+.term {
+  height: 100%;
+  padding: 6px 10px;
+  font-family: var(--mono);
+  font-size: var(--k-font-size);
+  line-height: var(--k-line-height);
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow: auto;
+  background: var(--k-chrome);
+}
+
+.term b {
+  font-weight: 400;
+}
+
+/* --------------------------------------------------------------- a11y ---- */
+
+/* Motion is decoration. When the reader has asked for none, the window
+ * changes state without animating, and nothing is lost but the movement. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--k-scrollbar);
+  border: 2px solid transparent;
+  background-clip: content-box;
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--k-text-faint);
+  background-clip: content-box;
+}
