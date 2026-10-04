@@ -372,30 +372,6 @@ mod tests {
     }
 
     #[test]
-    fn dump_the_window() {
-        fn walk(node: &LayoutNode, depth: usize, out: &mut String) {
-            out.push_str(&format!(
-                "{:indent$}{} x={:.1} y={:.1} w={:.1} h={:.1}\n",
-                "",
-                node.id,
-                node.rect.x,
-                node.rect.y,
-                node.rect.width,
-                node.rect.height,
-                indent = depth * 2
-            ));
-            for child in &node.children {
-                walk(child, depth + 1, out);
-            }
-        }
-        let mut state = state();
-        let app = layout(&mut state);
-        let mut out = String::new();
-        walk(&app.layout().root, 0, &mut out);
-        panic!("{out}");
-    }
-
-    #[test]
     fn the_window_has_a_bar_a_rail_a_pane_and_a_status() {
         let mut state = state();
         let app = layout(&mut state);
