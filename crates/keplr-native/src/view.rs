@@ -175,6 +175,384 @@ fn cell_style(cell: &Cell, on_cursor: bool, chrome: &Chrome) -> Style {
         })
 }
 
+/// An editor pane: a line number gutter, the text, and a caret block.
+///
+/// The line holding the cursor is drawn as three pieces, before the caret, the
+/// caret itself, and after it, so the block lands where the cursor is rather
+/// than only at the end of the line.
+fn editor(state: &mut State, path: &Path, rows: usize, chrome: &Chrome) -> ViewNode {
+    let Some(document) = state.document(path) else {
+        return empty_pane(
+            "editor",
+            "This file could not be read",
+            "ctrl+alt+e opens another",
+            chrome,
+        );
+    };
+    let lang = LangKind::from_path(path);
+    let cursor_line = document.cursor_line();
+    let selection = document.selection();
+    let total = document.lines();
+    let mut children = Vec::with_capacity(rows);
+    for offset in 0..rows.max(1) {
+        let line = document.top_line() + offset;
+        if line >= total {
+            break;
+        }
+        let on_cursor_line = line == cursor_line;
+        let text = document.line_text(line).to_string();
+        children.push(ViewNode::row_element(
+            format!("edit-row-{line}"),
+            Style::default()
+                .height(LINE)
+                .row_height(LINE)
+                .gap(10.0)
+                .background(if on_cursor_line {
+                    chrome.current_line
+                } else {
+                    // A transparent fill keeps the text rows from showing a
+                    // background only where a token claims one.
+                    Color::rgba(0.0, 0.0, 0.0, 0.0)
+                }),
+            editor_row(
+                &text,
+                lang,
+                document.line_start(line),
+                selection,
+                on_cursor_line,
+                if on_cursor_line {
+                    document.cursor() - document.line_start(line)
+                } else {
+                    usize::MAX
+                },
+                chrome,
+            ),
+        ));
+    }
+    ViewNode::element(
+        "editor",
+        Style::default()
+            .flex_grow(1.0)
+            .clip(true)
+            .padding(Insets::symmetric(0.0, 6.0))
+            .background(chrome.chrome),
+        children,
+    )
+}
+
+/// One editable line, drawn as colour runs with the caret and the selection
+/// laid out as if the selection were text.
+fn editor_row(
+    line: usize,
+    text: &str,
+    lang: LangKind,
+    line_byte: usize,
+    selection: Option<(usize, usize)>,
+    on_cursor_line: bool,
+    caret_col: usize,
+    chrome: &Chrome,
+) -> Vec<ViewNode> {
+    let mut runs = Vec::new();
+    let ws_len = text
+        .bytes()
+        .take_while(|b| *b == b' ' || *b == b'\t')
+        .count();
+    if ws_len > 0 {
+        runs.push(Run {
+            text: String::new(),
+            kind: TokenKind::Other,
+            selected: selection
+                .map(|(start, end)| line_byte < end && line_byte + ws_len > start)
+                .unwrap_or(false),
+            guided: true,
+            guides: guided_indent(&text[..ws_len]),
+            start: line_byte,
+        });
+    }
+    for run in highlight_line(lang, text, line_byte, selection, ws_len) {
+        runs.push(Run {
+            guided: false,
+            ..run
+        });
+    }
+
+    let mut row = Vec::new();
+    // The line number stays its own node, before the runs.
+    row.push(ViewNode::text_node(
+        format!("edit-num-{line}"),
+        (line + 1).to_string(),
+        Style::default()
+            .width(GUTTER - 10.0)
+            .color(if on_cursor_line {
+                chrome.text_muted
+            } else {
+                chrome.text_faint
+            })
+            .font_size(11.5),
+    ));
+    let mut caret_drawn = false;
+    for (index, run) in runs.iter().enumerate() {
+        let style = token_style(run.kind, run.selected, chrome);
+        if run.guided {
+            let guide_style = Style::default()
+                .color(chrome.indent_guide)
+                .font_size(13.0)
+                .row_height(LINE);
+            let guide_style = if run.selected {
+                guide_style.background(chrome.selection)
+            } else {
+                guide_style
+            };
+            // The caret takes precedence over a column in the indent, so the
+            // guide splits around it rather than letting it hide.
+            if on_cursor_line && caret_col < run.guides.chars().count() {
+                let split = caret_col.min(run.guides.len());
+                let (before, after) = run.guides.split_at(split.min(run.guides.len()));
+                row.push(ViewNode::text_node(
+                    format!("edit-indent-{}a", line),
+                    before.to_string(),
+                    guide_style.clone(),
+                ));
+                row.push(ViewNode::text_node(
+                    format!("edit-caret-{}", line),
+                    "\u{2588}".to_string(),
+                    Style::default()
+                        .color(chrome.accent)
+                        .font_size(13.0)
+                        .row_height(LINE),
+                ));
+                row.push(ViewNode::text_node(
+                    format!("edit-indent-{}b", line),
+                    after.to_string(),
+                    guide_style,
+                ));
+                caret_drawn = true;
+                continue;
+            }
+            row.push(ViewNode::text_node(
+                format!("edit-indent-{}", line),
+                run.guides.clone(),
+                guide_style,
+            ));
+            continue;
+        }
+        // A run owns the caret while the caret is strictly inside it; a caret
+        // between two runs belongs to the one it opens, so only one of them
+        // ever splits.
+        let run_start = run.start - line_byte;
+        let run_end = run_start + run.text.len();
+        if on_cursor_line && !caret_drawn && caret_col >= run_start && caret_col < run_end {
+            let split = (caret_col - run_start).min(run.text.len());
+            let (before, after) = run.text.split_at(split);
+            row.push(ViewNode::text_node(
+                format!("edit-run-{}-{}a", line, index),
+                before.to_string(),
+                style.clone(),
+            ));
+            row.push(ViewNode::text_node(
+                format!("edit-caret-{}", line),
+                "\u{2588}".to_string(),
+                Style::default()
+                    .color(chrome.accent)
+                    .font_size(13.0)
+                    .row_height(LINE),
+            ));
+            row.push(ViewNode::text_node(
+                format!("edit-run-{}-{}b", line, index),
+                after.to_string(),
+                style,
+            ));
+            caret_drawn = true;
+            continue;
+        }
+        row.push(ViewNode::text_node(
+            format!("edit-run-{}-{}", line, index),
+            run.text.clone(),
+            style,
+        ));
+    }
+    // A caret at the end of the last token, or on an empty line, owns no run.
+    if on_cursor_line && !caret_drawn {
+        row.push(ViewNode::text_node(
+            format!("edit-caret-{}", line),
+            "\u{2588}".to_string(),
+            Style::default()
+                .color(chrome.accent)
+                .font_size(13.0)
+                .row_height(LINE),
+        ));
+    }
+    row
+}
+
+/// The colour and background for a token, with the selection painted over the
+/// token's own background.
+fn token_style(kind: TokenKind, selected: bool, chrome: &Chrome) -> Style {
+    let color = match kind {
+        TokenKind::Keyword => chrome.syntax_keyword,
+        TokenKind::Str => chrome.syntax_string,
+        TokenKind::Comment => chrome.syntax_comment,
+        TokenKind::Number => chrome.syntax_number,
+        TokenKind::Type => chrome.syntax_type,
+        TokenKind::Function => chrome.syntax_function,
+        TokenKind::Macro => chrome.syntax_macro,
+        TokenKind::Attribute => chrome.syntax_function,
+        TokenKind::Constant => chrome.syntax_constant,
+        TokenKind::Parameter => chrome.syntax_variable,
+        TokenKind::Punctuation => chrome.text_faint,
+        TokenKind::Other => chrome.text,
+    };
+    let style = Style::default()
+        .color(color)
+        .font_size(13.0)
+        .row_height(LINE);
+    if selected {
+        style.background(chrome.selection)
+    } else {
+        style
+    }
+}
+
+/// The leading whitespace as vertical bars at every indent step: `│   │   `
+/// for two groups of four. The bars are the guides, the spaces keep the columns
+/// aligned, and the bars are the only thing the indent colour is drawn over.
+fn guided_indent(whitespace: &str) -> String {
+    let cols: usize = whitespace
+        .chars()
+        .map(|c| if c == '\t' { 4 } else { 1 })
+        .sum();
+    let mut out = String::with_capacity(cols);
+    let mut col = 0;
+    while col < cols {
+        out.push('\u{2502}');
+        out.extend(std::iter::repeat(' ').take(3));
+        col += 4;
+    }
+    out
+}
+
+/// The highlight runs for the text after the guided indent, each split at
+/// selection boundaries so a selection that starts mid-token only covers the
+/// part it owns.
+fn highlight_line(
+    lang: LangKind,
+    text: &str,
+    line_byte: usize,
+    selection: Option<(usize, usize)>,
+    ws_len: usize,
+) -> Vec<Run> {
+    let spans = highlight(lang, text);
+    let sel = selection.unwrap_or((usize::MAX, usize::MAX));
+    let mut runs = Vec::new();
+    let mut current_start: Option<usize> = None;
+    let mut current_kind = TokenKind::Other;
+    let mut current_selected = false;
+
+    // Re-tag every byte with its token kind, falling back to Other.
+    let mut kinds = vec![TokenKind::Other; text.len()];
+    for span in spans {
+        let end = (span.start + span.len).min(text.len());
+        for byte in span.start..end {
+            kinds[byte] = span.kind;
+        }
+    }
+
+    for byte in ws_len..text.len() {
+        let selected = line_byte + byte >= sel.0 && line_byte + byte < sel.1;
+        if current_start.is_some() && kinds[byte] == current_kind && selected == current_selected {
+            continue;
+        }
+        if let Some(start) = current_start.take() {
+            runs.push(Run {
+                text: text[start..byte].to_string(),
+                kind: current_kind,
+                selected: current_selected,
+                guided: false,
+                guides: String::new(),
+                start: line_byte + start,
+            });
+        }
+        current_start = Some(byte);
+        current_kind = kinds[byte];
+        current_selected = selected;
+    }
+    if let Some(start) = current_start {
+        runs.push(Run {
+            text: text[start..].to_string(),
+            kind: current_kind,
+            selected: current_selected,
+            guided: false,
+            guides: String::new(),
+            start: line_byte + start,
+        });
+    }
+    runs
+}
+
+/// The span of text the guide has to paint.
+struct Run {
+    text: String,
+    kind: TokenKind,
+    selected: bool,
+    guided: bool,
+    guides: String,
+    start: usize,
+}
+
+/// A list pane, with an empty state that says what would fill it.
+fn list(id: &str, empty: &str, items: Vec<String>, tone: Color, chrome: &Chrome) -> ViewNode {
+    if items.is_empty() {
+        return empty_pane(id, empty, "waiting for the host", chrome);
+    }
+    ViewNode::element(
+        id,
+        Style::default()
+            .flex_grow(1.0)
+            .clip(true)
+            .padding(Insets::symmetric(12.0, 8.0))
+            .gap(2.0)
+            .row_height(LINE)
+            .background(chrome.chrome),
+        items
+            .into_iter()
+            .enumerate()
+            .map(|(index, item)| {
+                ViewNode::text_node(
+                    format!("{id}-item-{index}"),
+                    item,
+                    Style::default()
+                        .color(tone)
+                        .font_size(12.5)
+                        .row_height(LINE),
+                )
+            })
+            .collect(),
+    )
+}
+
+/// The empty state, which is the point of the pane rather than a gap in it.
+fn empty_pane(id: &str, title: &str, hint: &str, chrome: &Chrome) -> ViewNode {
+    ViewNode::element(
+        id,
+        Style::default()
+            .flex_grow(1.0)
+            .padding(Insets::symmetric(24.0, 24.0))
+            .gap(6.0)
+            .justify(Justify::Center)
+            .background(chrome.chrome),
+        vec![
+            ViewNode::text(
+                title.to_string(),
+                Style::default().color(chrome.text_muted).font_size(13.0),
+            ),
+            ViewNode::text(
+                hint.to_string(),
+                Style::default().color(chrome.text_faint).font_size(11.5),
+            ),
+        ],
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -497,8 +875,8 @@ mod tests {
             top_line: 0,
         });
         let app = layout(&mut state);
-        // The caret sits at column 0, so it owns the split: indent-0a is empty
-        // and indent-0b holds the rest of the guide strip.
+        // The caret splits the guide on the cursor line, so the bar lives just
+        // after it.
         let guides = text_of(&app, "edit-indent-0b");
         assert!(
             guides.contains('\u{2502}'),
