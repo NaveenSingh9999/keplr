@@ -64,9 +64,15 @@ async function openPage(query) {
       return !!wrap && (!!wrap.querySelector(".cm-editor") || (!!fallback && getComputedStyle(fallback).display !== "none"));
     }, { timeout: 30000 });
     await page.waitForTimeout(1800);
-    // Shots must show content, never blank loading states: the file tree is
-    // the gate (it resolves after the cold workspace walk), then panels.
-    await page.waitForFunction(() => document.querySelectorAll("#leftbody .trow").length > 0, { timeout: 45000 });
+    // Shots must show content, never blank loading states: the sidebar is the
+    // gate (it resolves after the cold workspace walk), then panels. The
+    // source view renders filerows instead of tree rows, so gate on that.
+    const params = new URLSearchParams(query);
+    if (params.get("left") === "source") {
+      await page.waitForSelector("#scm .sechead", { timeout: 45000 });
+    } else {
+      await page.waitForFunction(() => document.querySelectorAll("#leftbody .trow").length > 0, { timeout: 45000 });
+    }
     await page.waitForSelector("#termstrip .tab", { timeout: 20000 }).catch(() => {});
     await page.waitForSelector("#scm .sechead", { timeout: 20000 }).catch(() => {});
     await page.waitForTimeout(1500);

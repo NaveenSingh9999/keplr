@@ -5541,11 +5541,14 @@ function loadFiles() {
   const done = get("/files?query=" + encodeURIComponent(q) + "&limit=5000")
     .then(list => {
       S.files = (list || []).map(f => f.path);
+      document.getElementById("sfiles").textContent = "files: " + S.files.length;
+      // A refresh must not yank the sidebar out of the SCM or search view;
+      // the project tree renders when its tab is showing.
+      if (S.leftTab !== "project") { setDot(true); return; }
       const box = document.getElementById("leftbody");
       box.innerHTML = "";
       renderTree(box, buildTree(S.files), 0, "");
       REVEAL = null;
-      document.getElementById("sfiles").textContent = "files: " + S.files.length;
       setDot(true);
     })
     .catch(e => { setDot(false); msg(String(e), true); });
