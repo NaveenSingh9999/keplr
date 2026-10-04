@@ -227,6 +227,7 @@ fn editor(state: &mut State, path: &Path, rows: usize, chrome: &Chrome) -> ViewN
                     Color::rgba(0.0, 0.0, 0.0, 0.0)
                 }),
             editor_row(
+                line,
                 &text,
                 lang,
                 document.line_start(line),
