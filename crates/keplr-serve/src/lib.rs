@@ -1849,7 +1849,7 @@ mod tests {
             attempts: Arc::new(Mutex::new(HashMap::new())),
             daemons: Arc::new(Mutex::new(HashMap::new())),
             sync_docs: Arc::new(Mutex::new(HashMap::new())),
-            sync_tx: Arc::new(Mutex::new(tokio::sync::broadcast::channel(16).0)),
+            sync_tx: Arc::new(Mutex::new(HashMap::new())),
             sync_peers: Arc::new(Mutex::new(HashMap::new())),
         }
     }
