@@ -73,8 +73,8 @@ async function openPage(query) {
     } else {
       await page.waitForFunction(() => document.querySelectorAll("#leftbody .trow").length > 0, { timeout: 45000 });
     }
-    await page.waitForSelector("#termstrip .tab", { timeout: 20000 }).catch(() => {});
-    await page.waitForSelector("#scm .sechead", { timeout: 20000 }).catch(() => {});
+    await page.waitForSelector("#termstrip .tab", { timeout: 6000 }).catch(() => {});
+    await page.waitForSelector("#scm .sechead", { timeout: 6000 }).catch(() => {});
     await page.waitForTimeout(1500);
   } catch (error) {
     const state = await page.evaluate(() => ({
