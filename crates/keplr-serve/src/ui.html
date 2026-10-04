@@ -297,6 +297,16 @@ select {
   }
 }
 
+@keyframes empty-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 /* ------------------------------------------------------------- titlebar -- */
 
 #titlebar {
@@ -306,7 +316,7 @@ select {
   align-items: center;
   gap: 6px;
   padding: 0 10px;
-  background: color-mix(in srgb, var(--k-surface) 72%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--k-raised) 42%, transparent), color-mix(in srgb, var(--k-surface) 72%, transparent));
   -webkit-backdrop-filter: blur(22px) saturate(1.5);
   backdrop-filter: blur(22px) saturate(1.5);
   border-bottom: var(--k-border-width) solid var(--k-border);
@@ -738,6 +748,7 @@ select {
 
 .railitem.sel {
   color: var(--k-accent);
+  background: color-mix(in srgb, var(--k-accent) 10%, transparent);
 }
 
 .railitem.sel::before {
@@ -766,7 +777,7 @@ select {
   flex-direction: column;
   min-height: 0;
   min-width: 0;
-  background: color-mix(in srgb, var(--k-surface) 78%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--k-raised) 38%, transparent), color-mix(in srgb, var(--k-surface) 78%, transparent) 130px);
   -webkit-backdrop-filter: blur(22px) saturate(1.5);
   backdrop-filter: blur(22px) saturate(1.5);
   border-right: var(--k-border-width) solid var(--k-border);
@@ -1048,7 +1059,7 @@ select {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: var(--k-chrome);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--k-raised) 45%, transparent), var(--k-chrome) 150px);
 }
 
 #tabsbar,
@@ -1095,7 +1106,10 @@ select {
 
 .tab.sel {
   color: var(--k-text);
-  background: var(--k-chrome);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--k-accent) 9%, transparent), transparent 65%),
+    var(--k-chrome);
+  box-shadow: inset 0 2px 0 var(--k-accent);
 }
 
 .tab .dot {
@@ -1213,7 +1227,9 @@ select {
   min-height: 0;
   position: relative;
   overflow: hidden;
-  background: var(--k-chrome);
+  background:
+    radial-gradient(1200px 260px at 50% -90px, color-mix(in srgb, var(--k-accent) 6%, transparent), transparent 70%),
+    var(--k-chrome);
 }
 
 #previewwrap,
@@ -1249,7 +1265,7 @@ select {
 
 .cm-editor {
   height: 100%;
-  background: var(--k-chrome);
+  background: transparent;
   color: var(--k-text);
   font-family: var(--mono);
   font-size: var(--k-font-size);
@@ -1270,7 +1286,7 @@ select {
 }
 
 .cm-gutters {
-  background: var(--k-chrome);
+  background: transparent;
   color: var(--k-text-faint);
   border-right: var(--k-border-width) solid var(--k-border);
 }
@@ -1567,7 +1583,7 @@ select {
 
 .kbtn.primary,
 .kbtn-acc {
-  background: var(--k-accent);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 55%), var(--k-accent);
   color: var(--k-on-accent);
   font-weight: 600;
   box-shadow: 0 1px 8px color-mix(in srgb, var(--k-accent) 35%, transparent),
@@ -3011,6 +3027,44 @@ input[type="number"].kinput {
   justify-content: flex-start;
   font-family: var(--mono);
   font-size: 12px;
+}
+
+/* ---------------------------------------------------------- empty states -- */
+
+/* No blank voids: every empty surface says what it is. Pure CSS, so even a
+ * panel that never gets data still reads as intentional. */
+#leftbody:empty::after,
+#bbody:empty::after,
+#symbols:empty::after,
+#searchhits:empty::after,
+.tree-window:empty::after {
+  display: block;
+  padding: 16px;
+  font-size: 12px;
+  color: var(--k-text-faint);
+  animation: band-fade var(--k-dur-normal) var(--k-ease) both;
+}
+
+#leftbody:empty::after {
+  content: "Loading files…";
+  animation: empty-pulse 1.6s var(--k-ease) infinite;
+}
+
+#bbody:empty::after {
+  content: "Nothing here yet — pick a panel tab above.";
+}
+
+#symbols:empty::after {
+  content: "No symbols — open a file.";
+}
+
+#searchhits:empty::after {
+  content: "Type above to search the workspace.";
+}
+
+.tree-window:empty::after {
+  padding: 10px 14px;
+  content: "No matches.";
 }
 
 /* ---------------------------------------------------------------- tooltip -- */
@@ -8495,6 +8549,16 @@ function focusGroup(i) {
   wireFind();
   initSplitters();
   health();
+  // Deep-link dock tabs apply before the (cold, slow) file walk, so a linked
+  // panel is already up while files stream in. ?open= stays after the walk so
+  // the tree can reveal the file.
+  try {
+    const q0 = new URLSearchParams(location.search);
+    const left0 = q0.get("left");
+    if (left0 === "project" || left0 === "source") setLeftTab(left0);
+    const bottom0 = q0.get("bottom");
+    if (bottom0) setBottomTab(bottom0);
+  } catch (e) {}
   await loadFiles();
   renderProblems();
   renderTabs();
@@ -8506,13 +8570,10 @@ function focusGroup(i) {
       setTimeout(() => toast("Welcome — Ctrl+P finds files, the gear tunes keplr"), 800);
     }
   } catch (e) {}
-  // Deep links for sharing/screenshots: ?open=path&line=12&bottom=terminal&left=source
+  // Deep links for sharing/screenshots: ?open=path&line=12 (?left= and ?bottom=
+  // were already applied before the file walk so linked panels open instantly)
   try {
     const q = new URLSearchParams(location.search);
-    const left = q.get("left");
-    if (left === "project" || left === "source") setLeftTab(left);
-    const bottom = q.get("bottom");
-    if (bottom) setBottomTab(bottom);
     const open = q.get("open");
     if (open) {
       const line = parseInt(q.get("line") || "0", 10) || 0;
