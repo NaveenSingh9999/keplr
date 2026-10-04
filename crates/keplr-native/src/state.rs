@@ -85,6 +85,17 @@ impl SidebarView {
     }
 }
 
+/// Which edge a drag has grabbed, if any.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Drag {
+    Sidebar,
+    Panel,
+}
+
+/// How close to an edge a press has to land to grab it, in logical pixels.
+/// Wide enough to hit with a finger, which is what a laptop trackpad is not.
+const EDGE: f32 = 6.0;
+
 /// The state behind one window.
 pub struct State {
     /// Which panes are open and which one is showing.
@@ -98,6 +109,10 @@ pub struct State {
     /// How wide the sidebar is, and how tall the panel is open.
     sidebar_width: f32,
     panel_height: f32,
+    /// The window's own size, so a drag can be turned back into a size.
+    window: (f32, f32),
+    /// What the pointer grabbed, while a drag is in progress.
+    drag: Option<Drag>,
     panel_open: bool,
     /// Live shells, keyed by session so a pane switch keeps the process.
     terminals: HashMap<String, Terminal>,
@@ -151,6 +166,8 @@ impl State {
             sidebar_width: crate::shell::SIDEBAR_DEFAULT,
             panel_height: crate::shell::PANEL_DEFAULT,
             panel_open: false,
+            window: (0.0, 0.0),
+            drag: None,
             terminals: HashMap::new(),
             documents: HashMap::new(),
             diagnostics: Vec::new(),
@@ -196,6 +213,22 @@ impl State {
     /// Drags the sidebar's edge, clamped to its bounds.
     pub fn set_sidebar_width(&mut self, width: f32) {
         self.sidebar_width = width.clamp(crate::shell::SIDEBAR_MIN, crate::shell::SIDEBAR_MAX);
+    }
+
+    /// The window's own size, kept so a drag can be turned back into a size.
+    pub fn window(&self) -> (f32, f32) {
+        self.window
+    }
+
+    /// Records a new window size.
+    pub fn set_window(&mut self, width: f32, height: f32) {
+        self.window = (width, height);
+    }
+
+    /// Where the panel's top edge is, which is what the panel drags by.
+    fn panel_top(&self) -> f32 {
+        let bars = crate::shell::TITLE_BAR_H + crate::shell::STATUS_BAR_H;
+        self.window.1 - bars - self.panel_height()
     }
 
     /// How tall the panel is open.
@@ -369,11 +402,78 @@ impl State {
                 self.client.cycle(!modifiers.shift);
                 return true;
             }
+            if character(key) == Some('j') {
+                self.panel_open = !self.panel_open;
+                return true;
+            }
             if character(key) == Some('w') {
                 let index = self.client.active_index();
                 self.client.close(index);
                 return true;
             }
+            // The rail has four views and they are numbered, so ctrl+1 through
+            // ctrl+4 go straight to one.
+            if let Some(digit) = character(key).and_then(|c| c.to_digit(10)) {
+                if let Some(view) = crate::shell::ACTIVITY_VIEWS.get(digit as usize - 1) {
+                    self.set_sidebar_view(*view);
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// A pointer event, routed by what is under it.
+    ///
+    /// `node` is the id of the deepest node under the pointer, so the shell's
+    /// own names are the whole hit table: an activity glyph, a tab, a sidebar
+    /// row, or one of the two drag edges.
+    pub fn pointer(&mut self, event: &InputEvent, node: Option<&str>) -> bool {
+        match event {
+            InputEvent::PointerDown { x, y, .. } => self.pointer_down(*x, *y, node),
+            InputEvent::PointerMove { x, y, .. } => match self.drag {
+                Some(Drag::Sidebar) => {
+                    self.set_sidebar_width(*x);
+                    true
+                }
+                Some(Drag::Panel) => {
+                    self.set_panel_height(self.window.1 - *y);
+                    true
+                }
+                None => false,
+            },
+            InputEvent::PointerUp { .. } => {
+                self.drag = None;
+                false
+            }
+            _ => false,
+        }
+    }
+
+    /// What the first press of a drag grabbed.
+    fn pointer_down(&mut self, x: f32, y: f32, node: Option<&str>) -> bool {
+        if let Some(id) = node {
+            if let Some(view) = crate::shell::ACTIVITY_VIEWS
+                .iter()
+                .find(|view| id.ends_with(view.slug()))
+            {
+                self.set_sidebar_view(*view);
+                return true;
+            }
+            if let Some(index) = id.strip_prefix("tab-label-").and_then(|n| n.parse().ok()) {
+                self.client.focus(index);
+                return true;
+            }
+        }
+        // The edges are grab bands rather than drawn handles: a window should not
+        // show a grabber to explain that it can be dragged.
+        if (x - self.sidebar_width()).abs() <= EDGE {
+            self.drag = Some(Drag::Sidebar);
+            return true;
+        }
+        if self.panel_open && (y - self.panel_top()).abs() <= EDGE {
+            self.drag = Some(Drag::Panel);
+            return true;
         }
         false
     }

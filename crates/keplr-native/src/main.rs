@@ -58,7 +58,7 @@ fn main() -> Result<()> {
 
     let handler = Rc::clone(&state);
     let window = DesktopApp::new("Keplr", RcusApp::new(root_view, rcus::fonts::MONO)).on_input(
-        move |event, root, _layout| {
+        move |event, root, layout| {
             let mut state = handler.borrow_mut();
             let changed = match event {
                 // A shell wrote output, or the host published to a room this
@@ -69,6 +69,18 @@ fn main() -> Result<()> {
                     true
                 }
                 InputEvent::KeyDown { .. } => state.key(&event),
+                // The shell names every part of the window, so the id under the
+                // pointer is the whole hit table.
+                InputEvent::PointerDown { x, y, .. }
+                | InputEvent::PointerMove { x, y, .. }
+                | InputEvent::PointerUp { x, y, .. } => {
+                    state.set_window(
+                        layout.map(|tree| tree.viewport.width).unwrap_or(0.0),
+                        layout.map(|tree| tree.viewport.height).unwrap_or(0.0),
+                    );
+                    let hit = layout.and_then(|tree| tree.hit_test(*x, *y));
+                    state.pointer(&event, hit.map(|node| node.id.as_str()))
+                }
                 _ => false,
             };
             if changed {

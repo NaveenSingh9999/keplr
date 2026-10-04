@@ -20,11 +20,8 @@ pub const FALLBACK_ROWS: usize = 28;
 /// Height of one line of content, in logical pixels.
 const LINE: f32 = 18.0;
 /// Height of the tab bar.
-const TAB_BAR: f32 = crate::shell::TAB_STRIP_H;
 /// Height of the status bar.
-const STATUS_BAR: f32 = crate::shell::STATUS_BAR_H;
 /// Width of the left rail.
-const RAIL: f32 = crate::shell::ACTIVITY_BAR_W;
 /// Width of the editor's line number gutter, including its right gap.
 const GUTTER: f32 = 52.0;
 
@@ -331,6 +328,9 @@ fn empty_pane(id: &str, title: &str, hint: &str, chrome: &Chrome) -> ViewNode {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::shell::{
+        ACTIVITY_BAR_W as RAIL, STATUS_BAR_H as STATUS_BAR, TAB_STRIP_H as TAB_BAR,
+    };
     use crate::state::State;
     use crate::theme::Chrome;
     use keplr_term::{Cursor, Snapshot, TerminalGrid};
