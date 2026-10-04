@@ -58,7 +58,7 @@ function currentRoot() {
   return split(
     "split-root",
     "vertical",
-    0.70,
+    0.78,
     split(
       "split-top",
       "horizontal",
